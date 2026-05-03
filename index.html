@@ -1,0 +1,400 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Snoolink Lens</title>
+    <link rel="icon" type="image/x-icon" href="./assets/app-icon.ico" />
+    <link rel="stylesheet" href="./styles.css" />
+    <link rel="stylesheet" href="./settings-ui.css" />
+  </head>
+  <body>
+    <div id="app">
+      <div id="app-background">
+        <div id="app-background-overlay"></div>
+      </div>
+
+      <div id="layout">
+        <aside id="settings-sidebar">
+          <div id="settingsSidebarMount"></div>
+        </aside>
+        <button id="sidebarMidToggleBtn" type="button" aria-label="Collapse sidebar" title="Collapse sidebar"></button>
+
+        <main id="main-content">
+          <header id="main-toolbar">
+            <button id="openSidebarBtn" type="button">Settings</button>
+            <button id="addSelectedToAlbumBtn" type="button" class="hidden">Add Selected To Album</button>
+            <button id="removeSelectedFromAlbumBtn" type="button" class="hidden">Remove Selected</button>
+            <button id="backToHomeBtn" class="hidden" type="button" title="Back to home" aria-label="Back to home">
+              <span class="back-icon" aria-hidden="true">&#x2190;</span>
+              <span class="back-label">Home</span>
+            </button>
+          </header>
+
+          <section id="home-screen">
+            <div id="search-bar-aligner">
+              <div id="search-bar-wrapper">
+                <div id="search-bar">
+                  <svg id="search-bar-logo" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <circle cx="11" cy="11" r="8"/>
+                    <line x1="21" y1="21" x2="16.65" y2="16.65"/>
+                  </svg>
+                  <input id="query" type="text" placeholder="Search your images..." autocomplete="off" />
+                  <button id="searchBtn" type="button">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                      <line x1="5" y1="12" x2="19" y2="12"/>
+                      <polyline points="12 5 19 12 12 19"/>
+                    </svg>
+                  </button>
+                </div>
+
+                <div id="filters-toolbar">
+                  <button id="toggleFiltersBtn" type="button" aria-expanded="false" aria-controls="filters-shell">
+                    Show all filters
+                  </button>
+                  <button id="clearAllFiltersBtn" type="button" aria-label="Clear all filters" title="Clear all filters">Clear</button>
+                </div>
+
+                <div id="filters-shell" class="collapsed" aria-hidden="true">
+                  <div id="filters">
+                    <div class="filter-group">
+                      <label for="topK">Top K</label>
+                      <input id="topK" type="number" min="1" max="200" value="20" />
+                    </div>
+                    <div class="filter-group">
+                      <label for="containsPeople">People</label>
+                      <select id="containsPeople">
+                        <option value="any">Any</option>
+                        <option value="yes">Yes</option>
+                        <option value="no">No</option>
+                      </select>
+                    </div>
+                    <div class="filter-group">
+                      <label for="containsText">Text</label>
+                      <select id="containsText">
+                        <option value="any">Any</option>
+                        <option value="yes">Yes</option>
+                        <option value="no">No</option>
+                      </select>
+                    </div>
+                    <div class="filter-group">
+                      <label for="ocrTextQuery">OCR Text Contains</label>
+                      <input
+                        id="ocrTextQuery"
+                        type="text"
+                        placeholder="e.g. Ben Overlook"
+                        autocomplete="off"
+                      />
+                    </div>
+                    <div class="filter-group">
+                      <label for="mediaType">Media Type</label>
+                      <select id="mediaType">
+                        <option value="any">Any</option>
+                        <option value="image">Image</option>
+                        <option value="video">Video</option>
+                      </select>
+                    </div>
+                    <div class="filter-group">
+                      <label for="albumFilter">Album</label>
+                      <select id="albumFilter">
+                        <option value="any">Any</option>
+                      </select>
+                    </div>
+                    <div id="dynamicFilters"></div>
+                  </div>
+                </div>
+
+                <div id="search-bar-sass">
+                  <p id="status">Ready &mdash; choose a metadata file or start searching.</p>
+                  <p id="counts"></p>
+                </div>
+              </div>
+            </div>
+
+            <div id="search-results-wrapper">
+              <div id="albumViewMeta" class="album-view-meta hidden">
+                <div>
+                  <p id="activeAlbumName">Album</p>
+                  <p id="activeAlbumCount">0 images</p>
+                </div>
+                <div class="album-meta-actions">
+                  <button id="renameAlbumBtn" type="button">Rename</button>
+                  <button id="deleteAlbumBtn" type="button">Delete</button>
+                </div>
+              </div>
+              <div id="results"></div>
+            </div>
+          </section>
+          <section id="settings-screen" class="hidden">
+            <div class="settings-card">
+              <div class="settings-header">
+                <h2>App settings</h2>
+                <p>Manage visible filters and saved runtime configuration.</p>
+              </div>
+
+              <div class="settings-grid">
+                <div class="settings-block">
+                  <h3>Visible filters</h3>
+                  <div class="settings-chk-list" id="userFilterPicker"></div>
+                  <div class="settings-field">
+                    <label for="settingsMinMatchScore">Min. match score</label>
+                    <input id="settingsMinMatchScore" type="number" min="0" max="1" step="0.001" value="0.001" />
+                  </div>
+                </div>
+
+                <div class="settings-block">
+                  <h3>User</h3>
+                  <div class="settings-field">
+                    <label for="settingsUserName">User name</label>
+                    <input id="settingsUserName" type="text" placeholder="Enter user name" />
+                  </div>
+                  <div class="settings-field">
+                    <label for="settingsUserPassword">Password</label>
+                    <input id="settingsUserPassword" type="password" placeholder="Enter password" />
+                  </div>
+                </div>
+
+                <div class="settings-block">
+                  <h3>Cloud runtime</h3>
+                  <div class="settings-field">
+                    <label for="settingsAwsRegion">AWS region</label>
+                    <input id="settingsAwsRegion" type="text" placeholder="us-east-1" />
+                  </div>
+                  <div class="settings-field">
+                    <label for="settingsAwsKey">Access key</label>
+                    <input id="settingsAwsKey" type="password" placeholder="AWS access key" />
+                  </div>
+                  <div class="settings-field">
+                    <label for="settingsAwsSecret">Secret key</label>
+                    <input id="settingsAwsSecret" type="password" placeholder="AWS secret key" />
+                  </div>
+                  <div class="settings-field">
+                    <label for="settingsBedrockModel">Bedrock vision model</label>
+                    <input id="settingsBedrockModel" type="text" placeholder="qwen.qwen3-vl-235b-a22b" />
+                  </div>
+                </div>
+
+                <div class="settings-block">
+                  <h3>Experience</h3>
+                  <div class="settings-field">
+                    <label for="settingsUiTheme">Theme mood</label>
+                    <select id="settingsUiTheme">
+                      <option value="aurora">Aurora (default)</option>
+                      <option value="ocean">Ocean</option>
+                      <option value="ember">Ember</option>
+                    </select>
+                  </div>
+                  <div class="settings-field">
+                    <label for="settingsResultsDensity">Gallery density</label>
+                    <select id="settingsResultsDensity">
+                      <option value="compact">Compact</option>
+                      <option value="comfortable">Comfortable</option>
+                      <option value="cinematic">Cinematic</option>
+                    </select>
+                  </div>
+                  <div class="settings-field settings-field-checkbox">
+                    <label>
+                      <input id="settingsAutoExpandFilters" type="checkbox" />
+                      Auto-expand filters on Home
+                    </label>
+                  </div>
+                  <div class="settings-field settings-field-checkbox">
+                    <label>
+                      <input id="settingsAutoCloseSidebarOnSettingsNav" type="checkbox" />
+                      Auto-close sidebar after opening Settings page
+                    </label>
+                  </div>
+                </div>
+
+                <div class="settings-block">
+                  <h3>Local Face Indexing</h3>
+                  <div class="settings-field settings-field-checkbox">
+                    <label>
+                      <input id="settingsEnableFaceIndexing" type="checkbox" />
+                      Enable local face indexing during local indexing
+                    </label>
+                  </div>
+                  <div class="settings-field">
+                    <label for="settingsFaceModelVersion">Face model version</label>
+                    <input id="settingsFaceModelVersion" type="text" placeholder="face-api-ssd-v1" />
+                    <small class="settings-help-text">Use face-api-ssd-v1 for higher accuracy, face-api-tiny-v1 for speed.</small>
+                  </div>
+                  <div class="settings-field">
+                    <label for="settingsFaceMinConfidence">Min detection confidence</label>
+                    <input id="settingsFaceMinConfidence" type="number" min="0" max="1" step="0.01" value="0.6" />
+                  </div>
+                  <div class="settings-field">
+                    <label for="settingsFaceMinQuality">Min face quality score</label>
+                    <input id="settingsFaceMinQuality" type="number" min="0" max="1" step="0.01" value="0.45" />
+                  </div>
+                  <div class="settings-field">
+                    <label for="settingsFaceClusterDistanceThreshold">Cluster distance threshold</label>
+                    <input id="settingsFaceClusterDistanceThreshold" type="number" min="0.05" max="1" step="0.01" value="0.2" />
+                  </div>
+                  <div class="settings-field">
+                    <label for="settingsFaceClusterSelect">Detected people (cluster)</label>
+                    <select id="settingsFaceClusterSelect">
+                      <option value="">No face clusters yet</option>
+                    </select>
+                  </div>
+                  <div class="settings-field">
+                    <label for="settingsFaceClusterLabel">Person label</label>
+                    <input id="settingsFaceClusterLabel" type="text" placeholder="e.g. john, client-a" />
+                  </div>
+                  <div class="settings-field settings-inline-actions">
+                    <button class="settings-btn" id="settingsSaveFaceClusterLabelBtn" type="button">Save person label</button>
+                    <button class="settings-btn" id="settingsRebuildFaceClustersBtn" type="button">Rebuild clusters</button>
+                  </div>
+                  <div class="settings-field">
+                    <small id="settingsFaceClusterStatus" class="settings-help-text"></small>
+                  </div>
+                </div>
+              </div>
+
+              <div class="settings-actions">
+                <button class="settings-btn settings-btn--primary" id="saveUserSettingsBtn" type="button">
+                  <svg width="14" height="14" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M13 2H4L2 4v9a1 1 0 001 1h10a1 1 0 001-1V3a1 1 0 00-1-1z" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"/>
+                    <path d="M5 2v4h6V2M5 9h6" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/>
+                  </svg>
+                  Save settings
+                </button>
+                <button class="settings-btn" id="reloadUserSettingsBtn" type="button">
+                  <svg width="14" height="14" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M2.5 8a5.5 5.5 0 1 0 1.1-3.3" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/>
+                    <path d="M2.5 4.5V8H6" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/>
+                  </svg>
+                  Reload
+                </button>
+              </div>
+            </div>
+          </section>
+          <section id="faces-screen" class="hidden">
+            <div id="facesUiMount"></div>
+          </section>
+          <!-- <section id="settings-screen" class="hidden">
+            <div class="settings-screen-card">
+              <h2>App Settings</h2>
+              <p class="control-help">Manage visible filters and saved runtime configuration.</p>
+
+              <div class="settings-screen-grid">
+                <div class="settings-screen-block">
+                  <h3>Visible Filters</h3>
+                  <div id="userFilterPicker" class="settings-checkbox-list"></div>
+                  <div class="control-group">
+                    <label for="settingsMinMatchScore">Minimum Search Match Score</label>
+                    <input id="settingsMinMatchScore" type="number" min="0" max="1" step="0.001" value="0.001" />
+                  </div>
+                </div>
+
+                <div class="settings-screen-block">
+                  <h3>User</h3>
+                  <div class="control-group">
+                    <label for="settingsUserName">User Name</label>
+                    <input id="settingsUserName" type="text" placeholder="enter user name" />
+                  </div>
+                  <div class="control-group">
+                    <label for="settingsUserPassword">User Password</label>
+                    <input id="settingsUserPassword" type="password" placeholder="enter password" />
+                  </div>
+                </div>
+
+                <div class="settings-screen-block">
+                  <h3>Cloud Runtime</h3>
+                  <div class="control-group">
+                    <label for="settingsAwsRegion">AWS Region</label>
+                    <input id="settingsAwsRegion" type="text" placeholder="us-east-1" />
+                  </div>
+                  <div class="control-group">
+                    <label for="settingsAwsKey">AWS Access Key</label>
+                    <input id="settingsAwsKey" type="password" placeholder="AWS access key" />
+                  </div>
+                  <div class="control-group">
+                    <label for="settingsAwsSecret">AWS Secret Key</label>
+                    <input id="settingsAwsSecret" type="password" placeholder="AWS secret key" />
+                  </div>
+                  <div class="control-group">
+                    <label for="settingsBedrockModel">Bedrock Vision Model</label>
+                    <input id="settingsBedrockModel" type="text" placeholder="qwen.qwen3-vl-235b-a22b" />
+                  </div>
+                </div>
+              </div>
+
+              <div class="control-actions">
+                <button id="saveUserSettingsBtn" type="button" title="Save Settings" aria-label="Save Settings">&#128190;</button>
+                <button id="reloadUserSettingsBtn" type="button" title="Reload Settings" aria-label="Reload Settings">&#8635;</button>
+              </div>
+            </div>
+          </section> -->
+        </div>
+      </div>
+    </div>
+
+    <template id="resultCardTemplate">
+      <article class="search-result">
+        <img class="search-result-background" alt="result image" />
+        <video class="search-result-video hidden" muted loop playsinline preload="metadata"></video>
+        <div class="search-result-info-wrapper">
+          <div class="search-result-info">
+            <h3 class="title"></h3>
+            <span class="score"></span>
+            <p class="desc"></p>
+            <p class="tags"></p>
+            <p class="objects"></p>
+            <p class="path"></p>
+          </div>
+        </div>
+      </article>
+    </template>
+
+    <script type="module">
+      const sidebarMount = document.getElementById("settingsSidebarMount");
+      const facesMount = document.getElementById("facesUiMount");
+
+      async function loadPartialHtml(fileName) {
+        let fetchError = null;
+        try {
+          const response = await fetch(`./${fileName}`, { cache: "no-store" });
+          if (!response.ok) {
+            throw new Error(`Failed to load ${fileName} (${response.status})`);
+          }
+          return await response.text();
+        } catch (error) {
+          fetchError = error;
+        }
+
+        if (window.desktopAPI?.getUiPartial) {
+          const fallback = await window.desktopAPI.getUiPartial({ name: fileName });
+          if (fallback?.ok && typeof fallback.text === "string") {
+            return fallback.text;
+          }
+          const fallbackMessage = String(fallback?.message || "unknown error");
+          throw new Error(`Failed to load ${fileName}: fetch failed (${String(fetchError?.message || fetchError)}), IPC fallback failed (${fallbackMessage})`);
+        }
+
+        throw new Error(`Failed to load ${fileName}: ${String(fetchError?.message || fetchError)}`);
+      }
+
+      try {
+        sidebarMount.innerHTML = await loadPartialHtml("settings-ui.html");
+
+        if (facesMount) {
+          try {
+            facesMount.innerHTML = await loadPartialHtml("faces-ui.html");
+          } catch (facesError) {
+            facesMount.innerHTML = "<p style=\"padding:12px;color:#fca5a5;\">Failed to load Faces workspace UI.</p>";
+            console.error("Faces UI load error:", facesError);
+          }
+        }
+      } catch (error) {
+        sidebarMount.innerHTML = `<p style="padding:12px;color:#fca5a5;">Failed to load settings UI: ${String(error?.message || error)}</p>`;
+        if (facesMount) {
+          facesMount.innerHTML = "<p style=\"padding:12px;color:#fca5a5;\">Failed to load faces UI.</p>";
+        }
+        throw error;
+      }
+
+      await import("./renderer.js");
+    </script>
+  </body>
+</html>

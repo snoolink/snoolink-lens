@@ -1,0 +1,4 @@
+# Legacy file: Python InsightFace backend is no longer used in Phase A.
+# Local face indexing now runs via Node/Electron face-api.js backend.
+#
+# Kept for reference only; no required packages here.

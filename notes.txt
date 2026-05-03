@@ -1,0 +1,8 @@
+Currently the scan logic also scans the inwdows or mac operating system icons and lgogo and other software realted pics that should ideally be ignored or not processed. Will have to fic that later.
+
+skipping the beatufication of the sidebar right now. work on it later.
+
+currently the tagging feature is not working in the image preview that will be fixed later
+
+the album flows needs to be perfected and then later completed.
+
