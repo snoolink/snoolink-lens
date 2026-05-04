@@ -584,10 +584,16 @@ select[multiple] option:checked {
 /* ── Main Area ───────────────────────────────── */
 
 #main-content {
-  margin-left: 0;
+  flex: 1;
+  margin-left: clamp(280px, 28vw, 340px);
   min-height: 100vh;
   padding: 12px;
+  transition: margin-left 240ms ease;
   width: 100%;
+}
+
+#settings-sidebar.collapsed ~ #main-content {
+  margin-left: 78px;
 }
 
 #main-toolbar {
