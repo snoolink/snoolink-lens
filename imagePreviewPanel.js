@@ -292,10 +292,16 @@ export function createImagePreviewPanel(options = {}) {
             </div>
             <div class="image-preview-it-sep"></div>
             <button class="image-preview-it-btn" data-action="rotate-left" title="Rotate left" type="button">
-              <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2 8a6 6 0 106-6"/><path d="M2 4v4h4"/></svg>
+              <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
+               <path d="M3.5 9a4.5 4.5 0 1 0 4.5-4.5"/>
+               <polyline points="1.5 2 3.5 6.5 8 5"/>
+              </svg>
             </button>
-            <button class="image-preview-it-btn" data-action="rotate-right" title="Rotate right" type="button">
-              <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M14 8a6 6 0 10-6-6"/><path d="M14 4v4h-4"/></svg>
+            <button class="image-preview-it-btn" data-action="rotate-left" title="Rotate left" type="button">
+             <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
+               <path d="M3.5 9a4.5 4.5 0 1 0 4.5-4.5"/>
+               <polyline points="1.5 2 3.5 6.5 8 5"/>
+              </svg>
             </button>
             <button class="image-preview-it-btn" data-action="flip-h" title="Flip horizontal" type="button">
               <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M8 2v12M4 5l-3 3 3 3M12 5l3 3-3 3"/></svg>
