@@ -292,15 +292,15 @@ export function createImagePreviewPanel(options = {}) {
             </div>
             <div class="image-preview-it-sep"></div>
             <button class="image-preview-it-btn" data-action="rotate-left" title="Rotate left" type="button">
-              <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
-               <path d="M3.5 9a4.5 4.5 0 1 0 4.5-4.5"/>
-               <polyline points="1.5 2 3.5 6.5 8 5"/>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                 <polyline points="1 4 1 10 7 10"></polyline>
+                 <path d="M3.51 15a9 9 0 1 0 .49-3"></path>
               </svg>
             </button>
-            <button class="image-preview-it-btn" data-action="rotate-left" title="Rotate left" type="button">
-             <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
-               <path d="M3.5 9a4.5 4.5 0 1 0 4.5-4.5"/>
-               <polyline points="1.5 2 3.5 6.5 8 5"/>
+            <button class="image-preview-it-btn" data-action="rotate-right" title="Rotate right" type="button">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="23 4 23 10 17 10"></polyline>
+                <path d="M20.49 15a9 9 0 1 1-.49-3"></path>
               </svg>
             </button>
             <button class="image-preview-it-btn" data-action="flip-h" title="Flip horizontal" type="button">
