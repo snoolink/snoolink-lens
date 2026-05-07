@@ -356,6 +356,40 @@ Example:
 - Selected Object Tag: Sunglasses, Hat
 - Row passes if it has Sunglasses OR Hat (not required to have both)
 
+## Available Filters
+
+| Name                | Description                                 | Indexing Type | Best Used For (Use Cases)                                  |
+|---------------------|---------------------------------------------|--------------|------------------------------------------------------------|
+| People              | Filter images/videos containing people       | Local        | Finding photos with faces, portraits, group shots           |
+| Text                | Filter items containing detected text        | Local/Cloud  | Finding screenshots, documents, slides, memes               |
+| OCR Text Contains   | Search for specific text in images/videos    | Cloud        | Locating receipts, signs, documents by visible text         |
+| Media Type          | Filter by image or video                     | Local        | Separating photos from videos, focusing on one media type   |
+| Resolution / Megapixels | Filter by image resolution or megapixels | Local        | Finding high-res images for print, web, or archive          |
+| Aspect Ratio        | Filter by aspect ratio (e.g., 16:9, 4:3)     | Local        | Finding wide, square, or tall images                        |
+| File Type           | Filter by file extension/type                | Local        | Isolating JPEGs, PNGs, GIFs, RAW, etc.                     |
+| Duration            | Filter videos by duration                    | Local        | Finding short clips, long videos, or highlights             |
+| FPS                 | Filter videos by frames per second           | Local        | Locating slow-mo, high-FPS, or cinematic videos             |
+| Has Audio           | Filter videos with/without audio             | Local        | Finding silent videos, music videos, or interviews          |
+| Audio Type          | Filter by audio codec/type                   | Local        | Isolating videos with specific audio formats                |
+| Has Captions        | Filter videos with captions/subtitles        | Local/Cloud  | Finding accessible or subtitled content                     |
+| Motion Level        | Filter by detected motion amount             | Local        | Finding action shots, stills, or surveillance footage       |
+| Style               | Filter by AI-detected style                  | Cloud        | Finding artistic, documentary, or candid images             |
+| Orientation         | Filter by image orientation                  | Local        | Portrait vs. landscape, correcting rotated images           |
+| Brightness          | Filter by brightness category                | Local        | Finding dark, bright, or well-lit images                    |
+| Scene Tag           | Filter by AI-detected scene tags             | Cloud        | Finding beaches, mountains, cityscapes, etc.                |
+| Object Tag          | Filter by AI-detected object tags            | Cloud        | Finding images with cars, animals, products, etc.           |
+| Activity Tag        | Filter by AI-detected activity tags          | Cloud        | Finding sports, events, or specific actions                 |
+| Social Score        | Filter by social media suitability           | Cloud        | Finding images likely to perform well on social platforms   |
+| Instagram Score     | Filter by Instagram suitability              | Cloud        | Finding images optimized for Instagram                      |
+| Aspect Ratio Suitability | Filter by suitability for aspect ratios  | Cloud        | Finding images for stories, posts, banners                  |
+| Aesthetic Style     | Filter by AI-detected aesthetic style        | Cloud        | Finding minimal, vibrant, or vintage images                 |
+| Editing Level       | Filter by AI-detected editing level          | Cloud        | Finding raw, lightly, or heavily edited images              |
+| Visual Complexity   | Filter by AI-detected complexity             | Cloud        | Finding simple, busy, or detailed images                    |
+| Hero Element        | Filter by detected main subject              | Cloud        | Finding images with clear subjects or focal points          |
+| Depth Of Field      | Filter by detected depth of field            | Cloud        | Finding portraits, macro, or landscape shots                |
+| Person Label        | Filter by assigned person label              | Local        | Finding images of specific people (after labeling)          |
+| Person Group        | Filter by detected face cluster/group        | Local        | Finding all images of the same person/group                 |
+
 ## Faces Workspace
 
 Faces workspace provides person-group review and labeling tools.

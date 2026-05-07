@@ -1,0 +1,1570 @@
+{
+  "generated_at": "2026-05-07T16:50:45.289Z",
+  "threshold": 0.16,
+  "total_faces_clustered": 314,
+  "cluster_count": 16,
+  "clusters": [
+    {
+      "cluster_id": "face-cluster-0001",
+      "person_label": null,
+      "face_count": 45,
+      "image_count": 33,
+      "sample_paths": [
+        "/Users/jay/Desktop/sample-data/IMG20250130094514.jpg",
+        "/Users/jay/Desktop/sample-data/IMG20250201072835.jpg",
+        "/Users/jay/Desktop/sample-data/IMG20250130094919.jpg",
+        "/Users/jay/Desktop/sample-data/IMG20250130094524.jpg",
+        "/Users/jay/Desktop/sample-data/IMG20250131070959.jpg",
+        "/Users/jay/Desktop/sample-data/IMG20250201072841.jpg",
+        "/Users/jay/Desktop/sample-data/IMG20250127172746.jpg",
+        "/Users/jay/Desktop/sample-data/IMG20250131071043.jpg",
+        "/Users/jay/Desktop/sample-data/IMG20250130095414.jpg",
+        "/Users/jay/Desktop/sample-data/IMG_20151225_141958.jpg"
+      ],
+      "average_quality_score": 0.6033,
+      "members": [
+        {
+          "path": "/Users/jay/Desktop/sample-data/IMG20250130094514.jpg",
+          "face_id": "358dc6932f8af3dd"
+        },
+        {
+          "path": "/Users/jay/Desktop/sample-data/IMG20250201072835.jpg",
+          "face_id": "1008584f8d3474b3"
+        },
+        {
+          "path": "/Users/jay/Desktop/sample-data/IMG20250130094919.jpg",
+          "face_id": "9f77a148370c423c"
+        },
+        {
+          "path": "/Users/jay/Desktop/sample-data/IMG20250130094524.jpg",
+          "face_id": "b89592c90e891a3b"
+        },
+        {
+          "path": "/Users/jay/Desktop/sample-data/IMG20250130094524.jpg",
+          "face_id": "87c216cbe5f50c0f"
+        },
+        {
+          "path": "/Users/jay/Desktop/sample-data/IMG20250130094524.jpg",
+          "face_id": "a0e2661b3de89dd5"
+        },
+        {
+          "path": "/Users/jay/Desktop/sample-data/IMG20250201072835.jpg",
+          "face_id": "3e7eb9b599ca0b39"
+        },
+        {
+          "path": "/Users/jay/Desktop/sample-data/IMG20250130094514.jpg",
+          "face_id": "8fd38d38f89d42fa"
+        },
+        {
+          "path": "/Users/jay/Desktop/sample-data/IMG20250131070959.jpg",
+          "face_id": "1acf718773dbf8c9"
+        },
+        {
+          "path": "/Users/jay/Desktop/sample-data/IMG20250201072841.jpg",
+          "face_id": "cb134c473b39e327"
+        },
+        {
+          "path": "/Users/jay/Desktop/sample-data/IMG20250127172746.jpg",
+          "face_id": "4877407c6693d5b0"
+        },
+        {
+          "path": "/Users/jay/Desktop/sample-data/IMG20250131071043.jpg",
+          "face_id": "7b7006fc898c3c1c"
+        },
+        {
+          "path": "/Users/jay/Desktop/sample-data/IMG20250130094524.jpg",
+          "face_id": "25263e2d3d6fa057"
+        },
+        {
+          "path": "/Users/jay/Desktop/sample-data/IMG20250130095414.jpg",
+          "face_id": "146e1703d223a92e"
+        },
+        {
+          "path": "/Users/jay/Desktop/sample-data/IMG_20151225_141958.jpg",
+          "face_id": "50bc1ae4a229ea9d"
+        },
+        {
+          "path": "/Users/jay/Desktop/sample-data/JayinAZ.JPG",
+          "face_id": "c1b9148993dfb916"
+        },
+        {
+          "path": "/Users/jay/Desktop/sample-data/IMG20250128173633.jpg",
+          "face_id": "440b13133926208a"
+        },
+        {
+          "path": "/Users/jay/Desktop/sample-data/IMG20250127172812.jpg",
+          "face_id": "ecdb3981a0a2f09b"
+        },
+        {
+          "path": "/Users/jay/Desktop/sample-data/IMG20250128173832.jpg",
+          "face_id": "40d21bd7f48bc795"
+        },
+        {
+          "path": "/Users/jay/Desktop/sample-data/IMG20250130095414.jpg",
+          "face_id": "93dec1c4cd0e869e"
+        },
+        {
+          "path": "/Users/jay/Desktop/sample-data/20250127_174654.jpg",
+          "face_id": "570d45b9b82ee59b"
+        },
+        {
+          "path": "/Users/jay/Desktop/sample-data/IMG20250128173839.jpg",
+          "face_id": "5c67ff0284d29e97"
+        },
+        {
+          "path": "/Users/jay/Desktop/sample-data/IMG20250130095417.jpg",
+          "face_id": "6aa511aefd1dc008"
+        },
+        {
+          "path": "/Users/jay/Desktop/sample-data/IMG20250125163312.jpg",
+          "face_id": "2a5a5424b54468b6"
+        },
+        {
+          "path": "/Users/jay/Desktop/sample-data/IMG20250131071041.jpg",
+          "face_id": "7a572d22e1d4ba85"
+        },
+        {
+          "path": "/Users/jay/Desktop/sample-data/IMG20250130095419.jpg",
+          "face_id": "38ef9109c291614a"
+        },
+        {
+          "path": "/Users/jay/Desktop/sample-data/IMG20250128173836.jpg",
+          "face_id": "c3f86bd3330359f6"
+        },
+        {
+          "path": "/Users/jay/Desktop/sample-data/IMG20250127172808.jpg",
+          "face_id": "41c85e26359accff"
+        },
+        {
+          "path": "/Users/jay/Desktop/sample-data/IMG20250127172808.jpg",
+          "face_id": "d77a1054a0bc6134"
+        },
+        {
+          "path": "/Users/jay/Desktop/sample-data/IMG20250131071043.jpg",
+          "face_id": "be5d5ebc5fecf14f"
+        },
+        {
+          "path": "/Users/jay/Desktop/sample-data/IMG20250201072907.jpg",
+          "face_id": "23336bd447f7e3e5"
+        },
+        {
+          "path": "/Users/jay/Desktop/sample-data/IMG20250202113403.jpg",
+          "face_id": "427600c429aae717"
+        },
+        {
+          "path": "/Users/jay/Desktop/sample-data/IMG20250128173559.jpg",
+          "face_id": "fc0181d008074bb6"
+        },
+        {
+          "path": "/Users/jay/Desktop/sample-data/IMG20250130094919.jpg",
+          "face_id": "7c6158b59013b92a"
+        },
+        {
+          "path": "/Users/jay/Desktop/sample-data/IMG20250131071043.jpg",
+          "face_id": "33dce334e41750c0"
+        },
+        {
+          "path": "/Users/jay/Desktop/sample-data/IMG20250202113411.jpg",
+          "face_id": "58cd8bc384a0941c"
+        },
+        {
+          "path": "/Users/jay/Desktop/sample-data/IMG20250128173548.jpg",
+          "face_id": "72b39e7f8c4ccaa7"
+        },
+        {
+          "path": "/Users/jay/Desktop/sample-data/IMG20250127172733.jpg",
+          "face_id": "c726020204f3482f"
+        },
+        {
+          "path": "/Users/jay/Desktop/sample-data/IMG20250128173830.jpg",
+          "face_id": "5743296876266d84"
+        },
+        {
+          "path": "/Users/jay/Desktop/sample-data/IMG20250130095417.jpg",
+          "face_id": "f0c0cd2da9f0db69"
+        },
+        {
+          "path": "/Users/jay/Desktop/sample-data/IMG20250128173617.jpg",
+          "face_id": "33a0e9d718cbe1ef"
+        },
+        {
+          "path": "/Users/jay/Desktop/sample-data/IMG20250131070953.jpg",
+          "face_id": "622bd025dc153f7d"
+        },
+        {
+          "path": "/Users/jay/Desktop/sample-data/IMG20250131070953.jpg",
+          "face_id": "3e7acec7c304111a"
+        },
+        {
+          "path": "/Users/jay/Desktop/sample-data/IMG20250130094918.jpg",
+          "face_id": "cd9d74db8ad03fd6"
+        },
+        {
+          "path": "/Users/jay/Desktop/sample-data/520160659_23923209110680958_2261072555985714336_n.jpg",
+          "face_id": "29369bf9a719f108"
+        }
+      ]
+    },
+    {
+      "cluster_id": "face-cluster-0002",
+      "person_label": null,
+      "face_count": 39,
+      "image_count": 19,
+      "sample_paths": [
+        "/Users/jay/Desktop/sample-data/CW1A6256.jpg",
+        "/Users/jay/Desktop/sample-data/IMG20250130095414.jpg",
+        "/Users/jay/Desktop/sample-data/IMG20250128173633.jpg",
+        "/Users/jay/Desktop/sample-data/IMG20250128173832.jpg",
+        "/Users/jay/Desktop/sample-data/IMG20250131071041.jpg",
+        "/Users/jay/Desktop/sample-data/IMG20250131070959.jpg",
+        "/Users/jay/Desktop/sample-data/IMG20250128173559.jpg",
+        "/Users/jay/Desktop/sample-data/IMG_20180616_184150035.jpg",
+        "/Users/jay/Desktop/sample-data/1.png",
+        "/Users/jay/Desktop/sample-data/IMG20250128173830.jpg"
+      ],
+      "average_quality_score": 0.4166,
+      "members": [
+        {
+          "path": "/Users/jay/Desktop/sample-data/CW1A6256.jpg",
+          "face_id": "f2633a35eef963e1"
+        },
+        {
+          "path": "/Users/jay/Desktop/sample-data/IMG20250130095414.jpg",
+          "face_id": "329ed74715068c2b"
+        },
+        {
+          "path": "/Users/jay/Desktop/sample-data/IMG20250128173633.jpg",
+          "face_id": "dd10522566caa544"
+        },
+        {
+          "path": "/Users/jay/Desktop/sample-data/IMG20250128173832.jpg",
+          "face_id": "92b19f73a9669e18"
+        },
+        {
+          "path": "/Users/jay/Desktop/sample-data/CW1A6256.jpg",
+          "face_id": "8f85bb698b28a3cf"
+        },
+        {
+          "path": "/Users/jay/Desktop/sample-data/IMG20250131071041.jpg",
+          "face_id": "26fe29a9104d0965"
+        },
+        {
+          "path": "/Users/jay/Desktop/sample-data/IMG20250131070959.jpg",
+          "face_id": "8967943e8b180a46"
+        },
+        {
+          "path": "/Users/jay/Desktop/sample-data/IMG20250128173559.jpg",
+          "face_id": "3e16fe2d679edc0e"
+        },
+        {
+          "path": "/Users/jay/Desktop/sample-data/IMG_20180616_184150035.jpg",
+          "face_id": "ea46dd136bdf9a4a"
+        },
+        {
+          "path": "/Users/jay/Desktop/sample-data/1.png",
+          "face_id": "af7dae60f742f71f"
+        },
+        {
+          "path": "/Users/jay/Desktop/sample-data/IMG_20180616_184150035.jpg",
+          "face_id": "7c8e4dff9284bc54"
+        },
+        {
+          "path": "/Users/jay/Desktop/sample-data/IMG20250128173830.jpg",
+          "face_id": "84e2000bc8b292d2"
+        },
+        {
+          "path": "/Users/jay/Desktop/sample-data/IMG20250130095414.jpg",
+          "face_id": "66b10d6cea518f57"
+        },
+        {
+          "path": "/Users/jay/Desktop/sample-data/IMG20250128173832.jpg",
+          "face_id": "d247f406a8a8f884"
+        },
+        {
+          "path": "/Users/jay/Desktop/sample-data/IMG20250128173559.jpg",
+          "face_id": "2200e8de33d6e506"
+        },
+        {
+          "path": "/Users/jay/Desktop/sample-data/IMG20250131071041.jpg",
+          "face_id": "2ff31b70872d90a5"
+        },
+        {
+          "path": "/Users/jay/Desktop/sample-data/IMG20250128173633.jpg",
+          "face_id": "ca3c5c8b8e560bbc"
+        },
+        {
+          "path": "/Users/jay/Desktop/sample-data/IMG20250128173617.jpg",
+          "face_id": "19209d4342afb583"
+        },
+        {
+          "path": "/Users/jay/Desktop/sample-data/IMG20250130095414.jpg",
+          "face_id": "d1b93f056176291f"
+        },
+        {
+          "path": "/Users/jay/Desktop/sample-data/IMG20250125163307.jpg",
+          "face_id": "0ab0f68ecf64ec62"
+        },
+        {
+          "path": "/Users/jay/Desktop/sample-data/IMG20250131070953.jpg",
+          "face_id": "8420add915fec035"
+        },
+        {
+          "path": "/Users/jay/Desktop/sample-data/IMG20250131070959.jpg",
+          "face_id": "d2ba2d5d8f8b4f8d"
+        },
+        {
+          "path": "/Users/jay/Desktop/sample-data/IMG20250128173830.jpg",
+          "face_id": "562633547c4b071c"
+        },
+        {
+          "path": "/Users/jay/Desktop/sample-data/IMG20250131071041.jpg",
+          "face_id": "801334294518e6ef"
+        },
+        {
+          "path": "/Users/jay/Desktop/sample-data/IMG_20180616_184150035.jpg",
+          "face_id": "3ea2ccd7138d37dd"
+        },
+        {
+          "path": "/Users/jay/Desktop/sample-data/IMG20250128173832.jpg",
+          "face_id": "739580e27836d7de"
+        },
+        {
+          "path": "/Users/jay/Desktop/sample-data/IMG20250131070959.jpg",
+          "face_id": "513e369198760472"
+        },
+        {
+          "path": "/Users/jay/Desktop/sample-data/IMG20250128173836.jpg",
+          "face_id": "8c915778a9d1cf30"
+        },
+        {
+          "path": "/Users/jay/Desktop/sample-data/CW1A6256.jpg",
+          "face_id": "b6b5eb1b39ba9bcb"
+        },
+        {
+          "path": "/Users/jay/Desktop/sample-data/IMG20250130095414.jpg",
+          "face_id": "751d587d5b3d0237"
+        },
+        {
+          "path": "/Users/jay/Desktop/sample-data/IMG20250130095419.jpg",
+          "face_id": "ad9ffa90e7b829c0"
+        },
+        {
+          "path": "/Users/jay/Desktop/sample-data/IMG20250131071041.jpg",
+          "face_id": "2a73fe55d18ea99f"
+        },
+        {
+          "path": "/Users/jay/Desktop/sample-data/IMG20250131071043.jpg",
+          "face_id": "ec479dc7e7953410"
+        },
+        {
+          "path": "/Users/jay/Desktop/sample-data/IMG20250125163312.jpg",
+          "face_id": "2398f09a2ae32533"
+        },
+        {
+          "path": "/Users/jay/Desktop/sample-data/IMG20250131071041.jpg",
+          "face_id": "7c10ccc30498572a"
+        },
+        {
+          "path": "/Users/jay/Desktop/sample-data/IMG20250128173839.jpg",
+          "face_id": "8dc9eb818bb2a64c"
+        },
+        {
+          "path": "/Users/jay/Desktop/sample-data/IMG20250131071041.jpg",
+          "face_id": "74f65b0135c58e70"
+        },
+        {
+          "path": "/Users/jay/Desktop/sample-data/IMG20250128173633.jpg",
+          "face_id": "232fc6eacba3883f"
+        },
+        {
+          "path": "/Users/jay/Desktop/sample-data/IMG20250130094514.jpg",
+          "face_id": "8c6cd9667ce9df72"
+        }
+      ]
+    },
+    {
+      "cluster_id": "face-cluster-0003",
+      "person_label": null,
+      "face_count": 32,
+      "image_count": 16,
+      "sample_paths": [
+        "/Users/jay/Desktop/sample-data/IMG20250130095414.jpg",
+        "/Users/jay/Desktop/sample-data/IMG20250202113403.jpg",
+        "/Users/jay/Desktop/sample-data/IMG20250130094919.jpg",
+        "/Users/jay/Desktop/sample-data/IMG20250201072835.jpg",
+        "/Users/jay/Desktop/sample-data/IMG20250201072841.jpg",
+        "/Users/jay/Desktop/sample-data/IMG_20180616_184150035.jpg",
+        "/Users/jay/Desktop/sample-data/IMG20250130095419.jpg",
+        "/Users/jay/Desktop/sample-data/IMG20250201072907.jpg",
+        "/Users/jay/Desktop/sample-data/IMG20250131070959.jpg",
+        "/Users/jay/Desktop/sample-data/IMG20250125163312.jpg"
+      ],
+      "average_quality_score": 0.6165,
+      "members": [
+        {
+          "path": "/Users/jay/Desktop/sample-data/IMG20250130095414.jpg",
+          "face_id": "82f7d880f09b46cf"
+        },
+        {
+          "path": "/Users/jay/Desktop/sample-data/IMG20250202113403.jpg",
+          "face_id": "2e95bac0891fa814"
+        },
+        {
+          "path": "/Users/jay/Desktop/sample-data/IMG20250130094919.jpg",
+          "face_id": "ce35fca81d3bd104"
+        },
+        {
+          "path": "/Users/jay/Desktop/sample-data/IMG20250201072835.jpg",
+          "face_id": "6485822d32fd7928"
+        },
+        {
+          "path": "/Users/jay/Desktop/sample-data/IMG20250201072841.jpg",
+          "face_id": "5a4a96c355d41a2f"
+        },
+        {
+          "path": "/Users/jay/Desktop/sample-data/IMG_20180616_184150035.jpg",
+          "face_id": "3f2d0b6634dd8024"
+        },
+        {
+          "path": "/Users/jay/Desktop/sample-data/IMG_20180616_184150035.jpg",
+          "face_id": "7d06f0de9401382b"
+        },
+        {
+          "path": "/Users/jay/Desktop/sample-data/IMG20250130095419.jpg",
+          "face_id": "53a568ecdfb6f0a3"
+        },
+        {
+          "path": "/Users/jay/Desktop/sample-data/IMG_20180616_184150035.jpg",
+          "face_id": "9418973b183d4227"
+        },
+        {
+          "path": "/Users/jay/Desktop/sample-data/IMG20250201072907.jpg",
+          "face_id": "08b9b3d95ad8d37c"
+        },
+        {
+          "path": "/Users/jay/Desktop/sample-data/IMG20250130095419.jpg",
+          "face_id": "ad2e165870da913c"
+        },
+        {
+          "path": "/Users/jay/Desktop/sample-data/IMG20250130094919.jpg",
+          "face_id": "56903f3f28523ccd"
+        },
+        {
+          "path": "/Users/jay/Desktop/sample-data/IMG20250131070959.jpg",
+          "face_id": "f411c5bb524fc421"
+        },
+        {
+          "path": "/Users/jay/Desktop/sample-data/IMG20250130094919.jpg",
+          "face_id": "7c4e2fbaf011e581"
+        },
+        {
+          "path": "/Users/jay/Desktop/sample-data/IMG20250125163312.jpg",
+          "face_id": "e94625a2a8025662"
+        },
+        {
+          "path": "/Users/jay/Desktop/sample-data/IMG20250201072907.jpg",
+          "face_id": "750412cfd5228c35"
+        },
+        {
+          "path": "/Users/jay/Desktop/sample-data/IMG20250130095417.jpg",
+          "face_id": "196f8225daf90531"
+        },
+        {
+          "path": "/Users/jay/Desktop/sample-data/IMG20250130095417.jpg",
+          "face_id": "f53f36ca821011ef"
+        },
+        {
+          "path": "/Users/jay/Desktop/sample-data/IMG20250131070959.jpg",
+          "face_id": "4ddee9e58e1aec2b"
+        },
+        {
+          "path": "/Users/jay/Desktop/sample-data/IMG20250130094918.jpg",
+          "face_id": "3e47c38bf69c4a2e"
+        },
+        {
+          "path": "/Users/jay/Desktop/sample-data/IMG20250128173633.jpg",
+          "face_id": "47070dd83d74ffe0"
+        },
+        {
+          "path": "/Users/jay/Desktop/sample-data/IMG20250131070959.jpg",
+          "face_id": "727e28c5ffab9ac9"
+        },
+        {
+          "path": "/Users/jay/Desktop/sample-data/IMG20250125163307.jpg",
+          "face_id": "789927b605b01d3b"
+        },
+        {
+          "path": "/Users/jay/Desktop/sample-data/IMG20250130095414.jpg",
+          "face_id": "e021961254b5d646"
+        },
+        {
+          "path": "/Users/jay/Desktop/sample-data/IMG20250130095417.jpg",
+          "face_id": "2e0ce6a060f7134f"
+        },
+        {
+          "path": "/Users/jay/Desktop/sample-data/IMG20250131071041.jpg",
+          "face_id": "947e2ce264e3e404"
+        },
+        {
+          "path": "/Users/jay/Desktop/sample-data/IMG20250130095419.jpg",
+          "face_id": "07b0c0438b0bfe91"
+        },
+        {
+          "path": "/Users/jay/Desktop/sample-data/IMG20250130095419.jpg",
+          "face_id": "cb17f7fcf7963c48"
+        },
+        {
+          "path": "/Users/jay/Desktop/sample-data/JayinColorado.jpg",
+          "face_id": "b9e1c9810650cf33"
+        },
+        {
+          "path": "/Users/jay/Desktop/sample-data/IMG20250130095419.jpg",
+          "face_id": "d18cdc96779b90f3"
+        },
+        {
+          "path": "/Users/jay/Desktop/sample-data/IMG20250130095419.jpg",
+          "face_id": "fe7a1a212259d7c5"
+        },
+        {
+          "path": "/Users/jay/Desktop/sample-data/IMG20250130094918.jpg",
+          "face_id": "ab0663d017f294b3"
+        }
+      ]
+    },
+    {
+      "cluster_id": "face-cluster-0004",
+      "person_label": null,
+      "face_count": 32,
+      "image_count": 19,
+      "sample_paths": [
+        "/Users/jay/Desktop/sample-data/IMG20250130094918.jpg",
+        "/Users/jay/Desktop/sample-data/IMG20250125163312.jpg",
+        "/Users/jay/Desktop/sample-data/IMG20250201072835.jpg",
+        "/Users/jay/Desktop/sample-data/IMG20250130094919.jpg",
+        "/Users/jay/Desktop/sample-data/IMG20250201072841.jpg",
+        "/Users/jay/Desktop/sample-data/IMG20250128173548.jpg",
+        "/Users/jay/Desktop/sample-data/IMG20250128173633.jpg",
+        "/Users/jay/Desktop/sample-data/IMG20250131071041.jpg",
+        "/Users/jay/Desktop/sample-data/IMG20250130095419.jpg",
+        "/Users/jay/Desktop/sample-data/IMG20250125163307.jpg"
+      ],
+      "average_quality_score": 0.5842,
+      "members": [
+        {
+          "path": "/Users/jay/Desktop/sample-data/IMG20250130094918.jpg",
+          "face_id": "efb4ea8279a49e67"
+        },
+        {
+          "path": "/Users/jay/Desktop/sample-data/IMG20250125163312.jpg",
+          "face_id": "65b5117b0c8dd00d"
+        },
+        {
+          "path": "/Users/jay/Desktop/sample-data/IMG20250201072835.jpg",
+          "face_id": "5b69eba4580f3cb0"
+        },
+        {
+          "path": "/Users/jay/Desktop/sample-data/IMG20250130094919.jpg",
+          "face_id": "c6e541fe057336cb"
+        },
+        {
+          "path": "/Users/jay/Desktop/sample-data/IMG20250130094918.jpg",
+          "face_id": "1988b98e1152ecf2"
+        },
+        {
+          "path": "/Users/jay/Desktop/sample-data/IMG20250125163312.jpg",
+          "face_id": "e03d34cfb68af227"
+        },
+        {
+          "path": "/Users/jay/Desktop/sample-data/IMG20250130094918.jpg",
+          "face_id": "3911575ddca82e93"
+        },
+        {
+          "path": "/Users/jay/Desktop/sample-data/IMG20250201072841.jpg",
+          "face_id": "6c035b2af0121052"
+        },
+        {
+          "path": "/Users/jay/Desktop/sample-data/IMG20250128173548.jpg",
+          "face_id": "823c525d32ac5c99"
+        },
+        {
+          "path": "/Users/jay/Desktop/sample-data/IMG20250128173633.jpg",
+          "face_id": "ed93159110a87458"
+        },
+        {
+          "path": "/Users/jay/Desktop/sample-data/IMG20250131071041.jpg",
+          "face_id": "647a8c18a47c08eb"
+        },
+        {
+          "path": "/Users/jay/Desktop/sample-data/IMG20250130095419.jpg",
+          "face_id": "53c729fcc4bc82dc"
+        },
+        {
+          "path": "/Users/jay/Desktop/sample-data/IMG20250130095419.jpg",
+          "face_id": "f79252f1fa438ad5"
+        },
+        {
+          "path": "/Users/jay/Desktop/sample-data/IMG20250125163307.jpg",
+          "face_id": "cc0a4b2c24b7ee8a"
+        },
+        {
+          "path": "/Users/jay/Desktop/sample-data/IMG20250128173633.jpg",
+          "face_id": "5efd71e3f2888da3"
+        },
+        {
+          "path": "/Users/jay/Desktop/sample-data/IMG20250201072907.jpg",
+          "face_id": "1ade681c76e76998"
+        },
+        {
+          "path": "/Users/jay/Desktop/sample-data/IMG20250131070953.jpg",
+          "face_id": "11d4f10622d21f4f"
+        },
+        {
+          "path": "/Users/jay/Desktop/sample-data/IMG20250128173559.jpg",
+          "face_id": "cc179f30bf2f5347"
+        },
+        {
+          "path": "/Users/jay/Desktop/sample-data/IMG20250128173830.jpg",
+          "face_id": "145068964c46a71e"
+        },
+        {
+          "path": "/Users/jay/Desktop/sample-data/IMG20250131071041.jpg",
+          "face_id": "7ea3c258f9034c1f"
+        },
+        {
+          "path": "/Users/jay/Desktop/sample-data/IMG20250131071043.jpg",
+          "face_id": "f94f3da5b76f5ab0"
+        },
+        {
+          "path": "/Users/jay/Desktop/sample-data/IMG20250128173617.jpg",
+          "face_id": "f1ff0fcfd1723e61"
+        },
+        {
+          "path": "/Users/jay/Desktop/sample-data/IMG20250128173830.jpg",
+          "face_id": "2aebb129d5994c4d"
+        },
+        {
+          "path": "/Users/jay/Desktop/sample-data/IMG20250128173559.jpg",
+          "face_id": "ca12e7c9347c553c"
+        },
+        {
+          "path": "/Users/jay/Desktop/sample-data/IMG20250128173617.jpg",
+          "face_id": "c4bd1db2d88b4ff8"
+        },
+        {
+          "path": "/Users/jay/Desktop/sample-data/IMG20250128173548.jpg",
+          "face_id": "33ab3a913ac3e250"
+        },
+        {
+          "path": "/Users/jay/Desktop/sample-data/IMG20250128173617.jpg",
+          "face_id": "813f5208e4962168"
+        },
+        {
+          "path": "/Users/jay/Desktop/sample-data/IMG20250128173832.jpg",
+          "face_id": "cf27f26436b0479b"
+        },
+        {
+          "path": "/Users/jay/Desktop/sample-data/IMG20250131071043.jpg",
+          "face_id": "c332156e574fce46"
+        },
+        {
+          "path": "/Users/jay/Desktop/sample-data/IMG20250131071041.jpg",
+          "face_id": "6da35cb6aff9ed56"
+        },
+        {
+          "path": "/Users/jay/Desktop/sample-data/IMG20250130095417.jpg",
+          "face_id": "85e24eb5dd413e6d"
+        },
+        {
+          "path": "/Users/jay/Desktop/sample-data/IMG20250128173836.jpg",
+          "face_id": "eb5ba5668638ab1a"
+        }
+      ]
+    },
+    {
+      "cluster_id": "face-cluster-0005",
+      "person_label": null,
+      "face_count": 27,
+      "image_count": 16,
+      "sample_paths": [
+        "/Users/jay/Desktop/sample-data/Gemini_Generated_Image_8mdpst8mdpst8mdp 3.png",
+        "/Users/jay/Desktop/sample-data/IMG20250202113403.jpg",
+        "/Users/jay/Desktop/sample-data/IMG20250130094524.jpg",
+        "/Users/jay/Desktop/sample-data/IMG_20180616_184150035.jpg",
+        "/Users/jay/Desktop/sample-data/IMG20250130094919.jpg",
+        "/Users/jay/Desktop/sample-data/IMG20250127172733.jpg",
+        "/Users/jay/Desktop/sample-data/IMG20250130094918.jpg",
+        "/Users/jay/Desktop/sample-data/IMG20250130095414.jpg",
+        "/Users/jay/Desktop/sample-data/IMG20250130094514.jpg",
+        "/Users/jay/Desktop/sample-data/IMG20250201072907.jpg"
+      ],
+      "average_quality_score": 0.6244,
+      "members": [
+        {
+          "path": "/Users/jay/Desktop/sample-data/Gemini_Generated_Image_8mdpst8mdpst8mdp 3.png",
+          "face_id": "6477141626caf63e"
+        },
+        {
+          "path": "/Users/jay/Desktop/sample-data/IMG20250202113403.jpg",
+          "face_id": "c9856d67aad6c384"
+        },
+        {
+          "path": "/Users/jay/Desktop/sample-data/IMG20250130094524.jpg",
+          "face_id": "d6c658a077e9f15b"
+        },
+        {
+          "path": "/Users/jay/Desktop/sample-data/IMG_20180616_184150035.jpg",
+          "face_id": "70dde00464bd19a7"
+        },
+        {
+          "path": "/Users/jay/Desktop/sample-data/IMG_20180616_184150035.jpg",
+          "face_id": "e5326e468f48dd59"
+        },
+        {
+          "path": "/Users/jay/Desktop/sample-data/IMG20250130094919.jpg",
+          "face_id": "ae3d1213bc413026"
+        },
+        {
+          "path": "/Users/jay/Desktop/sample-data/IMG20250127172733.jpg",
+          "face_id": "a5cb7e498b63c8ee"
+        },
+        {
+          "path": "/Users/jay/Desktop/sample-data/IMG_20180616_184150035.jpg",
+          "face_id": "79c74df5a2c449c4"
+        },
+        {
+          "path": "/Users/jay/Desktop/sample-data/IMG_20180616_184150035.jpg",
+          "face_id": "4624d2081540c08c"
+        },
+        {
+          "path": "/Users/jay/Desktop/sample-data/IMG_20180616_184150035.jpg",
+          "face_id": "ac2bc5198e247c50"
+        },
+        {
+          "path": "/Users/jay/Desktop/sample-data/IMG_20180616_184150035.jpg",
+          "face_id": "e8e7502f899e03d8"
+        },
+        {
+          "path": "/Users/jay/Desktop/sample-data/IMG_20180616_184150035.jpg",
+          "face_id": "f592079b8b26d6c3"
+        },
+        {
+          "path": "/Users/jay/Desktop/sample-data/IMG20250130094918.jpg",
+          "face_id": "2e16f4e36951e6c0"
+        },
+        {
+          "path": "/Users/jay/Desktop/sample-data/IMG20250130095414.jpg",
+          "face_id": "3243db8ffd1e77aa"
+        },
+        {
+          "path": "/Users/jay/Desktop/sample-data/IMG20250130094514.jpg",
+          "face_id": "0a3e99a32223b3bb"
+        },
+        {
+          "path": "/Users/jay/Desktop/sample-data/IMG20250201072907.jpg",
+          "face_id": "e4e73f0ccc79645f"
+        },
+        {
+          "path": "/Users/jay/Desktop/sample-data/IMG20250130095419.jpg",
+          "face_id": "7db8960abdc88ec3"
+        },
+        {
+          "path": "/Users/jay/Desktop/sample-data/IMG20250125163307.jpg",
+          "face_id": "d8496881aeccfd1d"
+        },
+        {
+          "path": "/Users/jay/Desktop/sample-data/IMG20250130094919.jpg",
+          "face_id": "4eb3638d41e34daf"
+        },
+        {
+          "path": "/Users/jay/Desktop/sample-data/IMG20250130094918.jpg",
+          "face_id": "35a2470c0f3f1abc"
+        },
+        {
+          "path": "/Users/jay/Desktop/sample-data/IMG20250131071043.jpg",
+          "face_id": "9ef528b217054908"
+        },
+        {
+          "path": "/Users/jay/Desktop/sample-data/IMG20250130095417.jpg",
+          "face_id": "42a3578f27dde36c"
+        },
+        {
+          "path": "/Users/jay/Desktop/sample-data/IMG20250130095419.jpg",
+          "face_id": "a4d5d2f7fecfc57c"
+        },
+        {
+          "path": "/Users/jay/Desktop/sample-data/IMG20250202113411.jpg",
+          "face_id": "a9e201b11a6a4a8e"
+        },
+        {
+          "path": "/Users/jay/Desktop/sample-data/IMG20250130095417.jpg",
+          "face_id": "5b5cfb67d6a26fa2"
+        },
+        {
+          "path": "/Users/jay/Desktop/sample-data/IMG20250131071041.jpg",
+          "face_id": "557f7159cd0c6f02"
+        },
+        {
+          "path": "/Users/jay/Desktop/sample-data/IMG_20180616_184150035.jpg",
+          "face_id": "83c351b22064f3a1"
+        }
+      ]
+    },
+    {
+      "cluster_id": "face-cluster-0006",
+      "person_label": null,
+      "face_count": 23,
+      "image_count": 14,
+      "sample_paths": [
+        "/Users/jay/Desktop/sample-data/IMG_20180616_184150035.jpg",
+        "/Users/jay/Desktop/sample-data/IMG20250130095414.jpg",
+        "/Users/jay/Desktop/sample-data/IMG20250202113411.jpg",
+        "/Users/jay/Desktop/sample-data/IMG20250131070959.jpg",
+        "/Users/jay/Desktop/sample-data/IMG20250131071043.jpg",
+        "/Users/jay/Desktop/sample-data/IMG20250128173559.jpg",
+        "/Users/jay/Desktop/sample-data/IMG20250202113403.jpg",
+        "/Users/jay/Desktop/sample-data/IMG20250131071041.jpg",
+        "/Users/jay/Desktop/sample-data/IMG20250128173836.jpg",
+        "/Users/jay/Desktop/sample-data/IMG20250128173839.jpg"
+      ],
+      "average_quality_score": 0.5946,
+      "members": [
+        {
+          "path": "/Users/jay/Desktop/sample-data/IMG_20180616_184150035.jpg",
+          "face_id": "3f0f8bfbd2441add"
+        },
+        {
+          "path": "/Users/jay/Desktop/sample-data/IMG_20180616_184150035.jpg",
+          "face_id": "5a1d7983fcca2537"
+        },
+        {
+          "path": "/Users/jay/Desktop/sample-data/IMG20250130095414.jpg",
+          "face_id": "4667f4d673ca438f"
+        },
+        {
+          "path": "/Users/jay/Desktop/sample-data/IMG_20180616_184150035.jpg",
+          "face_id": "4d1acc8b0e983d56"
+        },
+        {
+          "path": "/Users/jay/Desktop/sample-data/IMG_20180616_184150035.jpg",
+          "face_id": "4c3a83350730132e"
+        },
+        {
+          "path": "/Users/jay/Desktop/sample-data/IMG_20180616_184150035.jpg",
+          "face_id": "e22ef0f149eb4461"
+        },
+        {
+          "path": "/Users/jay/Desktop/sample-data/IMG20250202113411.jpg",
+          "face_id": "79f1fb7b620609a4"
+        },
+        {
+          "path": "/Users/jay/Desktop/sample-data/IMG_20180616_184150035.jpg",
+          "face_id": "72c46b6783376102"
+        },
+        {
+          "path": "/Users/jay/Desktop/sample-data/IMG_20180616_184150035.jpg",
+          "face_id": "5ecce0d6fc7eaad8"
+        },
+        {
+          "path": "/Users/jay/Desktop/sample-data/IMG20250131070959.jpg",
+          "face_id": "8a97f424adeb8139"
+        },
+        {
+          "path": "/Users/jay/Desktop/sample-data/IMG_20180616_184150035.jpg",
+          "face_id": "81c63ed968088ad3"
+        },
+        {
+          "path": "/Users/jay/Desktop/sample-data/IMG_20180616_184150035.jpg",
+          "face_id": "d2a25c1e9166ebeb"
+        },
+        {
+          "path": "/Users/jay/Desktop/sample-data/IMG20250131071043.jpg",
+          "face_id": "7535ae3309fa2e93"
+        },
+        {
+          "path": "/Users/jay/Desktop/sample-data/IMG20250128173559.jpg",
+          "face_id": "2b6ad2d9aecbf9d6"
+        },
+        {
+          "path": "/Users/jay/Desktop/sample-data/IMG20250202113403.jpg",
+          "face_id": "93e3830afe51eb0d"
+        },
+        {
+          "path": "/Users/jay/Desktop/sample-data/IMG20250131071041.jpg",
+          "face_id": "5a56ff6c31f69057"
+        },
+        {
+          "path": "/Users/jay/Desktop/sample-data/IMG20250128173836.jpg",
+          "face_id": "d5a451c26cbac392"
+        },
+        {
+          "path": "/Users/jay/Desktop/sample-data/IMG20250128173839.jpg",
+          "face_id": "47857c57cad64b41"
+        },
+        {
+          "path": "/Users/jay/Desktop/sample-data/IMG20250128173830.jpg",
+          "face_id": "0274c7a6e9677d16"
+        },
+        {
+          "path": "/Users/jay/Desktop/sample-data/IMG20250128173832.jpg",
+          "face_id": "ff05d3f02393f04b"
+        },
+        {
+          "path": "/Users/jay/Desktop/sample-data/IMG20250131070959.jpg",
+          "face_id": "00c689dab2bcc0b8"
+        },
+        {
+          "path": "/Users/jay/Desktop/sample-data/IMG20250125163307.jpg",
+          "face_id": "f0083cc978c66ba8"
+        },
+        {
+          "path": "/Users/jay/Desktop/sample-data/IMG20250128173633.jpg",
+          "face_id": "e00538f310145c8e"
+        }
+      ]
+    },
+    {
+      "cluster_id": "face-cluster-0007",
+      "person_label": null,
+      "face_count": 23,
+      "image_count": 16,
+      "sample_paths": [
+        "/Users/jay/Desktop/sample-data/IMG20250128173832.jpg",
+        "/Users/jay/Desktop/sample-data/IMG20250128173559.jpg",
+        "/Users/jay/Desktop/sample-data/IMG20250127172733.jpg",
+        "/Users/jay/Desktop/sample-data/IMG20250128173548.jpg",
+        "/Users/jay/Desktop/sample-data/IMG20250125163307.jpg",
+        "/Users/jay/Desktop/sample-data/IMG20250128173839.jpg",
+        "/Users/jay/Desktop/sample-data/IMG20250128173617.jpg",
+        "/Users/jay/Desktop/sample-data/IMG20250128173830.jpg",
+        "/Users/jay/Desktop/sample-data/IMG20250131071041.jpg",
+        "/Users/jay/Desktop/sample-data/IMG20250130095417.jpg"
+      ],
+      "average_quality_score": 0.5473,
+      "members": [
+        {
+          "path": "/Users/jay/Desktop/sample-data/IMG20250128173832.jpg",
+          "face_id": "c66dafd9352a66ba"
+        },
+        {
+          "path": "/Users/jay/Desktop/sample-data/IMG20250128173559.jpg",
+          "face_id": "691f550e7e4c8e5f"
+        },
+        {
+          "path": "/Users/jay/Desktop/sample-data/IMG20250127172733.jpg",
+          "face_id": "0a7f89e1a1c5826d"
+        },
+        {
+          "path": "/Users/jay/Desktop/sample-data/IMG20250128173548.jpg",
+          "face_id": "d48e70b75bc4808a"
+        },
+        {
+          "path": "/Users/jay/Desktop/sample-data/IMG20250128173559.jpg",
+          "face_id": "194bbd48a534b081"
+        },
+        {
+          "path": "/Users/jay/Desktop/sample-data/IMG20250125163307.jpg",
+          "face_id": "07d42d36a7e66079"
+        },
+        {
+          "path": "/Users/jay/Desktop/sample-data/IMG20250128173548.jpg",
+          "face_id": "118ba69ae658fe13"
+        },
+        {
+          "path": "/Users/jay/Desktop/sample-data/IMG20250128173548.jpg",
+          "face_id": "874e24146c6614c7"
+        },
+        {
+          "path": "/Users/jay/Desktop/sample-data/IMG20250125163307.jpg",
+          "face_id": "af674b13fb71899c"
+        },
+        {
+          "path": "/Users/jay/Desktop/sample-data/IMG20250128173839.jpg",
+          "face_id": "b5a3914308cc1913"
+        },
+        {
+          "path": "/Users/jay/Desktop/sample-data/IMG20250128173617.jpg",
+          "face_id": "67fbbe0c95aa66b7"
+        },
+        {
+          "path": "/Users/jay/Desktop/sample-data/IMG20250128173830.jpg",
+          "face_id": "92d5b98f81b7628b"
+        },
+        {
+          "path": "/Users/jay/Desktop/sample-data/IMG20250131071041.jpg",
+          "face_id": "8389eba1ad373151"
+        },
+        {
+          "path": "/Users/jay/Desktop/sample-data/IMG20250130095417.jpg",
+          "face_id": "323a61d314fe0506"
+        },
+        {
+          "path": "/Users/jay/Desktop/sample-data/IMG20250130094918.jpg",
+          "face_id": "5cbd5c446845d51e"
+        },
+        {
+          "path": "/Users/jay/Desktop/sample-data/IMG20250128173836.jpg",
+          "face_id": "32d1614af4f40ed2"
+        },
+        {
+          "path": "/Users/jay/Desktop/sample-data/IMG20250131071041.jpg",
+          "face_id": "516ce52504fb4b12"
+        },
+        {
+          "path": "/Users/jay/Desktop/sample-data/IMG20250131070959.jpg",
+          "face_id": "54971d506ad39985"
+        },
+        {
+          "path": "/Users/jay/Desktop/sample-data/IMG20250130095419.jpg",
+          "face_id": "c2c2e183253840ab"
+        },
+        {
+          "path": "/Users/jay/Desktop/sample-data/IMG20250130094919.jpg",
+          "face_id": "bbf5bea793852c76"
+        },
+        {
+          "path": "/Users/jay/Desktop/sample-data/IMG20250131071041.jpg",
+          "face_id": "9b576847f7ed5df7"
+        },
+        {
+          "path": "/Users/jay/Desktop/sample-data/IMG20250131070959.jpg",
+          "face_id": "868681c3c453ae30"
+        },
+        {
+          "path": "/Users/jay/Desktop/sample-data/IMG20250130095414.jpg",
+          "face_id": "9d3d7d909f5949c7"
+        }
+      ]
+    },
+    {
+      "cluster_id": "face-cluster-0008",
+      "person_label": null,
+      "face_count": 21,
+      "image_count": 16,
+      "sample_paths": [
+        "/Users/jay/Desktop/sample-data/41f1b4b19cac7cfca6ff36853e1533e8.jpg",
+        "/Users/jay/Desktop/sample-data/CW1A6256.jpg",
+        "/Users/jay/Desktop/sample-data/IMG20250130095414.jpg",
+        "/Users/jay/Desktop/sample-data/IMG20250131070953.jpg",
+        "/Users/jay/Desktop/sample-data/IMG20250128173548.jpg",
+        "/Users/jay/Desktop/sample-data/IMG20250130094514.jpg",
+        "/Users/jay/Desktop/sample-data/IMG20250130095417.jpg",
+        "/Users/jay/Desktop/sample-data/IMG20250202113411.jpg",
+        "/Users/jay/Desktop/sample-data/IMG20250128173839.jpg",
+        "/Users/jay/Desktop/sample-data/20221230_110644.jpg"
+      ],
+      "average_quality_score": 0.5501,
+      "members": [
+        {
+          "path": "/Users/jay/Desktop/sample-data/41f1b4b19cac7cfca6ff36853e1533e8.jpg",
+          "face_id": "dbaec37d94e2300f"
+        },
+        {
+          "path": "/Users/jay/Desktop/sample-data/CW1A6256.jpg",
+          "face_id": "1410c393f96bb8cb"
+        },
+        {
+          "path": "/Users/jay/Desktop/sample-data/IMG20250130095414.jpg",
+          "face_id": "d07c66c4724507af"
+        },
+        {
+          "path": "/Users/jay/Desktop/sample-data/IMG20250131070953.jpg",
+          "face_id": "b54d2c18df50637c"
+        },
+        {
+          "path": "/Users/jay/Desktop/sample-data/IMG20250128173548.jpg",
+          "face_id": "68ac64313fd12628"
+        },
+        {
+          "path": "/Users/jay/Desktop/sample-data/IMG20250130094514.jpg",
+          "face_id": "d3a1546a2abd7d40"
+        },
+        {
+          "path": "/Users/jay/Desktop/sample-data/IMG20250130095417.jpg",
+          "face_id": "4f1c947cee2d8f42"
+        },
+        {
+          "path": "/Users/jay/Desktop/sample-data/CW1A6256.jpg",
+          "face_id": "cf041d32d87cd245"
+        },
+        {
+          "path": "/Users/jay/Desktop/sample-data/IMG20250202113411.jpg",
+          "face_id": "eb19fdee46f975ea"
+        },
+        {
+          "path": "/Users/jay/Desktop/sample-data/IMG20250128173839.jpg",
+          "face_id": "b0fbf88651a72b75"
+        },
+        {
+          "path": "/Users/jay/Desktop/sample-data/20221230_110644.jpg",
+          "face_id": "37511bcf084dd259"
+        },
+        {
+          "path": "/Users/jay/Desktop/sample-data/IMG20250130095414.jpg",
+          "face_id": "1555776d9a14a7e3"
+        },
+        {
+          "path": "/Users/jay/Desktop/sample-data/IMG20250131071043.jpg",
+          "face_id": "f9a5e32f0ec6f62a"
+        },
+        {
+          "path": "/Users/jay/Desktop/sample-data/IMG20250130094918.jpg",
+          "face_id": "996591507ffa3bce"
+        },
+        {
+          "path": "/Users/jay/Desktop/sample-data/IMG20250128173617.jpg",
+          "face_id": "f28f2f8256c9b6bf"
+        },
+        {
+          "path": "/Users/jay/Desktop/sample-data/IMG20250131071041.jpg",
+          "face_id": "a01275abceabbfd8"
+        },
+        {
+          "path": "/Users/jay/Desktop/sample-data/IMG20250130095414.jpg",
+          "face_id": "8491bdd5e314caf2"
+        },
+        {
+          "path": "/Users/jay/Desktop/sample-data/IMG20250128173633.jpg",
+          "face_id": "f635c16be5e261bc"
+        },
+        {
+          "path": "/Users/jay/Desktop/sample-data/IMG_20180616_184150035.jpg",
+          "face_id": "f5f7a195cc0af96a"
+        },
+        {
+          "path": "/Users/jay/Desktop/sample-data/IMG_20180616_184150035.jpg",
+          "face_id": "b40f0e0e312722af"
+        },
+        {
+          "path": "/Users/jay/Desktop/sample-data/IMG20250131070953.jpg",
+          "face_id": "810d86fb7fa4ce6b"
+        }
+      ]
+    },
+    {
+      "cluster_id": "face-cluster-0009",
+      "person_label": null,
+      "face_count": 18,
+      "image_count": 14,
+      "sample_paths": [
+        "/Users/jay/Desktop/sample-data/IMG20250125163312.jpg",
+        "/Users/jay/Desktop/sample-data/IMG20250202113403.jpg",
+        "/Users/jay/Desktop/sample-data/IMG20250128173548.jpg",
+        "/Users/jay/Desktop/sample-data/IMG20250201072841.jpg",
+        "/Users/jay/Desktop/sample-data/IMG20250130095417.jpg",
+        "/Users/jay/Desktop/sample-data/IMG20250127172812.jpg",
+        "/Users/jay/Desktop/sample-data/IMG20250130095419.jpg",
+        "/Users/jay/Desktop/sample-data/IMG20250125163307.jpg",
+        "/Users/jay/Desktop/sample-data/IMG20250128173617.jpg",
+        "/Users/jay/Desktop/sample-data/IMG20250128173836.jpg"
+      ],
+      "average_quality_score": 0.562,
+      "members": [
+        {
+          "path": "/Users/jay/Desktop/sample-data/IMG20250125163312.jpg",
+          "face_id": "e970871ee957e742"
+        },
+        {
+          "path": "/Users/jay/Desktop/sample-data/IMG20250202113403.jpg",
+          "face_id": "5871661f5f87600a"
+        },
+        {
+          "path": "/Users/jay/Desktop/sample-data/IMG20250128173548.jpg",
+          "face_id": "1fe9ec5823f83f58"
+        },
+        {
+          "path": "/Users/jay/Desktop/sample-data/IMG20250201072841.jpg",
+          "face_id": "7f76569ca30c3585"
+        },
+        {
+          "path": "/Users/jay/Desktop/sample-data/IMG20250125163312.jpg",
+          "face_id": "f1d1db87fdb30884"
+        },
+        {
+          "path": "/Users/jay/Desktop/sample-data/IMG20250130095417.jpg",
+          "face_id": "706365a78d6fb54d"
+        },
+        {
+          "path": "/Users/jay/Desktop/sample-data/IMG20250127172812.jpg",
+          "face_id": "159a6f300c1c735d"
+        },
+        {
+          "path": "/Users/jay/Desktop/sample-data/IMG20250130095417.jpg",
+          "face_id": "2b2814159be92910"
+        },
+        {
+          "path": "/Users/jay/Desktop/sample-data/IMG20250130095419.jpg",
+          "face_id": "023fe1d750a8acc7"
+        },
+        {
+          "path": "/Users/jay/Desktop/sample-data/IMG20250125163307.jpg",
+          "face_id": "047281a50cd31d12"
+        },
+        {
+          "path": "/Users/jay/Desktop/sample-data/IMG20250128173617.jpg",
+          "face_id": "1f1cdebd5725795c"
+        },
+        {
+          "path": "/Users/jay/Desktop/sample-data/IMG20250130095419.jpg",
+          "face_id": "e82cf2ebad2bf46f"
+        },
+        {
+          "path": "/Users/jay/Desktop/sample-data/IMG20250128173836.jpg",
+          "face_id": "56c5ac5fa7064b4f"
+        },
+        {
+          "path": "/Users/jay/Desktop/sample-data/IMG20250125163307.jpg",
+          "face_id": "9e393cc7ef7418a5"
+        },
+        {
+          "path": "/Users/jay/Desktop/sample-data/IMG20250127172808.jpg",
+          "face_id": "cb834d154fd41748"
+        },
+        {
+          "path": "/Users/jay/Desktop/sample-data/IMG20250131070959.jpg",
+          "face_id": "ec62b458ef3ac7db"
+        },
+        {
+          "path": "/Users/jay/Desktop/sample-data/IMG20250131071043.jpg",
+          "face_id": "19b0de7315763d6c"
+        },
+        {
+          "path": "/Users/jay/Desktop/sample-data/IMG20250128173633.jpg",
+          "face_id": "452c165d3cb88f89"
+        }
+      ]
+    },
+    {
+      "cluster_id": "face-cluster-0010",
+      "person_label": null,
+      "face_count": 16,
+      "image_count": 4,
+      "sample_paths": [
+        "/Users/jay/Desktop/sample-data/IMG_20180616_184150035.jpg",
+        "/Users/jay/Desktop/sample-data/IMG20250130095414.jpg",
+        "/Users/jay/Desktop/sample-data/IMG20250131070953.jpg",
+        "/Users/jay/Desktop/sample-data/IMG20250131071043.jpg"
+      ],
+      "average_quality_score": 0.5443,
+      "members": [
+        {
+          "path": "/Users/jay/Desktop/sample-data/IMG_20180616_184150035.jpg",
+          "face_id": "54832640f98286ce"
+        },
+        {
+          "path": "/Users/jay/Desktop/sample-data/IMG_20180616_184150035.jpg",
+          "face_id": "9addb05865501fde"
+        },
+        {
+          "path": "/Users/jay/Desktop/sample-data/IMG_20180616_184150035.jpg",
+          "face_id": "10c2fd9bf42debe0"
+        },
+        {
+          "path": "/Users/jay/Desktop/sample-data/IMG_20180616_184150035.jpg",
+          "face_id": "e5112812b0e8409f"
+        },
+        {
+          "path": "/Users/jay/Desktop/sample-data/IMG_20180616_184150035.jpg",
+          "face_id": "edb3802d43e0f51e"
+        },
+        {
+          "path": "/Users/jay/Desktop/sample-data/IMG20250130095414.jpg",
+          "face_id": "667b854925450bd2"
+        },
+        {
+          "path": "/Users/jay/Desktop/sample-data/IMG_20180616_184150035.jpg",
+          "face_id": "30880540c4ccfca0"
+        },
+        {
+          "path": "/Users/jay/Desktop/sample-data/IMG_20180616_184150035.jpg",
+          "face_id": "8023d097dc65a612"
+        },
+        {
+          "path": "/Users/jay/Desktop/sample-data/IMG_20180616_184150035.jpg",
+          "face_id": "be11479459084cbc"
+        },
+        {
+          "path": "/Users/jay/Desktop/sample-data/IMG_20180616_184150035.jpg",
+          "face_id": "85ec86d06f2524e2"
+        },
+        {
+          "path": "/Users/jay/Desktop/sample-data/IMG_20180616_184150035.jpg",
+          "face_id": "235ceb4daf73baa7"
+        },
+        {
+          "path": "/Users/jay/Desktop/sample-data/IMG20250131070953.jpg",
+          "face_id": "275705411ea805c0"
+        },
+        {
+          "path": "/Users/jay/Desktop/sample-data/IMG20250131071043.jpg",
+          "face_id": "ae22aa2cf3c9535c"
+        },
+        {
+          "path": "/Users/jay/Desktop/sample-data/IMG_20180616_184150035.jpg",
+          "face_id": "c5f822ad861714d5"
+        },
+        {
+          "path": "/Users/jay/Desktop/sample-data/IMG20250130095414.jpg",
+          "face_id": "7b0f61e2ea63cf39"
+        },
+        {
+          "path": "/Users/jay/Desktop/sample-data/IMG_20180616_184150035.jpg",
+          "face_id": "30fdfaa104cde0a7"
+        }
+      ]
+    },
+    {
+      "cluster_id": "face-cluster-0011",
+      "person_label": null,
+      "face_count": 9,
+      "image_count": 9,
+      "sample_paths": [
+        "/Users/jay/Desktop/sample-data/IMG20250201072907.jpg",
+        "/Users/jay/Desktop/sample-data/IMG20250131071041.jpg",
+        "/Users/jay/Desktop/sample-data/IMG20250128173836.jpg",
+        "/Users/jay/Desktop/sample-data/IMG20250131071043.jpg",
+        "/Users/jay/Desktop/sample-data/IMG20250128173633.jpg",
+        "/Users/jay/Desktop/sample-data/IMG20250130094919.jpg",
+        "/Users/jay/Desktop/sample-data/IMG20250202113411.jpg",
+        "/Users/jay/Desktop/sample-data/IMG20250128173617.jpg",
+        "/Users/jay/Desktop/sample-data/IMG20250130094918.jpg"
+      ],
+      "average_quality_score": 0.4604,
+      "members": [
+        {
+          "path": "/Users/jay/Desktop/sample-data/IMG20250201072907.jpg",
+          "face_id": "7293e39ed9e69f03"
+        },
+        {
+          "path": "/Users/jay/Desktop/sample-data/IMG20250131071041.jpg",
+          "face_id": "88dc297e1bcdf620"
+        },
+        {
+          "path": "/Users/jay/Desktop/sample-data/IMG20250128173836.jpg",
+          "face_id": "4ae78f5f8e2c8b5b"
+        },
+        {
+          "path": "/Users/jay/Desktop/sample-data/IMG20250131071043.jpg",
+          "face_id": "2cbf0f3b6a17c974"
+        },
+        {
+          "path": "/Users/jay/Desktop/sample-data/IMG20250128173633.jpg",
+          "face_id": "74aace0b800bb6eb"
+        },
+        {
+          "path": "/Users/jay/Desktop/sample-data/IMG20250130094919.jpg",
+          "face_id": "646a889c8c2bcfe8"
+        },
+        {
+          "path": "/Users/jay/Desktop/sample-data/IMG20250202113411.jpg",
+          "face_id": "3938f6d77fce6e19"
+        },
+        {
+          "path": "/Users/jay/Desktop/sample-data/IMG20250128173617.jpg",
+          "face_id": "37d3941e2cbab058"
+        },
+        {
+          "path": "/Users/jay/Desktop/sample-data/IMG20250130094918.jpg",
+          "face_id": "72c9cd25c4e1e502"
+        }
+      ]
+    },
+    {
+      "cluster_id": "face-cluster-0012",
+      "person_label": null,
+      "face_count": 8,
+      "image_count": 6,
+      "sample_paths": [
+        "/Users/jay/Desktop/sample-data/IMG20250131070959.jpg",
+        "/Users/jay/Desktop/sample-data/IMG20250127172746.jpg",
+        "/Users/jay/Desktop/sample-data/IMG20250130095414.jpg",
+        "/Users/jay/Desktop/sample-data/IMG20250127172812.jpg",
+        "/Users/jay/Desktop/sample-data/IMG20250125163307.jpg",
+        "/Users/jay/Desktop/sample-data/IMG20250128173830.jpg"
+      ],
+      "average_quality_score": 0.4742,
+      "members": [
+        {
+          "path": "/Users/jay/Desktop/sample-data/IMG20250131070959.jpg",
+          "face_id": "9b0b037e3bee57f2"
+        },
+        {
+          "path": "/Users/jay/Desktop/sample-data/IMG20250127172746.jpg",
+          "face_id": "1b345d75d04aa74a"
+        },
+        {
+          "path": "/Users/jay/Desktop/sample-data/IMG20250131070959.jpg",
+          "face_id": "6b041a06311792df"
+        },
+        {
+          "path": "/Users/jay/Desktop/sample-data/IMG20250130095414.jpg",
+          "face_id": "31d47c280ab13700"
+        },
+        {
+          "path": "/Users/jay/Desktop/sample-data/IMG20250127172746.jpg",
+          "face_id": "e4e3fabe094a0fc2"
+        },
+        {
+          "path": "/Users/jay/Desktop/sample-data/IMG20250127172812.jpg",
+          "face_id": "16c23ec36719847f"
+        },
+        {
+          "path": "/Users/jay/Desktop/sample-data/IMG20250125163307.jpg",
+          "face_id": "65627d94e556c54a"
+        },
+        {
+          "path": "/Users/jay/Desktop/sample-data/IMG20250128173830.jpg",
+          "face_id": "5549b0ce0a9104c2"
+        }
+      ]
+    },
+    {
+      "cluster_id": "face-cluster-0013",
+      "person_label": null,
+      "face_count": 6,
+      "image_count": 6,
+      "sample_paths": [
+        "/Users/jay/Desktop/sample-data/IMG20250131070959.jpg",
+        "/Users/jay/Desktop/sample-data/IMG20250130094918.jpg",
+        "/Users/jay/Desktop/sample-data/IMG20250130095417.jpg",
+        "/Users/jay/Desktop/sample-data/IMG20250131070953.jpg",
+        "/Users/jay/Desktop/sample-data/IMG20250128173836.jpg",
+        "/Users/jay/Desktop/sample-data/IMG20250125163312.jpg"
+      ],
+      "average_quality_score": 0.4393,
+      "members": [
+        {
+          "path": "/Users/jay/Desktop/sample-data/IMG20250131070959.jpg",
+          "face_id": "0f46019fb1b5e2b7"
+        },
+        {
+          "path": "/Users/jay/Desktop/sample-data/IMG20250130094918.jpg",
+          "face_id": "96529f6e93b9f3d0"
+        },
+        {
+          "path": "/Users/jay/Desktop/sample-data/IMG20250130095417.jpg",
+          "face_id": "e00e03df2d32001d"
+        },
+        {
+          "path": "/Users/jay/Desktop/sample-data/IMG20250131070953.jpg",
+          "face_id": "569d4a5c90ca533b"
+        },
+        {
+          "path": "/Users/jay/Desktop/sample-data/IMG20250128173836.jpg",
+          "face_id": "ce6d24e8402bb1bd"
+        },
+        {
+          "path": "/Users/jay/Desktop/sample-data/IMG20250125163312.jpg",
+          "face_id": "c3b5f926f3e9afda"
+        }
+      ]
+    },
+    {
+      "cluster_id": "face-cluster-0014",
+      "person_label": null,
+      "face_count": 6,
+      "image_count": 6,
+      "sample_paths": [
+        "/Users/jay/Desktop/sample-data/IMG20250128173633.jpg",
+        "/Users/jay/Desktop/sample-data/IMG20250130095417.jpg",
+        "/Users/jay/Desktop/sample-data/IMG20250130095419.jpg",
+        "/Users/jay/Desktop/sample-data/IMG20250128173548.jpg",
+        "/Users/jay/Desktop/sample-data/IMG20250131071043.jpg",
+        "/Users/jay/Desktop/sample-data/IMG20250128173559.jpg"
+      ],
+      "average_quality_score": 0.3798,
+      "members": [
+        {
+          "path": "/Users/jay/Desktop/sample-data/IMG20250128173633.jpg",
+          "face_id": "d9c5a08767632136"
+        },
+        {
+          "path": "/Users/jay/Desktop/sample-data/IMG20250130095417.jpg",
+          "face_id": "0d1218273d9d59b6"
+        },
+        {
+          "path": "/Users/jay/Desktop/sample-data/IMG20250130095419.jpg",
+          "face_id": "90d3e3b84d9eee7d"
+        },
+        {
+          "path": "/Users/jay/Desktop/sample-data/IMG20250128173548.jpg",
+          "face_id": "f7acef6c6cbe18c2"
+        },
+        {
+          "path": "/Users/jay/Desktop/sample-data/IMG20250131071043.jpg",
+          "face_id": "508303a40c6647f0"
+        },
+        {
+          "path": "/Users/jay/Desktop/sample-data/IMG20250128173559.jpg",
+          "face_id": "09a148ea10b49a88"
+        }
+      ]
+    },
+    {
+      "cluster_id": "face-cluster-0015",
+      "person_label": null,
+      "face_count": 6,
+      "image_count": 6,
+      "sample_paths": [
+        "/Users/jay/Desktop/sample-data/IMG20250128173830.jpg",
+        "/Users/jay/Desktop/sample-data/IMG20250130094919.jpg",
+        "/Users/jay/Desktop/sample-data/IMG20250128173559.jpg",
+        "/Users/jay/Desktop/sample-data/IMG20250131071043.jpg",
+        "/Users/jay/Desktop/sample-data/IMG20250128173839.jpg",
+        "/Users/jay/Desktop/sample-data/IMG20250128173832.jpg"
+      ],
+      "average_quality_score": 0.4023,
+      "members": [
+        {
+          "path": "/Users/jay/Desktop/sample-data/IMG20250128173830.jpg",
+          "face_id": "cc59543bfe8515bc"
+        },
+        {
+          "path": "/Users/jay/Desktop/sample-data/IMG20250130094919.jpg",
+          "face_id": "226cafbc7b27225b"
+        },
+        {
+          "path": "/Users/jay/Desktop/sample-data/IMG20250128173559.jpg",
+          "face_id": "2b66f73517e7eb6e"
+        },
+        {
+          "path": "/Users/jay/Desktop/sample-data/IMG20250131071043.jpg",
+          "face_id": "0b4904ff7af768e7"
+        },
+        {
+          "path": "/Users/jay/Desktop/sample-data/IMG20250128173839.jpg",
+          "face_id": "2ed202912d91865e"
+        },
+        {
+          "path": "/Users/jay/Desktop/sample-data/IMG20250128173832.jpg",
+          "face_id": "2d7e8fcd5c2f4495"
+        }
+      ]
+    },
+    {
+      "cluster_id": "face-cluster-0016",
+      "person_label": null,
+      "face_count": 3,
+      "image_count": 3,
+      "sample_paths": [
+        "/Users/jay/Desktop/sample-data/IMG20250128173617.jpg",
+        "/Users/jay/Desktop/sample-data/IMG20250131070959.jpg",
+        "/Users/jay/Desktop/sample-data/IMG20250128173548.jpg"
+      ],
+      "average_quality_score": 0.4337,
+      "members": [
+        {
+          "path": "/Users/jay/Desktop/sample-data/IMG20250128173617.jpg",
+          "face_id": "53ac70ac5c96b4b0"
+        },
+        {
+          "path": "/Users/jay/Desktop/sample-data/IMG20250131070959.jpg",
+          "face_id": "c7b902d03702b836"
+        },
+        {
+          "path": "/Users/jay/Desktop/sample-data/IMG20250128173548.jpg",
+          "face_id": "09c14428e06af882"
+        }
+      ]
+    }
+  ]
+}

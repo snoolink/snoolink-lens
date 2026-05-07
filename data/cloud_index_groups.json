@@ -1,0 +1,86 @@
+{
+  "generated_at": "2026-05-06T15:53:22.324Z",
+  "total_candidates": 126,
+  "eligible_after_prereq_and_skip": 11,
+  "grouped_out": 0,
+  "representative_count": 11,
+  "groups": [
+    {
+      "representative": "/Users/jay/Desktop/sample-data/IMG_0161.HEIC",
+      "members": [
+        "/Users/jay/Desktop/sample-data/IMG_0161.HEIC"
+      ],
+      "group_id": 1
+    },
+    {
+      "representative": "/Users/jay/Desktop/sample-data/IMG_0170.HEIC",
+      "members": [
+        "/Users/jay/Desktop/sample-data/IMG_0170.HEIC"
+      ],
+      "group_id": 2
+    },
+    {
+      "representative": "/Users/jay/Desktop/sample-data/IMG_1061.HEIC",
+      "members": [
+        "/Users/jay/Desktop/sample-data/IMG_1061.HEIC"
+      ],
+      "group_id": 3
+    },
+    {
+      "representative": "/Users/jay/Desktop/sample-data/IMG_3459.HEIC",
+      "members": [
+        "/Users/jay/Desktop/sample-data/IMG_3459.HEIC"
+      ],
+      "group_id": 4
+    },
+    {
+      "representative": "/Users/jay/Desktop/sample-data/IMG_6061.HEIC",
+      "members": [
+        "/Users/jay/Desktop/sample-data/IMG_6061.HEIC"
+      ],
+      "group_id": 5
+    },
+    {
+      "representative": "/Users/jay/Desktop/sample-data/IMG_7553.HEIC",
+      "members": [
+        "/Users/jay/Desktop/sample-data/IMG_7553.HEIC"
+      ],
+      "group_id": 6
+    },
+    {
+      "representative": "/Users/jay/Desktop/sample-data/IMG_7557.HEIC",
+      "members": [
+        "/Users/jay/Desktop/sample-data/IMG_7557.HEIC"
+      ],
+      "group_id": 7
+    },
+    {
+      "representative": "/Users/jay/Desktop/sample-data/IMG_7567.HEIC",
+      "members": [
+        "/Users/jay/Desktop/sample-data/IMG_7567.HEIC"
+      ],
+      "group_id": 8
+    },
+    {
+      "representative": "/Users/jay/Desktop/sample-data/IMG_9942.HEIC",
+      "members": [
+        "/Users/jay/Desktop/sample-data/IMG_9942.HEIC"
+      ],
+      "group_id": 9
+    },
+    {
+      "representative": "/Users/jay/Desktop/sample-data/IMG20250125163312.jpg",
+      "members": [
+        "/Users/jay/Desktop/sample-data/IMG20250125163312.jpg"
+      ],
+      "group_id": 10
+    },
+    {
+      "representative": "/Users/jay/Desktop/sample-data/IMG20250127174603.jpg",
+      "members": [
+        "/Users/jay/Desktop/sample-data/IMG20250127174603.jpg"
+      ],
+      "group_id": 11
+    }
+  ]
+}
