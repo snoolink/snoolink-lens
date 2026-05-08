@@ -231,8 +231,11 @@ async function extractFramesByInterval(videoPath, outputDir, frameIntervalSecond
     "-hide_banner",
     "-loglevel",
     "error",
+    "-y",
     "-i",
     videoPath,
+    "-map",
+    "0:v:0",
     "-vf",
     `fps=1/${safeInterval}`,
     "-q:v",
@@ -242,6 +245,75 @@ async function extractFramesByInterval(videoPath, outputDir, frameIntervalSecond
 
   try {
     await execFileAsync(ffmpegBinary, args, {
+      windowsHide: true,
+      maxBuffer: 20 * 1024 * 1024,
+    });
+  } catch (error) {
+    const code = String(error?.code || "").toUpperCase();
+    if (code === "ENOENT") {
+      throw new Error(
+        "ffmpeg was not found. Install FFmpeg and/or set FFMPEG_PATH to ffmpeg.exe.",
+      );
+    }
+    throw error;
+  }
+}
+
+async function normalizeMovToMp4(sourcePath, targetPath) {
+  const ffmpegBinary = await resolveMediaBinary("ffmpeg");
+
+  const remuxArgs = [
+    "-hide_banner",
+    "-loglevel",
+    "error",
+    "-y",
+    "-i",
+    sourcePath,
+    "-map",
+    "0:v:0",
+    "-an",
+    "-c:v",
+    "copy",
+    "-movflags",
+    "+faststart",
+    targetPath,
+  ];
+
+  try {
+    await execFileAsync(ffmpegBinary, remuxArgs, {
+      windowsHide: true,
+      maxBuffer: 20 * 1024 * 1024,
+    });
+    return;
+  } catch {
+    // Fall through to full re-encode when stream-copy is not possible.
+  }
+
+  const reencodeArgs = [
+    "-hide_banner",
+    "-loglevel",
+    "error",
+    "-y",
+    "-i",
+    sourcePath,
+    "-map",
+    "0:v:0",
+    "-an",
+    "-c:v",
+    "libx264",
+    "-preset",
+    "veryfast",
+    "-crf",
+    "20",
+    "-pix_fmt",
+    "yuv420p",
+    "-movflags",
+    "+faststart",
+    targetPath,
+  ];
+
+  try {
+    await execFileAsync(ffmpegBinary, reencodeArgs, {
       windowsHide: true,
       maxBuffer: 20 * 1024 * 1024,
     });
@@ -380,14 +452,33 @@ export async function describeVideo(videoPath, options = {}) {
     }
 
     const frameIntervalSeconds = pickFrameIntervalSeconds(durationSeconds);
-    await extractFramesByInterval(normalizedVideoPath, tempDir, frameIntervalSeconds);
+    let extractionSourcePath = normalizedVideoPath;
+    let frameFiles = [];
+    let firstExtractionError = "";
 
-    let frameFiles = (await readdir(tempDir))
-      .filter((name) => name.toLowerCase().endsWith(".jpg"))
-      .sort((a, b) => a.localeCompare(b));
+    try {
+      await extractFramesByInterval(extractionSourcePath, tempDir, frameIntervalSeconds);
+      frameFiles = (await readdir(tempDir))
+        .filter((name) => name.toLowerCase().endsWith(".jpg"))
+        .sort((a, b) => a.localeCompare(b));
+    } catch (error) {
+      firstExtractionError = String(error?.message || error);
+    }
+
+    // Some MOV containers/codecs fail direct frame extraction; normalize to MP4 and retry.
+    if (frameFiles.length === 0 && path.extname(normalizedVideoPath).toLowerCase() === ".mov") {
+      const normalizedMovPath = join(tempDir, "normalized-mov.mp4");
+      await normalizeMovToMp4(normalizedVideoPath, normalizedMovPath);
+      extractionSourcePath = normalizedMovPath;
+      await extractFramesByInterval(extractionSourcePath, tempDir, frameIntervalSeconds);
+      frameFiles = (await readdir(tempDir))
+        .filter((name) => name.toLowerCase().endsWith(".jpg"))
+        .sort((a, b) => a.localeCompare(b));
+    }
 
     if (frameFiles.length === 0) {
-      throw new Error("No frames extracted from video. Ensure ffmpeg is installed and the video is readable.");
+      const details = firstExtractionError ? ` Initial extraction error: ${firstExtractionError}` : "";
+      throw new Error(`No frames extracted from video. Ensure ffmpeg is installed and the video is readable.${details}`);
     }
 
     if (Number.isFinite(maxFrames) && maxFrames > 0 && frameFiles.length > maxFrames) {

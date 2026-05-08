@@ -2170,6 +2170,48 @@ async function runLocalFaceAnalysis(imagePath, faceSettings) {
   const requestedDetectorType = modelVersion === "face-api-ssd-v1" ? "ssd" : "tiny";
   let activeDetectorType = cachedFaceDetectorMode || requestedDetectorType;
 
+  function toRgbPixelBuffer(rawPixelData, width, height, channels) {
+    const source = rawPixelData instanceof Uint8Array ? rawPixelData : new Uint8Array(rawPixelData);
+    const pixelCount = width * height;
+    const target = new Uint8Array(pixelCount * 3);
+
+    if (channels === 3) {
+      if (source.length !== target.length) {
+        throw new Error(`Unexpected RGB buffer size ${source.length}; expected ${target.length}.`);
+      }
+      target.set(source);
+      return target;
+    }
+
+    if (channels === 4) {
+      if (source.length !== pixelCount * 4) {
+        throw new Error(`Unexpected RGBA buffer size ${source.length}; expected ${pixelCount * 4}.`);
+      }
+      for (let i = 0, j = 0; i < source.length; i += 4, j += 3) {
+        target[j] = source[i];
+        target[j + 1] = source[i + 1];
+        target[j + 2] = source[i + 2];
+      }
+      return target;
+    }
+
+    if (channels === 1 || channels === 2) {
+      const stride = channels;
+      if (source.length !== pixelCount * stride) {
+        throw new Error(`Unexpected grayscale buffer size ${source.length}; expected ${pixelCount * stride}.`);
+      }
+      for (let i = 0, j = 0; i < source.length; i += stride, j += 3) {
+        const value = source[i];
+        target[j] = value;
+        target[j + 1] = value;
+        target[j + 2] = value;
+      }
+      return target;
+    }
+
+    throw new Error(`Unsupported raw image channel count: ${channels}.`);
+  }
+
   async function loadFaceApiModule() {
     if (cachedFaceApiModule) {
       return cachedFaceApiModule;
@@ -2356,12 +2398,14 @@ async function runLocalFaceAnalysis(imagePath, faceSettings) {
 
     const width = Number(raw?.info?.width || 0);
     const height = Number(raw?.info?.height || 0);
-    const channels = Number(raw?.info?.channels || 3);
+    const channels = Number(raw?.info?.channels || 0);
     if (!width || !height) {
       return { ok: false, message: "Invalid image dimensions for face analysis." };
     }
 
-    const tensor = faceapi.tf.tensor3d(new Uint8Array(raw.data), [height, width, channels], "int32");
+    const rgbPixels = toRgbPixelBuffer(raw?.data, width, height, channels);
+
+    const tensor = faceapi.tf.tensor3d(rgbPixels, [height, width, 3], "int32");
 
     try {
       const minDetectionConfidence = Number(faceSettings?.minDetectionConfidence ?? 0.6);
