@@ -1,189 +1,3 @@
-// function toMetadataText(details) {
-//   const normalizedCloudMetadata = details?.cloud_metadata
-//     ? details.cloud_metadata
-//     : details?.model_id || details?.description || details?.ocr
-//       ? {
-//           id: details?.id || null,
-//           image_path: details?.image_path || details?.path || "",
-//           model_id: details?.model_id || null,
-//           analyzed_at: details?.analyzed_at || null,
-//           description: details?.description || "",
-//           ocr: details?.ocr || { all_text: "", entries: [] },
-//           status: details?.status || "unknown",
-//           error: details?.error || "",
-//         }
-//       : null;
-
-//   const metadata = details?.metadata || {};
-//   const payload = {
-//     path: details?.path || "",
-//     image_path: details?.image_path || details?.path || "",
-//     id: details?.id || null,
-//     status: details?.status || "unknown",
-//     metadata,
-//     local_metadata: details?.local_metadata || null,
-//     cloud_metadata: normalizedCloudMetadata,
-//     error: details?.error || "",
-//   };
-//   return JSON.stringify(payload, null, 2);
-// }
-
-// export function createImagePreviewPanel(options = {}) {
-//   const normalizeImageSrc = options.normalizeImageSrc || ((value) => value);
-//   const resolveDetails = options.resolveDetails || (async (_row) => ({ metadata: {} }));
-//   const onOpenSourceFolder = options.onOpenSourceFolder || (async () => ({ ok: false, message: "Action unavailable." }));
-//   const onCopyText = options.onCopyText || (async () => ({ ok: false, message: "Action unavailable." }));
-//   const setStatus = options.setStatus || (() => {});
-
-//   const overlay = document.createElement("div");
-//   overlay.className = "image-preview-overlay hidden";
-//   overlay.setAttribute("aria-hidden", "true");
-
-//   overlay.innerHTML = `
-//     <div class="image-preview-panel" role="dialog" aria-modal="true" aria-label="Image preview details">
-//       <button class="image-preview-close" type="button" aria-label="Close preview">x</button>
-//       <button class="image-preview-toggle-meta-btn" type="button" aria-pressed="false">Hide metadata</button>
-//       <section class="image-preview-left">
-//         <img class="image-preview-img" alt="Selected image preview" />
-//       </section>
-//       <section class="image-preview-right">
-//         <h3 class="image-preview-title">Image details</h3>
-//         <div class="image-preview-actions">
-//           <button class="image-preview-copy-btn" type="button">Copy</button>
-//           <button class="image-preview-open-btn" type="button">Go to Original Source Folder</button>
-//         </div>
-//         <pre class="image-preview-meta"></pre>
-//       </section>
-//     </div>
-//   `;
-
-//   document.body.appendChild(overlay);
-
-//   const panel = overlay.querySelector(".image-preview-panel");
-//   const closeBtn = overlay.querySelector(".image-preview-close");
-//   const imageEl = overlay.querySelector(".image-preview-img");
-//   const titleEl = overlay.querySelector(".image-preview-title");
-//   const metaEl = overlay.querySelector(".image-preview-meta");
-//   const toggleMetaBtn = overlay.querySelector(".image-preview-toggle-meta-btn");
-//   const copyBtn = overlay.querySelector(".image-preview-copy-btn");
-//   const openBtn = overlay.querySelector(".image-preview-open-btn");
-
-//   let currentDetails = null;
-
-//   function close() {
-//     overlay.classList.add("hidden");
-//     overlay.setAttribute("aria-hidden", "true");
-//     document.body.classList.remove("preview-open");
-//   }
-
-//   function open() {
-//     overlay.classList.remove("hidden");
-//     overlay.setAttribute("aria-hidden", "false");
-//     document.body.classList.add("preview-open");
-//   }
-
-//   function setMetadataCollapsed(collapsed) {
-//     panel.classList.toggle("metadata-hidden", collapsed);
-//     if (!toggleMetaBtn) {
-//       return;
-//     }
-//     toggleMetaBtn.textContent = collapsed ? "Show metadata" : "Hide metadata";
-//     toggleMetaBtn.setAttribute("aria-pressed", collapsed ? "true" : "false");
-//   }
-
-//   async function openForRow(row) {
-//     const imagePath = String(row?.path || row?.image_path || "");
-//     titleEl.textContent = row?.metadata?.title || "Image details";
-//     imageEl.src = normalizeImageSrc(imagePath);
-//     setMetadataCollapsed(false);
-//     metaEl.textContent = "Loading metadata...";
-//     currentDetails = {
-//       path: imagePath,
-//       image_path: imagePath,
-//       status: row?.status || "ok",
-//       metadata: row?.metadata || {},
-//       local_metadata: row?.local_metadata || null,
-//       cloud_metadata: row?.cloud_metadata || null,
-//     };
-//     open();
-
-//     try {
-//       const resolved = await resolveDetails(row);
-//       currentDetails = {
-//         path: imagePath,
-//         ...resolved,
-//       };
-//       titleEl.textContent = currentDetails?.metadata?.title || row?.metadata?.title || "Image details";
-//       metaEl.textContent = toMetadataText(currentDetails);
-//     } catch (error) {
-//       currentDetails = {
-//         path: imagePath,
-//         status: "failed",
-//         metadata: row?.metadata || {},
-//         error: String(error?.message || error),
-//       };
-//       metaEl.textContent = toMetadataText(currentDetails);
-//     }
-//   }
-
-//   closeBtn.addEventListener("click", () => {
-//     close();
-//   });
-
-//   overlay.addEventListener("click", (event) => {
-//     if (!panel.contains(event.target)) {
-//       close();
-//     }
-//   });
-
-//   window.addEventListener("keydown", (event) => {
-//     if (event.key === "Escape" && !overlay.classList.contains("hidden")) {
-//       close();
-//     }
-//   });
-
-//   if (toggleMetaBtn) {
-//     toggleMetaBtn.addEventListener("click", () => {
-//       const collapsed = !panel.classList.contains("metadata-hidden");
-//       setMetadataCollapsed(collapsed);
-//     });
-//   }
-
-//   copyBtn.addEventListener("click", async () => {
-//     if (!currentDetails) {
-//       return;
-//     }
-
-//     const payloadText = toMetadataText(currentDetails);
-//     const result = await onCopyText(payloadText);
-//     if (result?.ok) {
-//       setStatus("Copied image metadata.");
-//       return;
-//     }
-
-//     setStatus(`Could not copy metadata: ${String(result?.message || "Unknown error")}`);
-//   });
-
-//   openBtn.addEventListener("click", async () => {
-//     if (!currentDetails?.path) {
-//       return;
-//     }
-
-//     const result = await onOpenSourceFolder(currentDetails.path);
-//     if (result?.ok) {
-//       setStatus("Opened source folder.");
-//       return;
-//     }
-
-//     setStatus(`Could not open source folder: ${String(result?.message || "Unknown error")}`);
-//   });
-
-//   return {
-//     openForRow,
-//     close,
-//   };
-// }
-
 import { normalizeMediaType } from "./previewVideo.js";
 
 function toMetadataText(details) {
@@ -320,14 +134,14 @@ export function createImagePreviewPanel(options = {}) {
         <!-- Right: sidebar -->
         <section class="image-preview-right" aria-label="Image metadata">
           <div class="image-preview-tab-row" role="tablist">
-            <button class="image-preview-tab active" data-tab="info" role="tab" aria-selected="true" type="button">Info</button>
+            <button class="image-preview-tab" data-tab="info" role="tab" aria-selected="false" type="button">Info</button>
             <button class="image-preview-tab" data-tab="ai" role="tab" aria-selected="false" type="button">AI</button>
             <button class="image-preview-tab" data-tab="tags" role="tab" aria-selected="false" type="button">Tags</button>
-            <button class="image-preview-tab" data-tab="raw" role="tab" aria-selected="false" type="button">Raw</button>
+            <button class="image-preview-tab active" data-tab="raw" role="tab" aria-selected="true" type="button">Raw</button>
           </div>
 
           <!-- Info tab -->
-          <div class="image-preview-tab-body active" data-panel="info">
+          <div class="image-preview-tab-body" data-panel="info">
             <div class="image-preview-section">
               <div class="image-preview-section-label">Status</div>
               <div class="image-preview-status-row">
@@ -384,7 +198,7 @@ export function createImagePreviewPanel(options = {}) {
           </div>
 
           <!-- Raw tab -->
-          <div class="image-preview-tab-body" data-panel="raw">
+          <div class="image-preview-tab-body active" data-panel="raw">
             <div class="image-preview-section">
               <div class="image-preview-section-label">Raw metadata payload</div>
               <pre class="image-preview-meta"></pre>
@@ -520,7 +334,43 @@ export function createImagePreviewPanel(options = {}) {
       imageEl.classList.add("hidden");
       imageEl.src = "";
       videoEl.classList.remove("hidden");
-      videoEl.src = String(preferredPreviewSrc || "").trim() || normalizeImageSrc(imagePath);
+      let videoSrc = String(preferredPreviewSrc || "").trim() || normalizeImageSrc(imagePath);
+      try {
+        if (!preferredPreviewSrc) {
+          const preferred = await resolvePreviewSrc(imagePath, normalizedMediaType);
+          const preferredSrc = String(preferred?.previewSrc || "").trim();
+          if (preferred?.ok && preferredSrc) {
+            videoSrc = preferredSrc;
+          }
+        }
+      } catch {
+        // Keep normalized source.
+      }
+
+      let videoFallbackAttempted = false;
+      videoEl.onerror = async () => {
+        if (videoFallbackAttempted) {
+          videoEl.src = "";
+          return;
+        }
+
+        videoFallbackAttempted = true;
+        try {
+          const fallback = await resolvePreviewSrc(imagePath, normalizedMediaType);
+          const nextSrc = String(fallback?.previewSrc || "").trim();
+          if (fallback?.ok && nextSrc && nextSrc !== videoEl.src) {
+            videoEl.src = nextSrc;
+            void videoEl.play().catch(() => {});
+            return;
+          }
+        } catch {
+          // Ignore and fall through.
+        }
+
+        videoEl.src = "";
+      };
+
+      videoEl.src = videoSrc;
       videoEl.currentTime = 0;
       void videoEl.play().catch(() => {});
       return;
@@ -532,7 +382,7 @@ export function createImagePreviewPanel(options = {}) {
     let baseSrc = String(preferredPreviewSrc || "").trim() || normalizeImageSrc(imagePath);
     try {
       if (!preferredPreviewSrc) {
-        const preferred = await resolvePreviewSrc(imagePath);
+        const preferred = await resolvePreviewSrc(imagePath, normalizedMediaType);
         const preferredSrc = String(preferred?.previewSrc || "").trim();
         if (preferred?.ok && preferredSrc) {
           baseSrc = preferredSrc;
@@ -553,7 +403,7 @@ export function createImagePreviewPanel(options = {}) {
 
       fallbackAttempted = true;
       try {
-        const fallback = await resolvePreviewSrc(imagePath);
+        const fallback = await resolvePreviewSrc(imagePath, normalizedMediaType);
         const nextSrc = String(fallback?.previewSrc || "").trim();
         if (fallback?.ok && nextSrc && nextSrc !== imageEl.src) {
           imageEl.src = nextSrc;

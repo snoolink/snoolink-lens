@@ -4,7 +4,9 @@ import { createRequire } from "node:module";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import fs from "node:fs/promises";
 import fsSync from "node:fs";
+import { execFile } from "node:child_process";
 import { createHash } from "node:crypto";
+import { promisify } from "node:util";
 import { runSemanticSearch, validateMetadataFile } from "./searchEngine.js";
 import { getMediaTypeFromPath } from "./previewVideo.js";
 import { registerScanHandlers } from "./scanManager.js";
@@ -58,6 +60,7 @@ const LOCAL_GROUPS_OUTPUT_PATH = path.join(DATA_DIR_PATH, "local_index_groups.js
 const LOCAL_FACE_CLUSTERS_OUTPUT_PATH = path.join(DATA_DIR_PATH, "local_face_clusters.json");
 const SEARCH_HISTORY_PATH = path.join(DATA_DIR_PATH, "search_history.json");
 const MAX_SEARCH_HISTORY_ENTRIES = 10000;
+const execFileAsync = promisify(execFile);
 
 const IMAGE_FILE_TYPES = [
   ".jpg",
@@ -1066,7 +1069,234 @@ let cachedFaceModelDirPath = "";
 let cachedFaceTfBackendReady = false;
 let cachedFaceDetectorMode = "";
 let loggedSsdFallbackWarning = false;
+let cachedFfmpegBinary = "";
 const imagePreviewSrcCache = new Map();
+
+function normalizeBinaryFromEnv(pathOrDir, binaryName) {
+  const value = String(pathOrDir || "").trim();
+  if (!value) {
+    return "";
+  }
+
+  const exeName = process.platform === "win32" ? `${binaryName}.exe` : binaryName;
+  if (fsSync.existsSync(value)) {
+    return value;
+  }
+
+  const combined = path.join(value, exeName);
+  if (fsSync.existsSync(combined)) {
+    return combined;
+  }
+
+  return "";
+}
+
+async function resolveWingetFfmpegBinary() {
+  if (process.platform !== "win32") {
+    return "";
+  }
+
+  const localAppData = String(process.env.LOCALAPPDATA || "").trim();
+  if (!localAppData) {
+    return "";
+  }
+
+  const packagesRoot = path.join(localAppData, "Microsoft", "WinGet", "Packages");
+  if (!fsSync.existsSync(packagesRoot)) {
+    return "";
+  }
+
+  let packageEntries = [];
+  try {
+    packageEntries = await fs.readdir(packagesRoot, { withFileTypes: true });
+  } catch {
+    return "";
+  }
+
+  const ffmpegPackages = packageEntries
+    .filter((entry) => entry.isDirectory() && entry.name.toLowerCase().startsWith("gyan.ffmpeg_"))
+    .map((entry) => path.join(packagesRoot, entry.name));
+
+  for (const pkgPath of ffmpegPackages) {
+    let childEntries = [];
+    try {
+      childEntries = await fs.readdir(pkgPath, { withFileTypes: true });
+    } catch {
+      childEntries = [];
+    }
+
+    for (const child of childEntries) {
+      if (!child.isDirectory()) {
+        continue;
+      }
+      const candidate = path.join(pkgPath, child.name, "bin", "ffmpeg.exe");
+      if (fsSync.existsSync(candidate)) {
+        return candidate;
+      }
+    }
+  }
+
+  return "";
+}
+
+function resolveCommonFfmpegBinaryPath() {
+  const candidates = [];
+
+  if (process.platform === "darwin") {
+    candidates.push(
+      "/opt/homebrew/bin/ffmpeg",
+      "/usr/local/bin/ffmpeg",
+      "/opt/local/bin/ffmpeg",
+    );
+  }
+
+  if (process.platform === "linux") {
+    candidates.push(
+      "/usr/bin/ffmpeg",
+      "/usr/local/bin/ffmpeg",
+      "/snap/bin/ffmpeg",
+    );
+  }
+
+  for (const candidate of candidates) {
+    if (fsSync.existsSync(candidate)) {
+      return candidate;
+    }
+  }
+
+  return "";
+}
+
+async function resolveFfmpegBinary() {
+  if (cachedFfmpegBinary) {
+    return cachedFfmpegBinary;
+  }
+
+  const fromEnv = normalizeBinaryFromEnv(process.env.FFMPEG_PATH, "ffmpeg");
+  if (fromEnv) {
+    cachedFfmpegBinary = fromEnv;
+    return fromEnv;
+  }
+
+  const fromWinget = await resolveWingetFfmpegBinary();
+  if (fromWinget) {
+    cachedFfmpegBinary = fromWinget;
+    return fromWinget;
+  }
+
+  const fromCommonPath = resolveCommonFfmpegBinaryPath();
+  if (fromCommonPath) {
+    cachedFfmpegBinary = fromCommonPath;
+    return fromCommonPath;
+  }
+
+  cachedFfmpegBinary = "ffmpeg";
+  return cachedFfmpegBinary;
+}
+
+function getCachedPreviewPath(cacheKey) {
+  const cached = imagePreviewSrcCache.get(cacheKey);
+  if (!cached?.path) {
+    return "";
+  }
+  return String(cached.path || "");
+}
+
+function prunePreviewCacheMap(maxEntries = 400) {
+  if (imagePreviewSrcCache.size <= maxEntries) {
+    return;
+  }
+  const firstKey = imagePreviewSrcCache.keys().next().value;
+  if (firstKey) {
+    imagePreviewSrcCache.delete(firstKey);
+  }
+}
+
+function rememberPreviewCache(cacheKey, cacheFilePath, converter) {
+  prunePreviewCacheMap(400);
+  imagePreviewSrcCache.set(cacheKey, {
+    path: cacheFilePath,
+    converter,
+  });
+}
+
+async function transcodeMovPreviewToMp4(sourcePath, outputPath) {
+  const ffmpegBinary = await resolveFfmpegBinary();
+
+  // Preserve source look whenever possible by re-wrapping compatible MOV streams.
+  const remuxArgs = [
+    "-hide_banner",
+    "-loglevel",
+    "error",
+    "-y",
+    "-i",
+    sourcePath,
+    "-map",
+    "0:v:0",
+    "-map",
+    "0:a:0?",
+    "-c:v",
+    "copy",
+    "-c:a",
+    "copy",
+    "-movflags",
+    "+faststart",
+    outputPath,
+  ];
+
+  try {
+    await execFileAsync(ffmpegBinary, remuxArgs, {
+      windowsHide: true,
+      maxBuffer: 20 * 1024 * 1024,
+    });
+    return;
+  } catch {
+    // Fall through to full re-encode for incompatible stream combinations.
+  }
+
+  const args = [
+    "-hide_banner",
+    "-loglevel",
+    "error",
+    "-y",
+    "-i",
+    sourcePath,
+    "-map",
+    "0:v:0",
+    "-map",
+    "0:a:0?",
+    "-c:v",
+    "libx264",
+    "-profile:v",
+    "high",
+    "-level:v",
+    "4.1",
+    "-crf",
+    "18",
+    "-pix_fmt",
+    "yuv420p",
+    "-preset",
+    "medium",
+    "-movflags",
+    "+faststart+use_metadata_tags",
+    "-map_metadata",
+    "0",
+    "-c:a",
+    "aac",
+    "-b:a",
+    "160k",
+    "-ac",
+    "2",
+    "-ar",
+    "48000",
+    outputPath,
+  ];
+
+  await execFileAsync(ffmpegBinary, args, {
+    windowsHide: true,
+    maxBuffer: 20 * 1024 * 1024,
+  });
+}
 
 async function loadSharpModule() {
   if (cachedSharpModule) {
@@ -1093,16 +1323,76 @@ async function resolvePreviewSrcForImage(imagePath, mediaTypeHint = "image") {
     return { ok: false, message: "Image file not found.", imagePath: normalizedPath };
   }
 
+  const ext = path.extname(normalizedPath).toLowerCase();
   if (mediaType === "video") {
-    return {
-      ok: true,
-      previewSrc: toPreviewSrc(normalizedPath),
-      converted: false,
-      imagePath: normalizedPath,
-    };
+    if (ext !== ".mov") {
+      return {
+        ok: true,
+        previewSrc: toPreviewSrc(normalizedPath),
+        converted: false,
+        imagePath: normalizedPath,
+      };
+    }
+
+    await fs.mkdir(PREVIEW_CACHE_DIR_PATH, { recursive: true });
+    let sourceFingerprint = "";
+    try {
+      const stats = await fs.stat(normalizedPath);
+      sourceFingerprint = `${stats.size}:${Math.round(stats.mtimeMs)}`;
+    } catch {
+      sourceFingerprint = "";
+    }
+    const cacheKey = `video-mov-v2:${normalizedPath.toLowerCase()}:${sourceFingerprint}`;
+    const cachedPath = getCachedPreviewPath(cacheKey);
+    if (cachedPath && (await pathExists(cachedPath))) {
+      return {
+        ok: true,
+        previewSrc: toPreviewSrc(cachedPath),
+        converted: true,
+        converter: "ffmpeg-mov-h264-aac",
+        imagePath: normalizedPath,
+      };
+    }
+
+    const cacheFileName = `${createHash("sha1").update(cacheKey).digest("hex")}.mp4`;
+    const cacheFilePath = path.join(PREVIEW_CACHE_DIR_PATH, cacheFileName);
+    if (await pathExists(cacheFilePath)) {
+      rememberPreviewCache(cacheKey, cacheFilePath, "cache");
+      return {
+        ok: true,
+        previewSrc: toPreviewSrc(cacheFilePath),
+        converted: true,
+        converter: "cache",
+        imagePath: normalizedPath,
+      };
+    }
+
+    try {
+      await transcodeMovPreviewToMp4(normalizedPath, cacheFilePath);
+      rememberPreviewCache(cacheKey, cacheFilePath, "ffmpeg-mov-h264-aac");
+      return {
+        ok: true,
+        previewSrc: toPreviewSrc(cacheFilePath),
+        converted: true,
+        converter: "ffmpeg-mov-h264-aac",
+        imagePath: normalizedPath,
+      };
+    } catch (error) {
+      const code = String(error?.code || "").toUpperCase();
+      const missingBinaryMessage =
+        code === "ENOENT"
+          ? "ffmpeg was not found. Install FFmpeg and/or set FFMPEG_PATH to the ffmpeg binary path."
+          : "";
+      return {
+        ok: true,
+        previewSrc: toPreviewSrc(normalizedPath),
+        converted: false,
+        imagePath: normalizedPath,
+        warning: missingBinaryMessage || String(error?.message || error),
+      };
+    }
   }
 
-  const ext = path.extname(normalizedPath).toLowerCase();
   if (!PREVIEW_CONVERTIBLE_EXTENSIONS.has(ext)) {
     return {
       ok: true,
@@ -1126,10 +1416,7 @@ async function resolvePreviewSrcForImage(imagePath, mediaTypeHint = "image") {
   const cacheFileName = `${createHash("sha1").update(normalizedPath.toLowerCase()).digest("hex")}.png`;
   const cacheFilePath = path.join(PREVIEW_CACHE_DIR_PATH, cacheFileName);
   if (await pathExists(cacheFilePath)) {
-    imagePreviewSrcCache.set(normalizedPath, {
-      path: cacheFilePath,
-      converter: "cache",
-    });
+    rememberPreviewCache(normalizedPath, cacheFilePath, "cache");
     return {
       ok: true,
       previewSrc: toPreviewSrc(cacheFilePath),
@@ -1157,16 +1444,7 @@ async function resolvePreviewSrcForImage(imagePath, mediaTypeHint = "image") {
         .png({ quality: 86 })
         .toFile(cacheFilePath);
 
-      if (imagePreviewSrcCache.size > 400) {
-        const firstKey = imagePreviewSrcCache.keys().next().value;
-        if (firstKey) {
-          imagePreviewSrcCache.delete(firstKey);
-        }
-      }
-      imagePreviewSrcCache.set(normalizedPath, {
-        path: cacheFilePath,
-        converter: "sharp",
-      });
+      rememberPreviewCache(normalizedPath, cacheFilePath, "sharp");
 
       return {
         ok: true,
@@ -1188,16 +1466,7 @@ async function resolvePreviewSrcForImage(imagePath, mediaTypeHint = "image") {
 
     if (thumbnail && !thumbnail.isEmpty()) {
       await fs.writeFile(cacheFilePath, thumbnail.toPNG());
-      if (imagePreviewSrcCache.size > 400) {
-        const firstKey = imagePreviewSrcCache.keys().next().value;
-        if (firstKey) {
-          imagePreviewSrcCache.delete(firstKey);
-        }
-      }
-      imagePreviewSrcCache.set(normalizedPath, {
-        path: cacheFilePath,
-        converter: "native-thumbnail",
-      });
+      rememberPreviewCache(normalizedPath, cacheFilePath, "native-thumbnail");
 
       return {
         ok: true,
