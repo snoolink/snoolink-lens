@@ -4,10 +4,10 @@ import { createRequire } from "node:module";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import fs from "node:fs/promises";
 import fsSync from "node:fs";
-import os from "node:os";
 import { createHash } from "node:crypto";
 import { runSemanticSearch, validateMetadataFile } from "./searchEngine.js";
 import { getMediaTypeFromPath } from "./previewVideo.js";
+import { registerScanHandlers } from "./scanManager.js";
 import {
   buildSimilarityGroupsFromLocalTargets,
   buildCloudGroupsFromLocalTargets,
@@ -19,18 +19,22 @@ const nodeRequire = createRequire(import.meta.url);
 const WORKSPACE_DATA_DIR_PATH = path.join(process.cwd(), "data");
 const MODULE_DATA_DIR_PATH = path.join(__dirname, "data");
 const USER_DATA_DIR_PATH = path.join(app.getPath("userData"), "data");
-const DEV_MODE = fsSync.existsSync(path.join(process.cwd(), "package.json"));
-const DATA_DIR_PATH = DEV_MODE
-  ? WORKSPACE_DATA_DIR_PATH
-  : app.isPackaged
-    ? USER_DATA_DIR_PATH
+const DEV_MODE = !app.isPackaged && fsSync.existsSync(path.join(process.cwd(), "package.json"));
+const DATA_DIR_PATH = app.isPackaged
+  ? USER_DATA_DIR_PATH
+  : DEV_MODE
+    ? WORKSPACE_DATA_DIR_PATH
     : MODULE_DATA_DIR_PATH;
 const MASTER_DIRECTORY_PATH = path.join(DATA_DIR_PATH, "master_image_directory.json");
 const ALBUMS_DATA_PATH = path.join(DATA_DIR_PATH, "albums_data.json");
 const USER_SETTINGS_PATH = path.join(DATA_DIR_PATH, "app_settings.json");
 const LEGACY_USER_SETTINGS_PATH = path.join(DATA_DIR_PATH, "user_settings.json");
 const LEGACY_USER_SETTINGS_SJON_PATH = path.join(DATA_DIR_PATH, "user_setting.sjon");
-const ENV_FILE_PATH = DEV_MODE ? path.join(__dirname, ".env") : path.join(app.getPath("userData"), ".env");
+const ENV_FILE_PATH = app.isPackaged
+  ? path.join(app.getPath("userData"), ".env")
+  : DEV_MODE
+    ? path.join(__dirname, ".env")
+    : path.join(app.getPath("userData"), ".env");
 const BUNDLED_ENV_SEED_PATH = app.isPackaged
   ? path.join(process.resourcesPath, "config", "default.env")
   : path.join(__dirname, "config", "default.env");
@@ -79,7 +83,6 @@ const VIDEO_FILE_TYPES = [
   ".mpeg",
   ".mpg",
   ".m2v",
-  ".ts",
   ".mts",
   ".m2ts",
   ".3gp",
@@ -99,14 +102,6 @@ const FALLBACK_INDEXABLE_FILE_TYPES = new Set([
   ...VIDEO_FILE_TYPES,
   ...EXTENDED_FILE_TYPES,
 ]);
-
-const scanState = {
-  running: false,
-  paused: false,
-  cancelled: false,
-  files: [],
-  options: null,
-};
 
 const indexState = {
   running: false,
@@ -214,162 +209,6 @@ async function appendSearchHistoryEntry(entry) {
 
   await fs.mkdir(DATA_DIR_PATH, { recursive: true });
   await fs.writeFile(SEARCH_HISTORY_PATH, JSON.stringify(payload, null, 2), "utf-8");
-}
-
-async function getMountedWindowsDrives() {
-  const roots = [];
-  for (let i = 65; i <= 90; i += 1) {
-    const letter = String.fromCharCode(i);
-    const root = `${letter}:\\`;
-    if (await pathExists(root)) {
-      roots.push(root);
-    }
-  }
-  return roots;
-}
-
-function normalizeExtensions(options) {
-  const useExtended = Boolean(options?.includeMoreFormats);
-  const custom = Array.isArray(options?.fileTypes) ? options.fileTypes : [];
-  const base = useExtended
-    ? [...IMAGE_FILE_TYPES, ...VIDEO_FILE_TYPES, ...EXTENDED_FILE_TYPES]
-    : [...IMAGE_FILE_TYPES, ...VIDEO_FILE_TYPES];
-  const merged = [...base, ...custom]
-    .map((ext) => String(ext || "").trim().toLowerCase())
-    .filter(Boolean)
-    .map((ext) => (ext.startsWith(".") ? ext : `.${ext}`));
-  return new Set(merged);
-}
-
-function isSystemBrandingAsset(filePath) {
-  const normalizedPath = String(filePath || "").toLowerCase().replaceAll("\\", "/");
-  const fileName = path.basename(filePath, path.extname(filePath)).toLowerCase();
-  const extension = path.extname(filePath).toLowerCase();
-
-  if (extension === ".ico" || extension === ".icns") {
-    return true;
-  }
-
-  const brandTerms = "windows|microsoft|apple|macos|mac\\s?os|osx";
-  const iconLogoTerms = "icon|icons|logo|logos|symbol|branding";
-  const brandedFilePattern = new RegExp(`(?:${brandTerms}).*(?:${iconLogoTerms})|(?:${iconLogoTerms}).*(?:${brandTerms})`, "i");
-  if (brandedFilePattern.test(fileName)) {
-    return true;
-  }
-
-  const systemAssetFolderPattern =
-    /\/(windows\/(branding|web|resources)|program files|program files \(x86\)|programdata|system\/library\/coreservices|system\/library\/privateframeworks|library\/application support)\//i;
-  if (systemAssetFolderPattern.test(normalizedPath) && /(icon|logo|branding)/i.test(fileName)) {
-    return true;
-  }
-
-  return false;
-}
-
-function isTemporaryImageArtifact(fileName) {
-  const name = String(fileName || "").trim();
-  if (!name) {
-    return false;
-  }
-  // macOS sidecar files copied to other filesystems often start with ._
-  return name.startsWith("._");
-}
-
-function getSearchRoots(options, customFolders) {
-  if (options?.scanMode === "custom" && Array.isArray(customFolders) && customFolders.length > 0) {
-    return customFolders;
-  }
-
-  const homeDir = os.homedir();
-  const systemDrive = process.env.SystemDrive || "C:";
-  return [
-    `${systemDrive}\\`,
-    path.join(homeDir, "Pictures"),
-    path.join(homeDir, "Desktop"),
-    path.join(homeDir, "Downloads"),
-  ];
-}
-
-async function collectImageFiles(roots, extSet, state) {
-  const unique = new Set();
-  const queue = [...roots];
-  let visitedFolders = 0;
-  let excludedBrandAssets = 0;
-
-  while (queue.length > 0) {
-    if (state?.cancelled) {
-      return { cancelled: true, files: Array.from(unique) };
-    }
-
-    await waitWhilePaused(state || scanState);
-    if (state?.cancelled) {
-      return { cancelled: true, files: Array.from(unique) };
-    }
-
-    const current = queue.shift();
-    visitedFolders += 1;
-    if (visitedFolders % 50 === 0) {
-      sendToRenderer("scan-log", { message: `Scanning folder ${current}...` });
-    }
-
-    let entries;
-    try {
-      entries = await fs.readdir(current, { withFileTypes: true });
-    } catch {
-      continue;
-    }
-
-    for (const entry of entries) {
-      if (state?.cancelled) {
-        return { cancelled: true, files: Array.from(unique) };
-      }
-
-      await waitWhilePaused(state || scanState);
-      if (state?.cancelled) {
-        return { cancelled: true, files: Array.from(unique) };
-      }
-
-      const fullPath = path.join(current, entry.name);
-      if (entry.isDirectory()) {
-        queue.push(fullPath);
-        continue;
-      }
-
-      if (!entry.isFile()) {
-        continue;
-      }
-
-      if (isTemporaryImageArtifact(entry.name)) {
-        continue;
-      }
-
-      const ext = path.extname(entry.name).toLowerCase();
-      if (!extSet.has(ext)) {
-        continue;
-      }
-
-      if (isSystemBrandingAsset(fullPath)) {
-        excludedBrandAssets += 1;
-        if (excludedBrandAssets % 100 === 0) {
-          sendToRenderer("scan-log", {
-            message: `Skipped ${excludedBrandAssets} OS icon/logo assets so far...`,
-          });
-        }
-        continue;
-      }
-
-      unique.add(fullPath);
-      if (unique.size % 120 === 0) {
-        sendToRenderer("scan-log", { message: `Found ${unique.size} media files so far...` });
-      }
-    }
-  }
-
-  return {
-    cancelled: false,
-    files: Array.from(unique),
-    excludedBrandAssets,
-  };
 }
 
 function makeMetadataForMedia(filePath, mediaType = "image") {
@@ -1728,27 +1567,14 @@ async function loadIndexingStageLookup() {
 async function readUserSettings() {
   const defaults = {
     enabledFilters: [
-      "containsText",
       "style",
       "orientation",
       "mediaType",
-      "ocrTextQuery",
       "resolutionMegapixels",
       "durationBucket",
       "fpsLabel",
       "aspectRatio",
       "fileType",
-      "aestheticStyle",
-      "aspectRatioSuitability",
-      "heroElement",
-      "objectTag",
-      "sceneTag",
-      "activityTag",
-      "instagramBand",
-      "socialMediaBand",
-      "editingLevel",
-      "visualComplexity",
-      "depthOfField",
     ],
     user_name: "youremail@email.com",
     user_password: "password",
@@ -2157,8 +1983,10 @@ async function runLocalFaceAnalysis(imagePath, faceSettings) {
       process.env.FACE_API_MODEL_DIR,
       path.join(process.cwd(), "assets", "face-models"),
       path.join(__dirname, "assets", "face-models"),
+      path.join(process.resourcesPath, "assets", "face-models"),
       path.join(process.cwd(), "models", "face-api"),
       path.join(__dirname, "models", "face-api"),
+      path.join(process.resourcesPath, "models", "face-api"),
       path.join(process.cwd(), "node_modules", "@vladmandic", "face-api", "model"),
       path.join(__dirname, "node_modules", "@vladmandic", "face-api", "model"),
     ].filter(Boolean);
@@ -2176,7 +2004,7 @@ async function runLocalFaceAnalysis(imagePath, faceSettings) {
   async function ensureFaceApiModelsLoaded(faceapi) {
     const modelDir = await resolveFaceModelDirPath(activeDetectorType);
     if (!modelDir) {
-      throw new Error("Face model files not found. Set FACE_API_MODEL_DIR or place models in assets/face-models.");
+      throw new Error("Face model files not found. Set FACE_API_MODEL_DIR or place models in models/face-api (or assets/face-models).");
     }
 
     let loadedDetectorType = activeDetectorType;
@@ -3916,160 +3744,18 @@ ipcMain.handle("get-album-images", async (_event, payload) => {
   }
 });
 
-ipcMain.handle("start-full-scan", async (_event, options) => {
-  if (scanState.running) {
-    return { ok: false, message: "A scan is already running." };
-  }
-
-  scanState.running = true;
-  scanState.paused = false;
-  scanState.cancelled = false;
-  scanState.files = [];
-  scanState.options = options || {};
-
-  (async () => {
-    try {
-      const extSet = normalizeExtensions(options || {});
-      const customFolders = Array.isArray(options?.customFolders) ? options.customFolders : [];
-      const roots = getSearchRoots(options || {}, customFolders);
-      const allRoots = [...roots];
-
-      if (options?.includeMountedDrives) {
-        const mounted = await getMountedWindowsDrives();
-        for (const drive of mounted) {
-          if (!allRoots.includes(drive)) {
-            allRoots.push(drive);
-          }
-        }
-      }
-
-      sendToRenderer("scan-log", { message: "Scan started. Discovering media files (images + videos)..." });
-      const discovery = await collectImageFiles(allRoots, extSet, scanState);
-      if (discovery.cancelled || scanState.cancelled) {
-        const partialCount = Array.isArray(discovery.files) ? discovery.files.length : 0;
-        sendToRenderer("scan-log", { message: "Scan cancelled by user during discovery." });
-        sendToRenderer("scan-complete", {
-          ok: false,
-          cancelled: true,
-          total: partialCount,
-          scanned: partialCount,
-          files: [],
-        });
-        return;
-      }
-
-      const found = discovery.files;
-      scanState.files = found;
-
-      if (Number(discovery.excludedBrandAssets || 0) > 0) {
-        sendToRenderer("scan-log", {
-          message: `Excluded ${discovery.excludedBrandAssets} Windows/macOS icon/logo assets from scan results.`,
-        });
-      }
-
-      const total = found.length;
-      sendToRenderer("scan-progress", { phase: "scan", percent: 0, scanned: 0, total });
-      sendToRenderer("scan-log", { message: `Found ${total} media files. Beginning scan phase...` });
-
-      let scanned = 0;
-      for (const imagePath of found) {
-        if (scanState.cancelled) {
-          sendToRenderer("scan-log", { message: "Scan cancelled by user." });
-          sendToRenderer("scan-complete", { ok: false, cancelled: true, total, scanned, files: [] });
-          return;
-        }
-
-        await waitWhilePaused(scanState);
-        if (scanState.cancelled) {
-          sendToRenderer("scan-complete", { ok: false, cancelled: true, total, scanned, files: [] });
-          return;
-        }
-
-        scanned += 1;
-        if (scanned % 150 === 0 || scanned === total) {
-          sendToRenderer("scan-log", { message: `Scanned ${scanned}/${total}` });
-        }
-
-        const percent = total === 0 ? 100 : Math.floor((scanned / total) * 100);
-        sendToRenderer("scan-progress", { phase: "scan", percent, scanned, total, current: imagePath });
-      }
-
-      const directoryUpdate = await updateMasterDirectoryFromScan(found);
-
-      const scanAlbumIds = Array.isArray(options?.scanAlbumIds)
-        ? options.scanAlbumIds.map((id) => Number(id)).filter((id) => Number.isFinite(id))
-        : [];
-      const inlineAlbumName = String(options?.scanCreateAlbumName || "").trim();
-      let targetAlbumIds = [...scanAlbumIds];
-
-      if (inlineAlbumName) {
-        const created = await createAlbumByName(inlineAlbumName);
-        if (created?.ok && Number.isFinite(Number(created.album?.id))) {
-          targetAlbumIds.push(Number(created.album.id));
-        }
-      }
-
-      targetAlbumIds = Array.from(new Set(targetAlbumIds));
-      if (targetAlbumIds.length > 0 && found.length > 0) {
-        const assignResult = await assignImagePathsToAlbums(found, targetAlbumIds);
-        if (assignResult?.ok) {
-          sendToRenderer("scan-log", {
-            message: `Assigned ${assignResult.assignedCount} scanned media files to selected album(s).`,
-          });
-        }
-      }
-
-      sendToRenderer("scan-log", {
-        message: `Master directory updated: ${directoryUpdate.total} files (${directoryUpdate.newItems} new, ${directoryUpdate.refreshedItems} refreshed).`,
-      });
-      sendToRenderer("scan-complete", {
-        ok: true,
-        cancelled: false,
-        total,
-        scanned,
-        files: found,
-        masterDirectoryPath: directoryUpdate.path,
-      });
-
-      if (options?.autoIndexAfterScan) {
-        await startIndexingInternal({ mode: "local" });
-      }
-    } catch (error) {
-      sendToRenderer("scan-complete", { ok: false, cancelled: false, message: String(error?.message || error), files: [] });
-    } finally {
-      scanState.running = false;
-      scanState.paused = false;
-      scanState.cancelled = false;
-    }
-  })();
-
-  return { ok: true, message: "Scan started." };
-});
-
-ipcMain.handle("pause-scan", async () => {
-  if (!scanState.running) {
-    return { ok: false, message: "No running scan." };
-  }
-  scanState.paused = true;
-  sendToRenderer("scan-log", { message: "Scan paused." });
-  return { ok: true };
-});
-
-ipcMain.handle("resume-scan", async () => {
-  if (!scanState.running) {
-    return { ok: false, message: "No running scan." };
-  }
-  scanState.paused = false;
-  sendToRenderer("scan-log", { message: "Scan resumed." });
-  return { ok: true };
-});
-
-ipcMain.handle("cancel-scan", async () => {
-  if (!scanState.running) {
-    return { ok: false, message: "No running scan." };
-  }
-  scanState.cancelled = true;
-  return { ok: true };
+registerScanHandlers({
+  ipcMain,
+  sendToRenderer,
+  waitWhilePaused,
+  pathExists,
+  updateMasterDirectoryFromScan,
+  createAlbumByName,
+  assignImagePathsToAlbums,
+  startIndexingInternal,
+  imageFileTypes: IMAGE_FILE_TYPES,
+  videoFileTypes: VIDEO_FILE_TYPES,
+  extendedFileTypes: EXTENDED_FILE_TYPES,
 });
 
 async function startIndexingInternal({ files, mode = "local" }) {

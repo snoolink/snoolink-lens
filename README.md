@@ -44,6 +44,7 @@ npm run dist:all
 macOS:
 
 ```bash
+npm install --include=optional
 npm run dist:mac
 # or
 npm run dist:mac:universal
@@ -59,7 +60,7 @@ Windows (PowerShell):
 
 ```powershell
 git clone <your-repo-url>
-cd snoolink-studios
+cd snoolink-lens
 npm install
 ```
 
@@ -67,7 +68,7 @@ macOS (Terminal):
 
 ```bash
 git clone <your-repo-url>
-cd snoolink-studios
+cd snoolink-lens
 npm install
 ```
 
@@ -132,13 +133,13 @@ By default, the app resolves model files from the project model folder. If you n
 Example (Windows PowerShell):
 
 ```powershell
-$env:FACE_API_MODEL_DIR = "C:\path\to\snoolink-studios\models\face-api"
+$env:FACE_API_MODEL_DIR = "C:\path\to\snoolink-lens\models\face-api"
 ```
 
 Example (macOS Terminal):
 
 ```bash
-export FACE_API_MODEL_DIR="/path/to/snoolink-studios/models/face-api"
+export FACE_API_MODEL_DIR="/path/to/snoolink-lens/models/face-api"
 ```
 
 ### 5) Run the app in dev mode
@@ -403,6 +404,20 @@ Design and implementation notes:
 - docs/local-face-indexing-design.md
 
 ## App Configuration and Environment
+
+### Where app data is stored
+
+Packaged desktop builds store data in each OS user-data location:
+
+- Windows: `%APPDATA%\\Snoolink Lens\\data`
+- macOS: `~/Library/Application Support/Snoolink Lens/data`
+
+Packaged desktop `.env` location:
+
+- Windows: `%APPDATA%\\Snoolink Lens\\.env`
+- macOS: `~/Library/Application Support/Snoolink Lens/.env`
+
+Development runs from source still use the project-local `data/` folder.
 
 ### Core runtime settings
 

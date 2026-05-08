@@ -163,32 +163,21 @@ const FILTER_DEFINITIONS = [
   { key: "faceClusterId", label: "Person Group", kind: "enum" },
 ];
 
+const DEFAULT_ENABLED_FILTERS = [
+  "style",
+  "orientation",
+  "mediaType",
+  "resolutionMegapixels",
+  "durationBucket",
+  "fpsLabel",
+  "aspectRatio",
+  "fileType",
+];
+
 const MULTI_VALUE_FILTER_KEYS = new Set(["sceneTag", "objectTag", "activityTag"]);
 
 const userSettingsState = {
-  enabledFilters: [
-    "containsText",
-    "style",
-    "orientation",
-    "mediaType",
-    "ocrTextQuery",
-    "resolutionMegapixels",
-    "durationBucket",
-    "fpsLabel",
-    "aspectRatio",
-    "fileType",
-    "aestheticStyle",
-    "aspectRatioSuitability",
-    "heroElement",
-    "objectTag",
-    "sceneTag",
-    "activityTag",
-    "instagramBand",
-    "socialMediaBand",
-    "editingLevel",
-    "visualComplexity",
-    "depthOfField",
-  ],
+  enabledFilters: [...DEFAULT_ENABLED_FILTERS],
   minMatchScore: 0.03,
   uiTheme: "aurora",
   resultsDensity: "comfortable",
@@ -1597,7 +1586,7 @@ async function loadSettingsUiState() {
   ));
 
   if (!loadedEnabledFiltersFromSettings && userSettingsState.enabledFilters.length === 0) {
-    userSettingsState.enabledFilters = FILTER_DEFINITIONS.map((def) => def.key);
+    userSettingsState.enabledFilters = [...DEFAULT_ENABLED_FILTERS];
   }
 
   renderUserFilterPicker();

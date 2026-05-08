@@ -20,6 +20,10 @@
   "build": {
     "appId": "com.snoolink.lens.desktop",
     "productName": "Snoolink Lens",
+    "asarUnpack": [
+      "node_modules/sharp/**/*",
+      "node_modules/@img/**/*"
+    ],
     "directories": {
       "output": "dist"
     },
@@ -38,6 +42,10 @@
       {
         "from": "config/default.env",
         "to": "config/default.env"
+      },
+      {
+        "from": "models/face-api",
+        "to": "models/face-api"
       }
     ],
     "win": {
