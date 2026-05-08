@@ -491,3 +491,53 @@ Examples:
 
 - Utility script available: scripts/rerun-local-index.mjs
 - Root test helper scripts were removed to keep runtime surface clean
+
+## How Cloud Indexing Works
+
+Cloud indexing in Snoolink Lens uses a cloud AI vision model (such as AWS Bedrock Vision) to extract rich semantic metadata, scene descriptions, tags, and OCR (text-in-image) from your media. This is optional and augments local metadata with deeper content understanding.
+
+### Cloud Indexing for Images
+
+- **Process:**
+  1. The app uploads a resized, optimized version of the image to the cloud model.
+  2. The model analyzes the image and returns a detailed JSON object with:
+     - Rich prose description of the scene, subjects, and context
+     - Scene tags (e.g., “beach”, “city”, “portrait”)
+     - Object tags (e.g., “car”, “dog”, “laptop”)
+     - Activity tags (e.g., “running”, “meeting”)
+     - Social media suitability scores
+     - Aesthetic and editing style
+     - Visual complexity, hero element, depth of field
+     - OCR: all visible text, with location and confidence
+  3. This metadata is merged into your catalog for advanced search and filtering.
+
+- **Use Cases:**
+  - Find images by content, activity, or objects (e.g., “dog in park”, “people hiking”)
+  - Search for images containing specific text (e.g., receipts, signs)
+  - Filter by style, mood, or suitability for social media
+
+### Cloud Indexing for Videos
+
+- **Process:**
+  1. The app extracts frames from the video at regular intervals using ffmpeg. The interval is chosen based on video length:
+     - Videos < 6 seconds: 1 frame per second
+     - 6–15 seconds: 1 frame every 1.5 seconds
+     - 15–30 seconds: 1 frame every 2 seconds
+     - 30–60 seconds: 1 frame every 3 seconds
+     - > 60 seconds: 1 frame every 5 seconds
+  2. Each extracted frame is sent to the cloud model for the same deep analysis as images.
+  3. The results from all frames are aggregated:
+     - Combined scene/object/activity tags
+     - Average social/Instagram scores
+     - Aggregated OCR text from all frames
+     - Combined description summarizing the video content
+  4. The final metadata object includes per-frame details and overall video-level tags.
+
+- **Use Cases:**
+  - Find videos by what’s happening in them (e.g., “wedding ceremony”, “dog playing fetch”)
+  - Search for videos containing specific text in any frame (e.g., “conference 2024”)
+  - Filter by detected activities, objects, or social suitability
+
+**Privacy & Cost:**
+- Only optimized images/frames are sent to the cloud, not originals.
+- Requires cloud credentials (AWS) and may incur API costs depending on usage.
