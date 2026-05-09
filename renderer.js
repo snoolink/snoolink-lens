@@ -30,6 +30,7 @@ const settingsUiThemeSelect = document.getElementById("settingsUiTheme");
 const settingsResultsDensitySelect = document.getElementById("settingsResultsDensity");
 const settingsAutoExpandFiltersInput = document.getElementById("settingsAutoExpandFilters");
 const settingsAutoCloseSidebarOnSettingsNavInput = document.getElementById("settingsAutoCloseSidebarOnSettingsNav");
+const settingsGalleryVideoAutoplayInput = document.getElementById("settingsGalleryVideoAutoplay");
 const settingsEnableFaceIndexingInput = document.getElementById("settingsEnableFaceIndexing");
 const settingsFaceModelVersionInput = document.getElementById("settingsFaceModelVersion");
 const settingsFaceMinConfidenceInput = document.getElementById("settingsFaceMinConfidence");
@@ -183,6 +184,7 @@ const userSettingsState = {
   resultsDensity: "comfortable",
   autoExpandFilters: false,
   autoCloseSidebarOnSettingsNav: true,
+  galleryVideoAutoplay: false,
   enableFaceIndexing: true,
   faceModelVersion: "face-api-ssd-v1",
   faceMinDetectionConfidence: 0.3,
@@ -1534,6 +1536,10 @@ async function loadSettingsUiState() {
         settings.auto_close_sidebar_on_settings_nav === undefined
           ? true
           : Boolean(settings.auto_close_sidebar_on_settings_nav);
+      userSettingsState.galleryVideoAutoplay =
+        settings.gallery_video_autoplay === undefined
+          ? false
+          : Boolean(settings.gallery_video_autoplay);
       userSettingsState.enableFaceIndexing = Boolean(settings.enable_face_indexing);
       userSettingsState.faceModelVersion = String(settings.face_model_version || "face-api-ssd-v1");
       userSettingsState.faceMinDetectionConfidence = Number.isFinite(Number(settings.face_min_detection_confidence))
@@ -1559,6 +1565,9 @@ async function loadSettingsUiState() {
       }
       if (settingsAutoCloseSidebarOnSettingsNavInput) {
         settingsAutoCloseSidebarOnSettingsNavInput.checked = userSettingsState.autoCloseSidebarOnSettingsNav;
+      }
+      if (settingsGalleryVideoAutoplayInput) {
+        settingsGalleryVideoAutoplayInput.checked = userSettingsState.galleryVideoAutoplay;
       }
       if (settingsEnableFaceIndexingInput) {
         settingsEnableFaceIndexingInput.checked = userSettingsState.enableFaceIndexing;
@@ -1641,7 +1650,27 @@ async function setCardImageSource(img, card, imagePath, preferredPreviewSrc) {
       img.src = "";
     }
 
-    const directVideoSrc = String(preferredPreviewSrc || "").trim() || normalizeImageSrc(imagePath);
+    const preferredVideoSrc = String(preferredPreviewSrc || "").trim();
+    let directVideoSrc = preferredVideoSrc || normalizeImageSrc(imagePath);
+    const sourceExt = getFileExtension(imagePath);
+    const previewExt = getFileExtension(preferredVideoSrc);
+    const shouldResolveVideoPreview = !preferredVideoSrc || sourceExt === ".mov" || previewExt === ".mov";
+
+    if (shouldResolveVideoPreview) {
+      const previewApi = window.desktopAPI?.getMediaPreviewSrc || window.desktopAPI?.getImagePreviewSrc;
+      if (previewApi) {
+        try {
+          const previewResult = await previewApi({ imagePath, mediaType });
+          const previewSrc = String(previewResult?.previewSrc || "").trim();
+          if (previewResult?.ok && previewSrc) {
+            directVideoSrc = previewSrc;
+          }
+        } catch {
+          // Keep direct source.
+        }
+      }
+    }
+
     if (!video || !directVideoSrc) {
       card.classList.add("no-image");
       return;
@@ -1653,7 +1682,12 @@ async function setCardImageSource(img, card, imagePath, preferredPreviewSrc) {
     video.muted = true;
     video.loop = true;
     video.playsInline = true;
-    void video.play().catch(() => {});
+    if (userSettingsState.galleryVideoAutoplay) {
+      void video.play().catch(() => {});
+    } else {
+      video.pause();
+      video.currentTime = 0;
+    }
     video.onerror = () => {
       video.classList.add("hidden");
       card.classList.add("no-image");
@@ -2387,6 +2421,7 @@ if (saveUserSettingsBtn) {
       userSettingsState.autoCloseSidebarOnSettingsNav = Boolean(
         settingsAutoCloseSidebarOnSettingsNavInput?.checked,
       );
+      userSettingsState.galleryVideoAutoplay = Boolean(settingsGalleryVideoAutoplayInput?.checked);
       userSettingsState.enableFaceIndexing = Boolean(settingsEnableFaceIndexingInput?.checked);
       userSettingsState.faceModelVersion = String(settingsFaceModelVersionInput?.value || "face-api-ssd-v1").trim() || "face-api-ssd-v1";
       const faceMinConfidenceInputValue = Number(settingsFaceMinConfidenceInput?.value);
@@ -2415,6 +2450,7 @@ if (saveUserSettingsBtn) {
         results_density: userSettingsState.resultsDensity,
         auto_expand_filters: userSettingsState.autoExpandFilters,
         auto_close_sidebar_on_settings_nav: userSettingsState.autoCloseSidebarOnSettingsNav,
+        gallery_video_autoplay: userSettingsState.galleryVideoAutoplay,
         enable_face_indexing: userSettingsState.enableFaceIndexing,
         face_model_version: userSettingsState.faceModelVersion,
         face_min_detection_confidence: userSettingsState.faceMinDetectionConfidence,

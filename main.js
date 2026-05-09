@@ -1334,6 +1334,17 @@ async function resolvePreviewSrcForImage(imagePath, mediaTypeHint = "image") {
       };
     }
 
+    // macOS (and non-Windows targets) should render MOV directly in Electron.
+    // Keep Windows-only transcoding as a compatibility fallback.
+    if (process.platform !== "win32") {
+      return {
+        ok: true,
+        previewSrc: toPreviewSrc(normalizedPath),
+        converted: false,
+        imagePath: normalizedPath,
+      };
+    }
+
     await fs.mkdir(PREVIEW_CACHE_DIR_PATH, { recursive: true });
     let sourceFingerprint = "";
     try {
@@ -1856,6 +1867,7 @@ async function readUserSettings() {
     results_density: "comfortable",
     auto_expand_filters: false,
     auto_close_sidebar_on_settings_nav: true,
+    gallery_video_autoplay: false,
     enable_face_indexing: true,
     face_model_version: "face-api-ssd-v1",
     face_min_detection_confidence: 0.3,
@@ -1906,6 +1918,10 @@ async function readUserSettings() {
         payload?.auto_close_sidebar_on_settings_nav === undefined
           ? defaults.auto_close_sidebar_on_settings_nav
           : Boolean(payload?.auto_close_sidebar_on_settings_nav),
+      gallery_video_autoplay:
+        payload?.gallery_video_autoplay === undefined
+          ? defaults.gallery_video_autoplay
+          : Boolean(payload?.gallery_video_autoplay),
       enable_face_indexing:
         payload?.enable_face_indexing === undefined
           ? defaults.enable_face_indexing
@@ -2083,6 +2099,10 @@ async function writeUserSettings(settings) {
       settings?.auto_close_sidebar_on_settings_nav === undefined
         ? true
         : Boolean(settings?.auto_close_sidebar_on_settings_nav),
+    gallery_video_autoplay:
+      settings?.gallery_video_autoplay === undefined
+        ? false
+        : Boolean(settings?.gallery_video_autoplay),
     enable_face_indexing:
       settings?.enable_face_indexing === undefined
         ? true

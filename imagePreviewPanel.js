@@ -141,7 +141,7 @@ export function createImagePreviewPanel(options = {}) {
           <div class="image-preview-img-area">
             <button class="image-preview-nav prev" type="button" aria-label="Previous image">&#8592;</button>
             <img class="image-preview-img" alt="Selected image preview" />
-            <video class="image-preview-video hidden" controls preload="metadata"></video>
+            <video class="image-preview-video hidden" controls preload="auto" playsinline webkit-playsinline="true"></video>
             <button class="image-preview-nav next" type="button" aria-label="Next image">&#8594;</button>
             <span class="image-preview-zoom-badge">100%</span>
           </div>
@@ -346,7 +346,17 @@ export function createImagePreviewPanel(options = {}) {
     return videoEl.classList.contains("hidden") ? imageEl : videoEl;
   }
 
+  function isVideoActive() {
+    return !videoEl.classList.contains("hidden");
+  }
+
   function renderTransform() {
+    if (isVideoActive()) {
+      // Keep video playback on a stable render path for smoother decode/composition.
+      videoEl.style.transform = "none";
+      return;
+    }
+
     const activeViewer = getActiveViewer();
     const scale = Number(transformState.scale || 1);
     const flipX = Number(transformState.flipX || 1);
@@ -366,6 +376,9 @@ export function createImagePreviewPanel(options = {}) {
   }
 
   function setZoomPercent(percent) {
+    if (isVideoActive()) {
+      return;
+    }
     const clamped = Math.max(25, Math.min(300, Number(percent) || 100));
     transformState.scale = clamped / 100;
     syncZoomUi();
@@ -383,6 +396,9 @@ export function createImagePreviewPanel(options = {}) {
   }
 
   function nudgePan(deltaX, deltaY) {
+    if (isVideoActive()) {
+      return;
+    }
     transformState.translateX += Number(deltaX || 0);
     transformState.translateY += Number(deltaY || 0);
     renderTransform();
@@ -403,12 +419,12 @@ export function createImagePreviewPanel(options = {}) {
       videoEl.classList.remove("hidden");
       let videoSrc = String(preferredPreviewSrc || "").trim() || normalizeImageSrc(imagePath);
       try {
-        if (!preferredPreviewSrc) {
-          const preferred = await resolvePreviewSrc(imagePath, normalizedMediaType);
-          const preferredSrc = String(preferred?.previewSrc || "").trim();
-          if (preferred?.ok && preferredSrc) {
-            videoSrc = preferredSrc;
-          }
+        // Always resolve video preview when possible so MOV files can use a
+        // codec-compatible cached MP4 preview across all UI contexts.
+        const preferred = await resolvePreviewSrc(imagePath, normalizedMediaType);
+        const preferredSrc = String(preferred?.previewSrc || "").trim();
+        if (preferred?.ok && preferredSrc) {
+          videoSrc = preferredSrc;
         }
       } catch {
         // Keep normalized source.
@@ -438,6 +454,8 @@ export function createImagePreviewPanel(options = {}) {
       };
 
       videoEl.src = videoSrc;
+      videoEl.preload = "auto";
+      videoEl.playsInline = true;
       videoEl.currentTime = 0;
       void videoEl.play().catch(() => {});
       return;
