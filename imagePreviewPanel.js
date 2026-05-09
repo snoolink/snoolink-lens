@@ -30,6 +30,66 @@ function toMetadataText(details) {
   return JSON.stringify(payload, null, 2);
 }
 
+/**
+ * Parses a description string that may contain timestamp markers like:
+ *   [0:00] Intro scene...
+ *   [00:00:00] Opening shot...
+ *   [0:00 - 0:30] First segment...
+ *   [00:00:00 - 00:00:30] ...
+ *
+ * Returns an array of { timestamp, text } objects when timestamps are found,
+ * or null if no timestamps are detected (plain text description).
+ */
+function parseTimestampedDescription(description) {
+  if (!description) return null;
+
+  // Matches "second 1.5:" / "second 0:" / "second 12.5:" — the format used by the AI describer.
+  // Also falls back to bracket notation: [0:00], [0:00 - 0:30], [H:MM:SS], etc.
+  const SECOND_RE = /second\s+(\d+(?:\.\d+)?)\s*:/gi;
+  const BRACKET_RE = /\[(\d{1,2}:\d{2}(?::\d{2})?(?:\s*[-–]\s*\d{1,2}:\d{2}(?::\d{2})?)?)\]/g;
+
+  // Try "second X:" format first
+  let matches = [];
+  let m;
+  while ((m = SECOND_RE.exec(description)) !== null) {
+    matches.push({
+      label: `${m[1]}s`,          // display label e.g. "1.5s"
+      seekSeconds: parseFloat(m[1]),
+      index: m.index,
+      end: SECOND_RE.lastIndex,
+    });
+  }
+
+  // Fall back to bracket timestamps if no "second X:" found
+  if (matches.length === 0) {
+    while ((m = BRACKET_RE.exec(description)) !== null) {
+      const ts = m[1].trim();
+      matches.push({
+        label: ts,
+        seekSeconds: parseTimestampToSeconds(ts.split(/[-–]/)[0].trim()),
+        index: m.index,
+        end: BRACKET_RE.lastIndex,
+      });
+    }
+  }
+
+  if (matches.length === 0) return null;
+
+  // Any text before the first timestamp becomes a preamble
+  const preamble = description.slice(0, matches[0].index).trim();
+
+  const segments = matches.map((current, i) => {
+    const nextStart = matches[i + 1]?.index ?? description.length;
+    return {
+      label: current.label,
+      seekSeconds: current.seekSeconds,
+      text: description.slice(current.end, nextStart).trim(),
+    };
+  });
+
+  return { preamble, segments };
+}
+
 export function createImagePreviewPanel(options = {}) {
   const normalizeImageSrc = options.normalizeImageSrc || ((value) => value);
   const resolvePreviewSrc =
@@ -168,8 +228,13 @@ export function createImagePreviewPanel(options = {}) {
           <!-- AI tab -->
           <div class="image-preview-tab-body" data-panel="ai">
             <div class="image-preview-section">
-              <div class="image-preview-section-label">AI description</div>
-              <div class="image-preview-ai-card image-preview-ai-description">Loading…</div>
+              <div class="image-preview-ai-desc-header">
+                <div class="image-preview-section-label image-preview-ai-desc-label">AI description</div>
+                <select class="image-preview-ai-ts-select hidden" aria-label="Jump to timeframe">
+                  <option value="">All timeframes</option>
+                </select>
+              </div>
+              <div class="image-preview-ai-description"></div>
             </div>
             <div class="image-preview-section">
               <div class="image-preview-section-label">Detected objects</div>
@@ -247,6 +312,8 @@ export function createImagePreviewPanel(options = {}) {
   const tagInput       = overlay.querySelector(".image-preview-tag-input");
   const tagAddBtn      = overlay.querySelector(".image-preview-tag-add-btn");
   const aiDesc         = overlay.querySelector(".image-preview-ai-description");
+  const aiDescLabel    = overlay.querySelector(".image-preview-ai-desc-label");
+  const aiTsSelect     = overlay.querySelector(".image-preview-ai-ts-select");
   const ocrText        = overlay.querySelector(".image-preview-ocr-text");
   const objectsList    = overlay.querySelector(".image-preview-objects-list");
   const fileDetails    = overlay.querySelector(".image-preview-file-details");
@@ -673,6 +740,185 @@ export function createImagePreviewPanel(options = {}) {
       .join("");
   }
 
+  /**
+   * Renders the AI description area.
+   * - For videos with timestamped descriptions: renders a scrollable timeline.
+   * - For images or plain descriptions: renders a simple card as before.
+   *
+   * Clicking a timestamp badge on a video seeks the video element to that time.
+   */
+  // Builds one timeline item DOM node
+  function buildTimelineItem({ label, seekSeconds, text }) {
+    const item = document.createElement("div");
+    item.className = "image-preview-ai-timeline-item";
+    item.setAttribute("role", "listitem");
+    item.dataset.tsLabel = label;
+
+    // ── Header row: badge + expand toggle ────────────────────────────────
+    const header = document.createElement("div");
+    header.className = "image-preview-ai-ts-header";
+
+    const badge = document.createElement("button");
+    badge.className = "image-preview-ai-ts-badge";
+    badge.type = "button";
+    badge.textContent = label;
+    badge.setAttribute("aria-label", `Jump to ${label}`);
+    badge.title = seekSeconds != null ? `Seek to ${label}` : label;
+
+    if (seekSeconds != null) {
+      badge.addEventListener("click", (e) => {
+        e.stopPropagation();
+        if (!videoEl.classList.contains("hidden")) {
+          videoEl.currentTime = seekSeconds;
+          void videoEl.play().catch(() => {});
+        }
+        aiTsSelect.value = label;
+        filterTimelineItems(label);
+      });
+    } else {
+      badge.disabled = true;
+    }
+
+    // Chevron toggle button
+    const toggle = document.createElement("button");
+    toggle.className = "image-preview-ai-ts-toggle";
+    toggle.type = "button";
+    toggle.setAttribute("aria-expanded", "false");
+    toggle.setAttribute("aria-label", "Expand description");
+    toggle.innerHTML = `<svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M2 3.5l3 3 3-3"/></svg>`;
+
+    header.appendChild(badge);
+    header.appendChild(toggle);
+
+    // ── Collapsed preview (2-line clamp) ─────────────────────────────────
+    const preview = document.createElement("p");
+    preview.className = "image-preview-ai-ts-preview";
+    preview.textContent = text || "—";
+
+    // ── Full text (hidden by default) ─────────────────────────────────────
+    const full = document.createElement("p");
+    full.className = "image-preview-ai-ts-full";
+    full.textContent = text || "—";
+    full.setAttribute("aria-hidden", "true");
+
+    // ── Expand / collapse logic ───────────────────────────────────────────
+    let expanded = false;
+
+    function setExpanded(next) {
+      expanded = next;
+      toggle.setAttribute("aria-expanded", String(expanded));
+      toggle.setAttribute("aria-label", expanded ? "Collapse description" : "Expand description");
+      item.classList.toggle("image-preview-ai-timeline-item--expanded", expanded);
+      preview.setAttribute("aria-hidden", String(expanded));
+      full.setAttribute("aria-hidden", String(!expanded));
+    }
+
+    // Clicking the header row (anywhere except the badge itself) toggles
+    header.addEventListener("click", (e) => {
+      if (e.target === badge || badge.contains(e.target)) return;
+      setExpanded(!expanded);
+    });
+    toggle.addEventListener("click", (e) => {
+      e.stopPropagation();
+      setExpanded(!expanded);
+    });
+
+    item.appendChild(header);
+    item.appendChild(preview);
+    item.appendChild(full);
+    return item;
+  }
+
+  // Shows/hides timeline items based on dropdown selection
+  function filterTimelineItems(selectedLabel) {
+    const items = aiDesc.querySelectorAll(".image-preview-ai-timeline-item");
+    items.forEach(item => {
+      const match = !selectedLabel || item.dataset.tsLabel === selectedLabel;
+      item.classList.toggle("hidden", !match);
+      item.classList.toggle("image-preview-ai-timeline-item--active", !!selectedLabel && match);
+    });
+  }
+
+  function renderAIDescription(description, isVideo) {
+    aiDesc.innerHTML = "";
+
+    // Reset dropdown
+    aiTsSelect.innerHTML = "<option value=\"\" >All timeframes</option>";
+    aiTsSelect.classList.add("hidden");
+
+    if (!description) {
+      const card = document.createElement("div");
+      card.className = "image-preview-ai-card";
+      card.textContent = "No description available.";
+      aiDesc.appendChild(card);
+      aiDescLabel.textContent = "AI description";
+      return;
+    }
+
+    const parsed = isVideo ? parseTimestampedDescription(description) : null;
+
+    if (!parsed) {
+      // Plain description — single card, no dropdown
+      const card = document.createElement("div");
+      card.className = "image-preview-ai-card";
+      card.textContent = description;
+      aiDesc.appendChild(card);
+      aiDescLabel.textContent = "AI description";
+      return;
+    }
+
+    aiDescLabel.textContent = "Timeline";
+
+    // Populate and show the dropdown
+    parsed.segments.forEach(({ label }) => {
+      const opt = document.createElement("option");
+      opt.value = label;
+      opt.textContent = label;
+      aiTsSelect.appendChild(opt);
+    });
+    aiTsSelect.classList.remove("hidden");
+
+    // Dropdown change handler — filter visible items + seek video
+    aiTsSelect.onchange = () => {
+      const selected = aiTsSelect.value;
+      filterTimelineItems(selected);
+      if (selected) {
+        const seg = parsed.segments.find(s => s.label === selected);
+        if (seg?.seekSeconds != null && !videoEl.classList.contains("hidden")) {
+          videoEl.currentTime = seg.seekSeconds;
+          void videoEl.play().catch(() => {});
+        }
+      }
+    };
+
+    // Optional preamble
+    if (parsed.preamble) {
+      const pre = document.createElement("div");
+      pre.className = "image-preview-ai-card image-preview-ai-preamble";
+      pre.textContent = parsed.preamble;
+      aiDesc.appendChild(pre);
+    }
+
+    // Timeline
+    const timeline = document.createElement("div");
+    timeline.className = "image-preview-ai-timeline";
+    timeline.setAttribute("role", "list");
+    parsed.segments.forEach(seg => timeline.appendChild(buildTimelineItem(seg)));
+    aiDesc.appendChild(timeline);
+  }
+
+  /**
+   * Converts a timestamp string like "1:23", "0:05", "1:23:45" into total seconds.
+   * Returns null if parsing fails.
+   */
+  function parseTimestampToSeconds(ts) {
+    const parts = String(ts || "").trim().split(":").map(Number);
+    if (parts.some(isNaN)) return null;
+    if (parts.length === 2) return parts[0] * 60 + parts[1];
+    if (parts.length === 3) return parts[0] * 3600 + parts[1] * 60 + parts[2];
+    return null;
+  }
+
   function populateInfoTab(details) {
     const lm = details?.local_metadata || {};
     const cm = details?.cloud_metadata || {};
@@ -703,7 +949,10 @@ export function createImagePreviewPanel(options = {}) {
 
   function populateAITab(details) {
     const cm = details?.cloud_metadata || {};
-    aiDesc.textContent  = cm.description || "No description available.";
+    const isVideo = details?.media_type === "video";
+
+    renderAIDescription(cm.description || "", isVideo);
+
     ocrText.textContent = cm.ocr?.all_text?.trim() || "No text detected.";
 
     objectsList.innerHTML = "";
@@ -821,7 +1070,8 @@ export function createImagePreviewPanel(options = {}) {
     resetTransformState();
 
     metaEl.textContent = "Loading…";
-    aiDesc.textContent  = "Loading…";
+    // Show a loading state in the description area
+    aiDesc.innerHTML = '<div class="image-preview-ai-card">Loading…</div>';
 
     currentDetails = {
       path: imagePath,
@@ -839,7 +1089,7 @@ export function createImagePreviewPanel(options = {}) {
 
     try {
       const resolved = await resolveDetails(row);
-      currentDetails = { path: imagePath, ...resolved };
+      currentDetails = { path: imagePath, media_type: mediaType, ...resolved };
       titleEl.textContent = currentDetails?.metadata?.title || titleEl.textContent;
       metaEl.textContent  = toMetadataText(currentDetails);
       populateInfoTab(currentDetails);
@@ -848,6 +1098,7 @@ export function createImagePreviewPanel(options = {}) {
     } catch (error) {
       currentDetails = {
         path: imagePath,
+        media_type: mediaType,
         status: "failed",
         metadata: row?.metadata || {},
         error: String(error?.message || error),
