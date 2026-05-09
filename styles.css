@@ -1374,7 +1374,7 @@ body.preview-open {
 
 .image-preview-body {
   display: grid;
-  grid-template-columns: 1fr 320px;
+  grid-template-columns: minmax(0, 1fr) 320px;
   min-height: 0;
 }
 
@@ -1385,6 +1385,7 @@ body.preview-open {
   display: flex;
   flex-direction: column;
   min-height: 0;
+  min-width: 0;
 }
 
 .image-preview-img-area {
@@ -1560,6 +1561,7 @@ body.preview-open {
   display: flex;
   flex-direction: column;
   min-height: 0;
+  min-width: 0;
 }
 
 /* Tab row */

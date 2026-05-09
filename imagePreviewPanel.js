@@ -1,5 +1,340 @@
 import { normalizeMediaType } from "./previewVideo.js";
 
+// ─── CSS ──────────────────────────────────────────────────────────────────────
+
+const PANEL_CSS = `
+.ipp-overlay {
+  position: fixed; inset: 0;
+  background: rgba(0,0,0,0.72);
+  backdrop-filter: blur(8px);
+  display: flex; align-items: stretch;
+  z-index: 1000;
+}
+.ipp-overlay.hidden { display: none; }
+
+.ipp-panel {
+  display: grid;
+  grid-template-columns: 1fr 320px;
+  grid-template-rows: 48px 1fr 64px;
+  grid-template-areas: "topbar topbar" "viewer sidebar" "filmstrip filmstrip";
+  width: 100%; height: 100%;
+  background: #141518;
+  font-family: 'DM Sans', system-ui, sans-serif;
+  color: #f0f0f2;
+  overflow: hidden;
+}
+
+/* ── TOPBAR ── */
+.ipp-topbar {
+  grid-area: topbar;
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 0 16px;
+  border-bottom: 1px solid rgba(255,255,255,0.07);
+  background: #141518;
+}
+.ipp-breadcrumb {
+  display: flex; align-items: center; gap: 6px;
+  font-size: 12px; color: #54575f;
+  font-family: 'IBM Plex Mono', monospace;
+}
+.ipp-breadcrumb .ipp-bc-sep { opacity: 0.4; }
+.ipp-breadcrumb .ipp-bc-current { color: #8a8d96; }
+.ipp-topbar-actions { display: flex; align-items: center; gap: 4px; }
+
+.ipp-btn {
+  height: 28px; padding: 0 10px;
+  border: 1px solid rgba(255,255,255,0.12);
+  background: #1a1c20; color: #8a8d96;
+  font-family: inherit; font-size: 11.5px; font-weight: 500;
+  border-radius: 5px; cursor: pointer;
+  transition: background .15s, color .15s, border-color .15s;
+  white-space: nowrap; display: inline-flex; align-items: center; gap: 5px;
+}
+.ipp-btn:hover { background: #202228; color: #f0f0f2; }
+.ipp-btn.accent {
+  background: rgba(91,127,255,0.15); color: #5b7fff;
+  border-color: rgba(91,127,255,0.3);
+}
+.ipp-btn.accent:hover { background: rgba(91,127,255,0.25); }
+.ipp-btn.danger:hover { color: #f04438; border-color: rgba(240,68,56,0.3); background: rgba(240,68,56,0.08); }
+
+.ipp-close-btn {
+  width: 28px; height: 28px; margin-left: 4px;
+  border: 1px solid rgba(255,255,255,0.07);
+  background: transparent; color: #54575f;
+  border-radius: 5px; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 14px; transition: all .15s;
+}
+.ipp-close-btn:hover { background: #202228; color: #f0f0f2; }
+
+/* ── VIEWER ── */
+.ipp-viewer {
+  grid-area: viewer;
+  position: relative;
+  background: #0a0b0d;
+  display: flex; align-items: center; justify-content: center;
+  overflow: hidden;
+}
+.ipp-viewer.is-panning { cursor: grabbing; }
+.ipp-img { max-width: 100%; max-height: 100%; object-fit: contain; user-select: none; border-radius: 4px; }
+.ipp-video { max-width: 100%; max-height: 100%; }
+.ipp-img.hidden, .ipp-video.hidden { display: none; }
+
+.ipp-nav {
+  position: absolute; top: 50%; transform: translateY(-50%);
+  width: 36px; height: 36px;
+  background: rgba(0,0,0,0.55); border: 1px solid rgba(255,255,255,0.1);
+  color: #f0f0f2; border-radius: 50%; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 15px; transition: all .15s; z-index: 2;
+  backdrop-filter: blur(6px);
+}
+.ipp-nav:hover { background: rgba(91,127,255,0.3); border-color: #5b7fff; }
+.ipp-nav.prev { left: 14px; }
+.ipp-nav.next { right: 14px; }
+
+.ipp-zoom-badge {
+  position: absolute; top: 12px; right: 12px;
+  background: rgba(0,0,0,0.6); border: 1px solid rgba(255,255,255,0.07);
+  color: #8a8d96; font-family: 'IBM Plex Mono', monospace; font-size: 11px;
+  padding: 3px 8px; border-radius: 20px; backdrop-filter: blur(6px);
+  pointer-events: none;
+}
+
+.ipp-vtoolbar {
+  position: absolute; bottom: 12px; left: 50%; transform: translateX(-50%);
+  display: flex; align-items: center; gap: 2px;
+  background: rgba(14,15,17,0.85); border: 1px solid rgba(255,255,255,0.12);
+  border-radius: 30px; padding: 4px 8px;
+  backdrop-filter: blur(12px); z-index: 2;
+}
+.ipp-vt-btn {
+  width: 30px; height: 30px; background: transparent; border: none;
+  color: #8a8d96; cursor: pointer; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  transition: background .12s, color .12s;
+}
+.ipp-vt-btn:hover { background: #202228; color: #f0f0f2; }
+.ipp-vt-sep { width: 1px; height: 16px; background: rgba(255,255,255,0.07); margin: 0 4px; }
+
+/* ── SIDEBAR ── */
+.ipp-sidebar {
+  grid-area: sidebar;
+  border-left: 1px solid rgba(255,255,255,0.07);
+  overflow-y: auto; overflow-x: hidden;
+  scrollbar-width: thin; scrollbar-color: #25282f transparent;
+  display: flex; flex-direction: column;
+}
+.ipp-sidebar::-webkit-scrollbar { width: 4px; }
+.ipp-sidebar::-webkit-scrollbar-thumb { background: #25282f; border-radius: 2px; }
+
+/* Status strip */
+.ipp-status-strip {
+  display: flex; gap: 6px; flex-wrap: wrap;
+  padding: 8px 14px;
+  background: #1a1c20;
+  border-bottom: 1px solid rgba(255,255,255,0.07);
+  flex-shrink: 0;
+}
+.ipp-badge {
+  display: inline-flex; align-items: center; gap: 5px;
+  font-size: 10.5px; font-weight: 500; padding: 2px 8px 2px 6px;
+  border-radius: 20px; border: 1px solid transparent;
+  font-family: 'IBM Plex Mono', monospace;
+}
+.ipp-badge::before { content: ""; width: 5px; height: 5px; border-radius: 50%; flex-shrink: 0; }
+.ipp-badge.green  { color: #3ecf8e; background: rgba(62,207,142,.1);  border-color: rgba(62,207,142,.2);  }
+.ipp-badge.green::before  { background: #3ecf8e; }
+.ipp-badge.amber  { color: #f5a623; background: rgba(245,166,35,.1);  border-color: rgba(245,166,35,.2);  }
+.ipp-badge.amber::before  { background: #f5a623; }
+.ipp-badge.muted  { color: #54575f; background: #1a1c20; border-color: rgba(255,255,255,0.07); }
+.ipp-badge.muted::before  { background: #54575f; }
+
+/* Section */
+.ipp-section { border-bottom: 1px solid rgba(255,255,255,0.07); }
+.ipp-section-hdr {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 10px 14px; cursor: pointer; user-select: none;
+  transition: background .12s;
+}
+.ipp-section-hdr:hover { background: #202228; }
+.ipp-section-title {
+  font-size: 10px; font-weight: 500; letter-spacing: 0.1em;
+  text-transform: uppercase; color: #54575f;
+  font-family: 'IBM Plex Mono', monospace;
+}
+.ipp-section-chevron { color: #54575f; transition: transform .2s; display: flex; }
+.ipp-section.collapsed .ipp-section-chevron { transform: rotate(-90deg); }
+.ipp-section.collapsed .ipp-section-body { display: none; }
+.ipp-section-body { padding: 0 14px 14px; }
+
+/* Meta grid */
+.ipp-meta-grid { display: grid; grid-template-columns: 88px 1fr; }
+.ipp-meta-grid dt {
+  color: #54575f; font-family: 'IBM Plex Mono', monospace;
+  font-size: 10.5px; padding: 3.5px 0; align-self: start;
+}
+.ipp-meta-grid dd { color: #8a8d96; padding: 3.5px 0 3.5px 8px; font-size: 11.5px; word-break: break-all; }
+
+/* Sub-label */
+.ipp-sub-label {
+  font-family: 'IBM Plex Mono', monospace; font-size: 9.5px;
+  letter-spacing: 0.07em; text-transform: uppercase;
+  color: #54575f; margin: 10px 0 6px;
+}
+.ipp-sub-label:first-child { margin-top: 0; }
+
+.ipp-divider { height: 1px; background: rgba(255,255,255,0.07); margin: 10px 0; }
+
+/* Rating */
+.ipp-rating { display: flex; gap: 3px; }
+.ipp-star {
+  background: none; border: none; color: #54575f;
+  font-size: 18px; cursor: pointer; padding: 0 1px;
+  transition: color .12s, transform .1s; line-height: 1;
+}
+.ipp-star:hover, .ipp-star.active { color: #f5a623; }
+.ipp-star:hover { transform: scale(1.2); }
+
+/* Score bar */
+.ipp-score-row { display: flex; align-items: center; gap: 8px; padding: 3px 0; }
+.ipp-score-label {
+  font-family: 'IBM Plex Mono', monospace; font-size: 10px;
+  color: #54575f; width: 100px; flex-shrink: 0;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.ipp-score-bar { flex: 1; height: 3px; background: #25282f; border-radius: 2px; overflow: hidden; }
+.ipp-score-fill { height: 100%; background: #5b7fff; border-radius: 2px; transition: width .4s ease; }
+.ipp-score-val { font-family: 'IBM Plex Mono', monospace; font-size: 10px; color: #8a8d96; width: 26px; text-align: right; flex-shrink: 0; }
+
+/* AI description */
+.ipp-ai-text { font-size: 12px; line-height: 1.7; color: #8a8d96; }
+.ipp-ai-card { font-size: 12px; line-height: 1.7; color: #8a8d96; }
+
+/* Timeline */
+.ipp-timeline { display: flex; flex-direction: column; gap: 5px; }
+.ipp-tl-item {
+  border: 1px solid rgba(255,255,255,0.07); border-radius: 8px; overflow: hidden;
+  transition: border-color .15s;
+}
+.ipp-tl-item:hover { border-color: rgba(255,255,255,0.12); }
+.ipp-tl-hdr {
+  display: flex; align-items: center; gap: 7px;
+  padding: 7px 10px; cursor: pointer; background: #1a1c20;
+}
+.ipp-tl-badge {
+  font-family: 'IBM Plex Mono', monospace; font-size: 10px; font-weight: 500;
+  color: #5b7fff; background: rgba(91,127,255,.15);
+  border: 1px solid rgba(91,127,255,.25); border-radius: 4px;
+  padding: 2px 7px; cursor: pointer; transition: background .12s; white-space: nowrap;
+}
+.ipp-tl-badge:hover { background: rgba(91,127,255,.25); }
+.ipp-tl-preview {
+  font-size: 11.5px; color: #8a8d96; flex: 1;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin: 0;
+}
+.ipp-tl-chevron { margin-left: auto; color: #54575f; transition: transform .18s; flex-shrink: 0; display: flex; }
+.ipp-tl-item.expanded .ipp-tl-chevron { transform: rotate(180deg); }
+.ipp-tl-full {
+  display: none; padding: 8px 10px; font-size: 11.5px; line-height: 1.65;
+  color: #8a8d96; border-top: 1px solid rgba(255,255,255,0.07);
+  background: #141518; margin: 0;
+}
+.ipp-tl-item.expanded .ipp-tl-full { display: block; }
+
+/* OCR */
+.ipp-ocr {
+  background: #0a0b0d; border: 1px solid rgba(255,255,255,0.07);
+  border-radius: 5px; padding: 8px 10px;
+  font-family: 'IBM Plex Mono', monospace; font-size: 10.5px;
+  color: #8a8d96; line-height: 1.7; white-space: pre-wrap;
+  word-break: break-word; max-height: 120px; overflow-y: auto;
+  scrollbar-width: thin;
+}
+
+/* Tag cloud */
+.ipp-tag-cloud { display: flex; flex-wrap: wrap; gap: 5px; }
+.ipp-tag {
+  display: inline-flex; align-items: center; gap: 4px;
+  background: #25282f; border: 1px solid rgba(255,255,255,0.07);
+  color: #8a8d96; font-size: 10.5px; padding: 2px 8px; border-radius: 20px;
+}
+.ipp-tag-rm {
+  background: none; border: none; color: #54575f;
+  cursor: pointer; font-size: 13px; line-height: 1; padding: 0;
+  transition: color .12s;
+}
+.ipp-tag-rm:hover { color: #f04438; }
+.ipp-tag-input-row { display: flex; gap: 5px; margin-top: 8px; }
+.ipp-tag-input {
+  flex: 1; background: #0a0b0d; border: 1px solid rgba(255,255,255,0.07);
+  border-radius: 5px; color: #f0f0f2; font-family: inherit;
+  font-size: 11.5px; padding: 5px 9px; outline: none;
+  transition: border-color .15s;
+}
+.ipp-tag-input:focus { border-color: #5b7fff; }
+.ipp-tag-input::placeholder { color: #54575f; }
+
+/* Notes */
+.ipp-notes {
+  width: 100%; background: #0a0b0d;
+  border: 1px solid rgba(255,255,255,0.07); border-radius: 5px;
+  color: #f0f0f2; font-family: inherit; font-size: 11.5px;
+  line-height: 1.6; padding: 8px 10px; resize: vertical;
+  min-height: 72px; outline: none; transition: border-color .15s;
+}
+.ipp-notes:focus { border-color: #5b7fff; }
+.ipp-notes::placeholder { color: #54575f; }
+
+/* Raw */
+.ipp-raw-pre {
+  background: #0a0b0d; border: 1px solid rgba(255,255,255,0.07);
+  border-radius: 5px; padding: 8px 10px;
+  font-family: 'IBM Plex Mono', monospace; font-size: 10px;
+  color: #8a8d96; white-space: pre; overflow: auto;
+  max-height: 180px; scrollbar-width: thin; line-height: 1.7;
+}
+.ipp-raw-actions { display: flex; gap: 5px; margin-top: 8px; }
+
+/* ── FILMSTRIP ── */
+.ipp-filmstrip-bar {
+  grid-area: filmstrip;
+  border-top: 1px solid rgba(255,255,255,0.07);
+  background: #141518;
+  display: flex; align-items: center; gap: 12px;
+  padding: 0 16px; overflow: hidden;
+}
+.ipp-img-count {
+  font-family: 'IBM Plex Mono', monospace; font-size: 10.5px;
+  color: #54575f; white-space: nowrap; flex-shrink: 0;
+}
+.ipp-filmstrip {
+  display: flex; gap: 5px; overflow-x: auto; flex: 1;
+  scrollbar-width: none; padding: 8px 0;
+}
+.ipp-filmstrip::-webkit-scrollbar { display: none; }
+.ipp-filmstrip-thumb {
+  width: 42px; height: 42px; border-radius: 5px;
+  border: 2px solid transparent; background: #1a1c20;
+  overflow: hidden; cursor: pointer; flex-shrink: 0;
+  transition: border-color .15s;
+}
+.ipp-filmstrip-thumb.active { border-color: #5b7fff; }
+.ipp-filmstrip-thumb:hover:not(.active) { border-color: rgba(255,255,255,0.12); }
+.ipp-filmstrip-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+`;
+
+function injectStyles() {
+  if (document.getElementById("ipp-styles")) return;
+  const style = document.createElement("style");
+  style.id = "ipp-styles";
+  style.textContent = PANEL_CSS;
+  document.head.appendChild(style);
+}
+
+// ─── HELPERS ──────────────────────────────────────────────────────────────────
+
 function toMetadataText(details) {
   const normalizedCloudMetadata = details?.cloud_metadata
     ? details.cloud_metadata
@@ -16,740 +351,462 @@ function toMetadataText(details) {
         }
       : null;
 
-  const metadata = details?.metadata || {};
-  const payload = {
+  return JSON.stringify({
     path: details?.path || "",
     image_path: details?.image_path || details?.path || "",
     id: details?.id || null,
     status: details?.status || "unknown",
-    metadata,
+    metadata: details?.metadata || {},
     local_metadata: details?.local_metadata || null,
     cloud_metadata: normalizedCloudMetadata,
     error: details?.error || "",
-  };
-  return JSON.stringify(payload, null, 2);
+  }, null, 2);
 }
 
-/**
- * Parses a description string that may contain timestamp markers like:
- *   [0:00] Intro scene...
- *   [00:00:00] Opening shot...
- *   [0:00 - 0:30] First segment...
- *   [00:00:00 - 00:00:30] ...
- *
- * Returns an array of { timestamp, text } objects when timestamps are found,
- * or null if no timestamps are detected (plain text description).
- */
+function parseTimestampToSeconds(ts) {
+  const parts = String(ts || "").trim().split(":").map(Number);
+  if (parts.some(isNaN)) return null;
+  if (parts.length === 2) return parts[0] * 60 + parts[1];
+  if (parts.length === 3) return parts[0] * 3600 + parts[1] * 60 + parts[2];
+  return null;
+}
+
 function parseTimestampedDescription(description) {
   if (!description) return null;
 
-  // Matches "second 1.5:" / "second 0:" / "second 12.5:" — the format used by the AI describer.
-  // Also falls back to bracket notation: [0:00], [0:00 - 0:30], [H:MM:SS], etc.
   const SECOND_RE = /second\s+(\d+(?:\.\d+)?)\s*:/gi;
   const BRACKET_RE = /\[(\d{1,2}:\d{2}(?::\d{2})?(?:\s*[-–]\s*\d{1,2}:\d{2}(?::\d{2})?)?)\]/g;
 
-  // Try "second X:" format first
   let matches = [];
   let m;
+
   while ((m = SECOND_RE.exec(description)) !== null) {
-    matches.push({
-      label: `${m[1]}s`,          // display label e.g. "1.5s"
-      seekSeconds: parseFloat(m[1]),
-      index: m.index,
-      end: SECOND_RE.lastIndex,
-    });
+    matches.push({ label: `${m[1]}s`, seekSeconds: parseFloat(m[1]), index: m.index, end: SECOND_RE.lastIndex });
   }
 
-  // Fall back to bracket timestamps if no "second X:" found
   if (matches.length === 0) {
     while ((m = BRACKET_RE.exec(description)) !== null) {
       const ts = m[1].trim();
-      matches.push({
-        label: ts,
-        seekSeconds: parseTimestampToSeconds(ts.split(/[-–]/)[0].trim()),
-        index: m.index,
-        end: BRACKET_RE.lastIndex,
-      });
+      matches.push({ label: ts, seekSeconds: parseTimestampToSeconds(ts.split(/[-–]/)[0].trim()), index: m.index, end: BRACKET_RE.lastIndex });
     }
   }
 
   if (matches.length === 0) return null;
 
-  // Any text before the first timestamp becomes a preamble
   const preamble = description.slice(0, matches[0].index).trim();
-
-  const segments = matches.map((current, i) => {
-    const nextStart = matches[i + 1]?.index ?? description.length;
-    return {
-      label: current.label,
-      seekSeconds: current.seekSeconds,
-      text: description.slice(current.end, nextStart).trim(),
-    };
-  });
+  const segments = matches.map((current, i) => ({
+    label: current.label,
+    seekSeconds: current.seekSeconds,
+    text: description.slice(current.end, matches[i + 1]?.index ?? description.length).trim(),
+  }));
 
   return { preamble, segments };
 }
 
+function splitPathSegments(value) {
+  return String(value || "").replaceAll("\\", "/").split("/").filter(Boolean);
+}
+
+// ─── ICON SVGs ────────────────────────────────────────────────────────────────
+
+const ICONS = {
+  chevronDown: `<svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 3.5l3 3 3-3"/></svg>`,
+  fit:         `<svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="1" y="1" width="14" height="14" rx="2"/><path d="M5 8h6M8 5v6"/></svg>`,
+  zoomIn:      `<svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="7" cy="7" r="5"/><path d="M11 11l3 3M5 7h4M7 5v4"/></svg>`,
+  zoomOut:     `<svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="7" cy="7" r="5"/><path d="M11 11l3 3M5 7h4"/></svg>`,
+  rotateLeft:  `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-3"/></svg>`,
+  rotateRight: `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-.49-3"/></svg>`,
+  flipH:       `<svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M8 2v12M4 5l-3 3 3 3M12 5l3 3-3 3"/></svg>`,
+  fullscreen:  `<svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M1 1h4M1 1v4M15 1h-4M15 1v4M1 15h4M1 15v-4M15 15h-4M15 15v-4"/></svg>`,
+  share:       `<svg width="11" height="11" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="13" cy="3" r="2"/><circle cx="3" cy="8" r="2"/><circle cx="13" cy="13" r="2"/><path d="M5 7l6-3M5 9l6 3"/></svg>`,
+};
+
+// ─── SECTION BUILDER ──────────────────────────────────────────────────────────
+
+function makeSection(id, title, bodyHTML, startCollapsed = false) {
+  const sec = document.createElement("div");
+  sec.className = "ipp-section" + (startCollapsed ? " collapsed" : "");
+  sec.id = id;
+  sec.innerHTML = `
+    <div class="ipp-section-hdr">
+      <span class="ipp-section-title">${title}</span>
+      <span class="ipp-section-chevron">${ICONS.chevronDown}</span>
+    </div>
+    <div class="ipp-section-body">${bodyHTML}</div>
+  `;
+  sec.querySelector(".ipp-section-hdr").addEventListener("click", () => {
+    sec.classList.toggle("collapsed");
+  });
+  return sec;
+}
+
+// ─── MAIN EXPORT ──────────────────────────────────────────────────────────────
+
 export function createImagePreviewPanel(options = {}) {
-  const normalizeImageSrc = options.normalizeImageSrc || ((value) => value);
-  const resolvePreviewSrc =
-    options.resolvePreviewSrc ||
-    (async (imagePath) => ({
-      ok: true,
-      previewSrc: normalizeImageSrc(imagePath),
-      converted: false,
-    }));
-  const resolveDetails = options.resolveDetails || (async (_row) => ({ metadata: {} }));
-  const onOpenSourceFolder = options.onOpenSourceFolder || (async () => ({ ok: false, message: "Action unavailable." }));
-  const onCopyText = options.onCopyText || (async () => ({ ok: false, message: "Action unavailable." }));
-  const onDelete = options.onDelete || (async () => ({ ok: false, message: "Action unavailable." }));
-  const onExport = options.onExport || (async () => ({ ok: false, message: "Action unavailable." }));
-  const onAddToAlbum = options.onAddToAlbum || (async () => ({ ok: false, message: "Action unavailable." }));
-  const onShareLink = options.onShareLink || (async () => ({ ok: false, message: "Action unavailable." }));
-  const onNavigate = options.onNavigate || ((_direction) => {});
-  const setStatus = options.setStatus || (() => {});
+  injectStyles();
+
+  const normalizeImageSrc    = options.normalizeImageSrc    || ((v) => v);
+  const resolvePreviewSrc    = options.resolvePreviewSrc    || (async (p) => ({ ok: true, previewSrc: normalizeImageSrc(p), converted: false }));
+  const resolveDetails       = options.resolveDetails       || (async () => ({ metadata: {} }));
+  const onOpenSourceFolder   = options.onOpenSourceFolder   || (async () => ({ ok: false, message: "Action unavailable." }));
+  const onCopyText           = options.onCopyText           || (async () => ({ ok: false, message: "Action unavailable." }));
+  const onDelete             = options.onDelete             || (async () => ({ ok: false, message: "Action unavailable." }));
+  const onExport             = options.onExport             || (async () => ({ ok: false, message: "Action unavailable." }));
+  const onAddToAlbum         = options.onAddToAlbum         || (async () => ({ ok: false, message: "Action unavailable." }));
+  const onShareLink          = options.onShareLink          || (async () => ({ ok: false, message: "Action unavailable." }));
+  const onNavigate           = options.onNavigate           || (() => {});
+  const setStatus            = options.setStatus            || (() => {});
+
+  // ── BUILD DOM ────────────────────────────────────────────────────
 
   const overlay = document.createElement("div");
-  overlay.className = "image-preview-overlay hidden";
+  overlay.className = "ipp-overlay hidden";
   overlay.setAttribute("aria-hidden", "true");
 
-  overlay.innerHTML = `
-    <div class="image-preview-panel" role="dialog" aria-modal="true" aria-label="Image preview details">
-
-      <!-- Top bar -->
-      <div class="image-preview-topbar">
-        <div class="image-preview-breadcrumb">
-          <span class="breadcrumb-root">Library</span>
-          <span class="breadcrumb-sep">›</span>
-          <span class="breadcrumb-folder">Folder</span>
-          <span class="breadcrumb-sep">›</span>
-          <span class="breadcrumb-filename image-preview-title">Image details</span>
-        </div>
-        <div class="image-preview-topbar-actions">
-          <button class="image-preview-album-btn" type="button">Add to album</button>
-          <button class="image-preview-export-btn" type="button">Export</button>
-          <button class="image-preview-delete-btn" type="button">Delete</button>
-          <button class="image-preview-close" type="button" aria-label="Close preview">✕</button>
-        </div>
-      </div>
-
-      <!-- Body: viewer + sidebar -->
-      <div class="image-preview-body">
-
-        <!-- Left: viewer -->
-        <section class="image-preview-left" aria-label="Image viewer">
-          <div class="image-preview-img-area">
-            <button class="image-preview-nav prev" type="button" aria-label="Previous image">&#8592;</button>
-            <img class="image-preview-img" alt="Selected image preview" />
-            <video class="image-preview-video hidden" controls preload="auto" playsinline webkit-playsinline="true"></video>
-            <button class="image-preview-nav next" type="button" aria-label="Next image">&#8594;</button>
-            <span class="image-preview-zoom-badge">100%</span>
-          </div>
-
-          <!-- Image toolbar -->
-          <div class="image-preview-img-toolbar">
-            <button class="image-preview-it-btn active" data-action="fit" title="Fit to screen" type="button">
-              <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="1" y="1" width="14" height="14" rx="2"/><path d="M5 8h6M8 5v6"/></svg>
-            </button>
-            <button class="image-preview-it-btn" data-action="zoom-in" title="Zoom in" type="button">
-              <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="7" cy="7" r="5"/><path d="M11 11l3 3M5 7h4M7 5v4"/></svg>
-            </button>
-            <button class="image-preview-it-btn" data-action="zoom-out" title="Zoom out" type="button">
-              <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="7" cy="7" r="5"/><path d="M11 11l3 3M5 7h4"/></svg>
-            </button>
-            <div class="image-preview-it-sep"></div>
-            <div class="image-preview-pan-grid" role="group" aria-label="Pan controls">
-              <button class="image-preview-it-btn image-preview-pan-btn" data-pan="up" title="Pan up" type="button">&#8593;</button>
-              <button class="image-preview-it-btn image-preview-pan-btn" data-pan="left" title="Pan left" type="button">&#8592;</button>
-              <button class="image-preview-it-btn image-preview-pan-btn" data-pan="right" title="Pan right" type="button">&#8594;</button>
-              <button class="image-preview-it-btn image-preview-pan-btn" data-pan="down" title="Pan down" type="button">&#8595;</button>
-            </div>
-            <div class="image-preview-it-sep"></div>
-            <button class="image-preview-it-btn" data-action="rotate-left" title="Rotate left" type="button">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                 <polyline points="1 4 1 10 7 10"></polyline>
-                 <path d="M3.51 15a9 9 0 1 0 .49-3"></path>
-              </svg>
-            </button>
-            <button class="image-preview-it-btn" data-action="rotate-right" title="Rotate right" type="button">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <polyline points="23 4 23 10 17 10"></polyline>
-                <path d="M20.49 15a9 9 0 1 1-.49-3"></path>
-              </svg>
-            </button>
-            <button class="image-preview-it-btn" data-action="flip-h" title="Flip horizontal" type="button">
-              <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M8 2v12M4 5l-3 3 3 3M12 5l3 3-3 3"/></svg>
-            </button>
-            <div class="image-preview-it-sep"></div>
-            <button class="image-preview-it-btn" data-action="fullscreen" title="Fullscreen" type="button">
-              <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M1 1h4M1 1v4M15 1h-4M15 1v4M1 15h4M1 15v-4M15 15h-4M15 15v-4"/></svg>
-            </button>
-            <div class="image-preview-zoom-ctrl">
-              <input type="range" min="25" max="300" value="100" step="1" class="image-preview-zoom-slider" aria-label="Zoom level">
-              <span class="image-preview-zoom-val">100%</span>
-            </div>
-          </div>
-        </section>
-
-        <!-- Right: sidebar -->
-        <section class="image-preview-right" aria-label="Image metadata">
-          <div class="image-preview-tab-row" role="tablist">
-            <button class="image-preview-tab" data-tab="info" role="tab" aria-selected="false" type="button">Info</button>
-            <button class="image-preview-tab" data-tab="ai" role="tab" aria-selected="false" type="button">AI</button>
-            <button class="image-preview-tab" data-tab="tags" role="tab" aria-selected="false" type="button">Tags</button>
-            <button class="image-preview-tab active" data-tab="raw" role="tab" aria-selected="true" type="button">Raw</button>
-          </div>
-
-          <!-- Info tab -->
-          <div class="image-preview-tab-body" data-panel="info">
-            <div class="image-preview-section">
-              <div class="image-preview-section-label">Status</div>
-              <div class="image-preview-status-row">
-                <span class="image-preview-status-badge status-ok">Indexed</span>
-                <span class="image-preview-status-badge status-cloud image-preview-cloud-status">Cloud: unknown</span>
-              </div>
-            </div>
-            <div class="image-preview-section">
-              <div class="image-preview-section-label">File details</div>
-              <dl class="image-preview-meta-grid image-preview-file-details"></dl>
-            </div>
-            <div class="image-preview-section">
-              <div class="image-preview-section-label">Camera &amp; lens</div>
-              <dl class="image-preview-meta-grid image-preview-exif-details"></dl>
-            </div>
-            <div class="image-preview-section">
-              <div class="image-preview-section-label">Rating</div>
-              <div class="image-preview-rating" role="group" aria-label="Image rating">
-                ${[1,2,3,4,5].map(i => `<button class="image-preview-star" data-value="${i}" type="button" aria-label="${i} star">★</button>`).join("")}
-              </div>
-            </div>
-          </div>
-
-          <!-- AI tab -->
-          <div class="image-preview-tab-body" data-panel="ai">
-            <div class="image-preview-section">
-              <div class="image-preview-ai-desc-header">
-                <div class="image-preview-section-label image-preview-ai-desc-label">AI description</div>
-                <select class="image-preview-ai-ts-select hidden" aria-label="Jump to timeframe">
-                  <option value="">All timeframes</option>
-                </select>
-              </div>
-              <div class="image-preview-ai-description"></div>
-            </div>
-            <div class="image-preview-section">
-              <div class="image-preview-section-label">Detected objects</div>
-              <div class="image-preview-objects-list"></div>
-            </div>
-            <div class="image-preview-section">
-              <div class="image-preview-section-label">OCR text</div>
-              <pre class="image-preview-ocr-text">No text detected</pre>
-            </div>
-          </div>
-
-          <!-- Tags tab -->
-          <div class="image-preview-tab-body" data-panel="tags">
-            <div class="image-preview-section">
-              <div class="image-preview-section-label">Tags</div>
-              <div class="image-preview-tag-row"></div>
-              <div class="image-preview-tag-input-row">
-                <input type="text" class="image-preview-tag-input" placeholder="Add tag…" aria-label="New tag">
-                <button class="image-preview-tag-add-btn" type="button">Add</button>
-              </div>
-            </div>
-            <div class="image-preview-section">
-              <div class="image-preview-section-label">Notes</div>
-              <textarea class="image-preview-notes" placeholder="Add a note…" rows="4"></textarea>
-            </div>
-          </div>
-
-          <!-- Raw tab -->
-          <div class="image-preview-tab-body active" data-panel="raw">
-            <div class="image-preview-section">
-              <div class="image-preview-section-label">Raw metadata payload</div>
-              <pre class="image-preview-meta"></pre>
-            </div>
-            <div class="image-preview-raw-actions">
-              <button class="image-preview-copy-btn" type="button">Copy JSON</button>
-              <button class="image-preview-open-btn" type="button">Open source folder</button>
-            </div>
-          </div>
-        </section>
-      </div>
-
-      <!-- Bottom bar: filmstrip + nav counter -->
-      <div class="image-preview-bottombar">
-        <span class="image-preview-img-count"></span>
-        <div class="image-preview-filmstrip"></div>
-        <button class="image-preview-share-btn" type="button">Share link</button>
-      </div>
+  // Topbar
+  const topbar = document.createElement("div");
+  topbar.className = "ipp-topbar";
+  topbar.innerHTML = `
+    <div class="ipp-breadcrumb">
+      <span class="ipp-bc-root">Library</span>
+      <span class="ipp-bc-sep">›</span>
+      <span class="ipp-bc-folder">Folder</span>
+      <span class="ipp-bc-sep">›</span>
+      <span class="ipp-bc-current ipp-title">Details</span>
+    </div>
+    <div class="ipp-topbar-actions">
+      <button class="ipp-btn accent ipp-album-btn"  type="button">Add to album</button>
+      <button class="ipp-btn ipp-export-btn"         type="button">Export</button>
+      <button class="ipp-btn danger ipp-delete-btn"  type="button">Delete</button>
+      <button class="ipp-close-btn" type="button" aria-label="Close preview">✕</button>
     </div>
   `;
 
+  // Viewer
+  const viewer = document.createElement("section");
+  viewer.className = "ipp-viewer";
+  viewer.setAttribute("aria-label", "Image viewer");
+  viewer.innerHTML = `
+    <button class="ipp-nav prev" type="button" aria-label="Previous image">&#8592;</button>
+    <img  class="ipp-img"   alt="Selected preview" />
+    <video class="ipp-video hidden" controls preload="auto" playsinline webkit-playsinline="true"></video>
+    <button class="ipp-nav next" type="button" aria-label="Next image">&#8594;</button>
+    <span class="ipp-zoom-badge">100%</span>
+    <div class="ipp-vtoolbar">
+      <button class="ipp-vt-btn" data-action="fit"          title="Fit to screen">${ICONS.fit}</button>
+      <button class="ipp-vt-btn" data-action="zoom-in"      title="Zoom in">${ICONS.zoomIn}</button>
+      <button class="ipp-vt-btn" data-action="zoom-out"     title="Zoom out">${ICONS.zoomOut}</button>
+      <div class="ipp-vt-sep"></div>
+      <button class="ipp-vt-btn" data-action="rotate-left"  title="Rotate left">${ICONS.rotateLeft}</button>
+      <button class="ipp-vt-btn" data-action="rotate-right" title="Rotate right">${ICONS.rotateRight}</button>
+      <button class="ipp-vt-btn" data-action="flip-h"       title="Flip horizontal">${ICONS.flipH}</button>
+      <div class="ipp-vt-sep"></div>
+      <button class="ipp-vt-btn" data-action="fullscreen"   title="Fullscreen">${ICONS.fullscreen}</button>
+    </div>
+  `;
+
+  // Sidebar — built from discrete sections
+  const sidebar = document.createElement("section");
+  sidebar.className = "ipp-sidebar";
+  sidebar.setAttribute("aria-label", "Image details");
+
+  // Status strip (always visible, not collapsible)
+  const statusStrip = document.createElement("div");
+  statusStrip.className = "ipp-status-strip";
+  sidebar.appendChild(statusStrip);
+
+  // ── Section: File & Camera ──
+  const secFile = makeSection("ipp-sec-file", "File details", `
+    <dl class="ipp-meta-grid ipp-file-details"></dl>
+    <div class="ipp-divider"></div>
+    <div class="ipp-sub-label">Camera &amp; lens</div>
+    <dl class="ipp-meta-grid ipp-exif-details"></dl>
+    <div class="ipp-divider"></div>
+    <div class="ipp-sub-label">Rating</div>
+    <div class="ipp-rating">
+      ${[1,2,3,4,5].map(i => `<button class="ipp-star" data-value="${i}" type="button" aria-label="${i} star">★</button>`).join("")}
+    </div>
+  `);
+  sidebar.appendChild(secFile);
+
+  // ── Section: AI Analysis ──
+  const secAI = makeSection("ipp-sec-ai", "AI analysis", `
+    <div class="ipp-sub-label" style="margin-top:0" id="ipp-ai-desc-label">Description</div>
+    <div class="ipp-ai-description"></div>
+    <div class="ipp-divider"></div>
+    <div class="ipp-sub-label">Scores &amp; attributes</div>
+    <div class="ipp-objects-list"></div>
+    <div class="ipp-divider"></div>
+    <div class="ipp-sub-label">OCR text</div>
+    <pre class="ipp-ocr">No text detected.</pre>
+  `);
+  sidebar.appendChild(secAI);
+
+  // ── Section: Tags & Notes ──
+  const secTags = makeSection("ipp-sec-tags", "Tags &amp; notes", `
+    <div class="ipp-sub-label" style="margin-top:0">Tags</div>
+    <div class="ipp-tag-cloud ipp-tag-row"></div>
+    <div class="ipp-tag-input-row">
+      <input type="text" class="ipp-tag-input" placeholder="Add tag…" aria-label="New tag" />
+      <button class="ipp-btn ipp-tag-add-btn" type="button">Add</button>
+    </div>
+    <div class="ipp-divider"></div>
+    <div class="ipp-sub-label">Notes</div>
+    <textarea class="ipp-notes" placeholder="Add a note…" rows="4"></textarea>
+  `);
+  sidebar.appendChild(secTags);
+
+  // ── Section: Raw JSON (collapsed by default) ──
+  const secRaw = makeSection("ipp-sec-raw", "Raw metadata", `
+    <pre class="ipp-raw-pre ipp-meta-raw"></pre>
+    <div class="ipp-raw-actions">
+      <button class="ipp-btn ipp-copy-btn"  type="button">Copy JSON</button>
+      <button class="ipp-btn ipp-open-btn"  type="button">Open folder</button>
+    </div>
+  `, true /* collapsed */);
+  sidebar.appendChild(secRaw);
+
+  // Filmstrip bar
+  const filmstripBar = document.createElement("div");
+  filmstripBar.className = "ipp-filmstrip-bar";
+  filmstripBar.innerHTML = `
+    <span class="ipp-img-count"></span>
+    <div class="ipp-filmstrip"></div>
+    <button class="ipp-btn ipp-share-btn" type="button">${ICONS.share} Share</button>
+  `;
+
+  // Assemble panel
+  const panel = document.createElement("div");
+  panel.className = "ipp-panel";
+  panel.setAttribute("role", "dialog");
+  panel.setAttribute("aria-modal", "true");
+  panel.setAttribute("aria-label", "Image preview details");
+  panel.appendChild(topbar);
+  panel.appendChild(viewer);
+  panel.appendChild(sidebar);
+  panel.appendChild(filmstripBar);
+
+  overlay.appendChild(panel);
   document.body.appendChild(overlay);
 
-  // Element refs
-  const panel          = overlay.querySelector(".image-preview-panel");
-  const closeBtn       = overlay.querySelector(".image-preview-close");
-  const exportBtn      = overlay.querySelector(".image-preview-export-btn");
-  const deleteBtn      = overlay.querySelector(".image-preview-delete-btn");
-  const albumBtn       = overlay.querySelector(".image-preview-album-btn");
-  const imageAreaEl    = overlay.querySelector(".image-preview-img-area");
-  const imageEl        = overlay.querySelector(".image-preview-img");
-  const videoEl        = overlay.querySelector(".image-preview-video");
-  const titleEl        = overlay.querySelector(".image-preview-title");
-  const metaEl         = overlay.querySelector(".image-preview-meta");
-  const copyBtn        = overlay.querySelector(".image-preview-copy-btn");
-  const openBtn        = overlay.querySelector(".image-preview-open-btn");
-  const zoomSlider     = overlay.querySelector(".image-preview-zoom-slider");
-  const zoomVal        = overlay.querySelector(".image-preview-zoom-val");
-  const zoomBadge      = overlay.querySelector(".image-preview-zoom-badge");
-  const prevBtn        = overlay.querySelector(".image-preview-nav.prev");
-  const nextBtn        = overlay.querySelector(".image-preview-nav.next");
-  const tabs           = overlay.querySelectorAll(".image-preview-tab");
-  const panels         = overlay.querySelectorAll(".image-preview-tab-body");
-  const stars          = overlay.querySelectorAll(".image-preview-star");
-  const tagRow         = overlay.querySelector(".image-preview-tag-row");
-  const tagInput       = overlay.querySelector(".image-preview-tag-input");
-  const tagAddBtn      = overlay.querySelector(".image-preview-tag-add-btn");
-  const aiDesc         = overlay.querySelector(".image-preview-ai-description");
-  const aiDescLabel    = overlay.querySelector(".image-preview-ai-desc-label");
-  const aiTsSelect     = overlay.querySelector(".image-preview-ai-ts-select");
-  const ocrText        = overlay.querySelector(".image-preview-ocr-text");
-  const objectsList    = overlay.querySelector(".image-preview-objects-list");
-  const fileDetails    = overlay.querySelector(".image-preview-file-details");
-  const exifDetails    = overlay.querySelector(".image-preview-exif-details");
-  const cloudStatus    = overlay.querySelector(".image-preview-cloud-status");
-  const imgCount       = overlay.querySelector(".image-preview-img-count");
-  const shareBtn       = overlay.querySelector(".image-preview-share-btn");
-  const panButtons     = overlay.querySelectorAll(".image-preview-pan-btn");
+  // ── Element refs ──────────────────────────────────────────────────
+
+  const imageEl      = overlay.querySelector(".ipp-img");
+  const videoEl      = overlay.querySelector(".ipp-video");
+  const titleEl      = overlay.querySelector(".ipp-title");
+  const folderEl     = overlay.querySelector(".ipp-bc-folder");
+  const zoomBadge    = overlay.querySelector(".ipp-zoom-badge");
+  const prevBtn      = overlay.querySelector(".ipp-nav.prev");
+  const nextBtn      = overlay.querySelector(".ipp-nav.next");
+  const albumBtn     = overlay.querySelector(".ipp-album-btn");
+  const exportBtn    = overlay.querySelector(".ipp-export-btn");
+  const deleteBtn    = overlay.querySelector(".ipp-delete-btn");
+  const closeBtn     = overlay.querySelector(".ipp-close-btn");
+  const copyBtn      = overlay.querySelector(".ipp-copy-btn");
+  const openBtn      = overlay.querySelector(".ipp-open-btn");
+  const shareBtn     = overlay.querySelector(".ipp-share-btn");
+  const fileDetails  = overlay.querySelector(".ipp-file-details");
+  const exifDetails  = overlay.querySelector(".ipp-exif-details");
+  const metaRaw      = overlay.querySelector(".ipp-meta-raw");
+  const aiDesc       = overlay.querySelector(".ipp-ai-description");
+  const aiDescLabel  = overlay.querySelector("#ipp-ai-desc-label");
+  const ocrText      = overlay.querySelector(".ipp-ocr");
+  const objectsList  = overlay.querySelector(".ipp-objects-list");
+  const tagRow       = overlay.querySelector(".ipp-tag-row");
+  const tagInput     = overlay.querySelector(".ipp-tag-input");
+  const tagAddBtn    = overlay.querySelector(".ipp-tag-add-btn");
+  const imgCount     = overlay.querySelector(".ipp-img-count");
+  const filmstrip    = overlay.querySelector(".ipp-filmstrip");
+  const stars        = overlay.querySelectorAll(".ipp-star");
 
   let currentDetails = null;
   let currentRating  = 0;
-  const transformState = {
-    scale: 1,
-    translateX: 0,
-    translateY: 0,
-    rotation: 0,
-    flipX: 1,
-  };
-  const dragState = {
-    active: false,
-    lastX: 0,
-    lastY: 0,
-  };
-  const panHoldState = {
-    timer: null,
-  };
   let albumActionInFlight = false;
 
-  function getActiveViewer() {
-    return videoEl.classList.contains("hidden") ? imageEl : videoEl;
-  }
+  const transformState = { scale: 1, translateX: 0, translateY: 0, rotation: 0, flipX: 1 };
+  const dragState = { active: false, lastX: 0, lastY: 0 };
 
-  function isVideoActive() {
-    return !videoEl.classList.contains("hidden");
-  }
+  // ── TRANSFORM ─────────────────────────────────────────────────────
 
   function renderTransform() {
-    if (isVideoActive()) {
-      // Keep video playback on a stable render path for smoother decode/composition.
+    if (!videoEl.classList.contains("hidden")) {
       videoEl.style.transform = "none";
       return;
     }
-
-    const activeViewer = getActiveViewer();
-    const scale = Number(transformState.scale || 1);
-    const flipX = Number(transformState.flipX || 1);
-    const rotation = Number(transformState.rotation || 0);
-    const tx = Number(transformState.translateX || 0);
-    const ty = Number(transformState.translateY || 0);
-
-    activeViewer.style.transform = `translate(${tx}px, ${ty}px) rotate(${rotation}deg) scale(${scale * flipX}, ${scale})`;
+    const { scale, flipX, rotation, translateX: tx, translateY: ty } = transformState;
+    imageEl.style.transform = `translate(${tx}px,${ty}px) rotate(${rotation}deg) scale(${scale * flipX},${scale})`;
   }
 
   function syncZoomUi() {
-    const zoomPercent = Math.round(transformState.scale * 100);
-    zoomSlider.value = String(zoomPercent);
-    const text = `${zoomPercent}%`;
-    zoomVal.textContent = text;
-    zoomBadge.textContent = text;
+    const pct = `${Math.round(transformState.scale * 100)}%`;
+    zoomBadge.textContent = pct;
   }
 
   function setZoomPercent(percent) {
-    if (isVideoActive()) {
-      return;
-    }
-    const clamped = Math.max(25, Math.min(300, Number(percent) || 100));
-    transformState.scale = clamped / 100;
+    if (!videoEl.classList.contains("hidden")) return;
+    transformState.scale = Math.max(0.25, Math.min(3, (Number(percent) || 100) / 100));
     syncZoomUi();
     renderTransform();
   }
 
   function resetTransformState() {
-    transformState.scale = 1;
-    transformState.translateX = 0;
-    transformState.translateY = 0;
-    transformState.rotation = 0;
-    transformState.flipX = 1;
+    Object.assign(transformState, { scale: 1, translateX: 0, translateY: 0, rotation: 0, flipX: 1 });
     syncZoomUi();
     renderTransform();
   }
 
-  function nudgePan(deltaX, deltaY) {
-    if (isVideoActive()) {
-      return;
-    }
-    transformState.translateX += Number(deltaX || 0);
-    transformState.translateY += Number(deltaY || 0);
+  function nudgePan(dx, dy) {
+    if (!videoEl.classList.contains("hidden")) return;
+    transformState.translateX += dx;
+    transformState.translateY += dy;
     renderTransform();
   }
 
-  function splitPathSegments(value) {
-    return String(value || "")
-      .replaceAll("\\", "/")
-      .split("/")
-      .filter(Boolean);
+  // Viewer toolbar actions
+  overlay.querySelectorAll(".ipp-vt-btn").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const action = btn.dataset.action;
+      const pct = Math.round(transformState.scale * 100);
+      if (action === "zoom-in")      setZoomPercent(pct + 25);
+      if (action === "zoom-out")     setZoomPercent(pct - 25);
+      if (action === "fit")          resetTransformState();
+      if (action === "rotate-left")  { transformState.rotation -= 90; renderTransform(); }
+      if (action === "rotate-right") { transformState.rotation += 90; renderTransform(); }
+      if (action === "flip-h")       { transformState.flipX *= -1; renderTransform(); }
+      if (action === "fullscreen") {
+        const el = videoEl.classList.contains("hidden") ? imageEl : videoEl;
+        if (el.requestFullscreen) el.requestFullscreen();
+      }
+    });
+  });
+
+  // Scroll-to-zoom
+  viewer.addEventListener("wheel", (e) => {
+    if (!e.ctrlKey) return;
+    e.preventDefault();
+    const pct = Math.round(transformState.scale * 100);
+    setZoomPercent(e.deltaY < 0 ? pct + 8 : pct - 8);
+  }, { passive: false });
+
+  // Drag-to-pan
+  viewer.addEventListener("mousedown", (e) => {
+    if (e.button !== 0) return;
+    if (e.target?.closest(".ipp-nav") || e.target?.closest(".ipp-vt-btn")) return;
+    dragState.active = true;
+    dragState.lastX = e.clientX;
+    dragState.lastY = e.clientY;
+    viewer.classList.add("is-panning");
+  });
+  window.addEventListener("mousemove", (e) => {
+    if (!dragState.active) return;
+    nudgePan(e.clientX - dragState.lastX, e.clientY - dragState.lastY);
+    dragState.lastX = e.clientX;
+    dragState.lastY = e.clientY;
+  });
+  window.addEventListener("mouseup", () => {
+    dragState.active = false;
+    viewer.classList.remove("is-panning");
+  });
+
+  // ── MEDIA SOURCE ──────────────────────────────────────────────────
+
+  function refreshVideoPlayback() {
+    if (videoEl.classList.contains("hidden") || !videoEl.src) return;
+    imageEl.classList.add("hidden");
+    videoEl.classList.remove("hidden");
+    if (videoEl.readyState < 2) videoEl.load();
+    if (videoEl.paused) videoEl.play().catch(() => {});
   }
 
   async function applyPreviewImageSource(imagePath, preferredPreviewSrc, mediaType) {
-    const normalizedMediaType = normalizeMediaType(mediaType, imagePath);
-    if (normalizedMediaType === "video") {
+    const normalized = normalizeMediaType(mediaType, imagePath);
+
+    if (normalized === "video") {
       imageEl.classList.add("hidden");
       imageEl.src = "";
       videoEl.classList.remove("hidden");
-      let videoSrc = String(preferredPreviewSrc || "").trim() || normalizeImageSrc(imagePath);
+      let src = String(preferredPreviewSrc || "").trim() || normalizeImageSrc(imagePath);
       try {
-        // Always resolve video preview when possible so MOV files can use a
-        // codec-compatible cached MP4 preview across all UI contexts.
-        const preferred = await resolvePreviewSrc(imagePath, normalizedMediaType);
-        const preferredSrc = String(preferred?.previewSrc || "").trim();
-        if (preferred?.ok && preferredSrc) {
-          videoSrc = preferredSrc;
-        }
-      } catch {
-        // Keep normalized source.
-      }
+        const res = await resolvePreviewSrc(imagePath, normalized);
+        const s = String(res?.previewSrc || "").trim();
+        if (res?.ok && s) src = s;
+      } catch { /* keep normalized */ }
 
-      let videoFallbackAttempted = false;
+      let fallbackAttempted = false;
       videoEl.onerror = async () => {
-        if (videoFallbackAttempted) {
-          videoEl.src = "";
-          return;
-        }
-
-        videoFallbackAttempted = true;
+        if (fallbackAttempted) { videoEl.src = ""; return; }
+        fallbackAttempted = true;
         try {
-          const fallback = await resolvePreviewSrc(imagePath, normalizedMediaType);
-          const nextSrc = String(fallback?.previewSrc || "").trim();
-          if (fallback?.ok && nextSrc && nextSrc !== videoEl.src) {
-            videoEl.src = nextSrc;
-            void videoEl.play().catch(() => {});
-            return;
-          }
-        } catch {
-          // Ignore and fall through.
-        }
-
+          const fb = await resolvePreviewSrc(imagePath, normalized);
+          const s = String(fb?.previewSrc || "").trim();
+          if (fb?.ok && s && s !== videoEl.src) { videoEl.src = s; videoEl.play().catch(() => {}); return; }
+        } catch { /* ignore */ }
         videoEl.src = "";
       };
 
-      videoEl.src = videoSrc;
+      videoEl.src = src;
       videoEl.preload = "auto";
       videoEl.playsInline = true;
       videoEl.currentTime = 0;
-      void videoEl.play().catch(() => {});
+      videoEl.play().catch(() => {});
       return;
     }
 
     videoEl.pause();
     videoEl.src = "";
     videoEl.classList.add("hidden");
-    let baseSrc = String(preferredPreviewSrc || "").trim() || normalizeImageSrc(imagePath);
+    let src = String(preferredPreviewSrc || "").trim() || normalizeImageSrc(imagePath);
     try {
       if (!preferredPreviewSrc) {
-        const preferred = await resolvePreviewSrc(imagePath, normalizedMediaType);
-        const preferredSrc = String(preferred?.previewSrc || "").trim();
-        if (preferred?.ok && preferredSrc) {
-          baseSrc = preferredSrc;
-        }
+        const res = await resolvePreviewSrc(imagePath, normalized);
+        const s = String(res?.previewSrc || "").trim();
+        if (res?.ok && s) src = s;
       }
-    } catch {
-      // Keep normalized source.
-    }
+    } catch { /* keep normalized */ }
 
     imageEl.classList.remove("hidden");
-
     let fallbackAttempted = false;
     imageEl.onerror = async () => {
-      if (fallbackAttempted) {
-        imageEl.src = "";
-        return;
-      }
-
+      if (fallbackAttempted) { imageEl.src = ""; return; }
       fallbackAttempted = true;
       try {
-        const fallback = await resolvePreviewSrc(imagePath, normalizedMediaType);
-        const nextSrc = String(fallback?.previewSrc || "").trim();
-        if (fallback?.ok && nextSrc && nextSrc !== imageEl.src) {
-          imageEl.src = nextSrc;
-          return;
-        }
-      } catch {
-        // Ignore and fall through.
-      }
-
+        const fb = await resolvePreviewSrc(imagePath, normalized);
+        const s = String(fb?.previewSrc || "").trim();
+        if (fb?.ok && s && s !== imageEl.src) { imageEl.src = s; return; }
+      } catch { /* ignore */ }
       imageEl.src = "";
     };
-
-    imageEl.src = baseSrc;
+    imageEl.src = src;
   }
 
-  // ── Tabs ──────────────────────────────────────────────────────────────────
-
-  tabs.forEach(tab => {
-    tab.addEventListener("click", () => {
-      tabs.forEach(t => { t.classList.remove("active"); t.setAttribute("aria-selected", "false"); });
-      panels.forEach(p => p.classList.remove("active"));
-      tab.classList.add("active");
-      tab.setAttribute("aria-selected", "true");
-      overlay.querySelector(`.image-preview-tab-body[data-panel="${tab.dataset.tab}"]`).classList.add("active");
-    });
-  });
-
-  // ── Zoom ──────────────────────────────────────────────────────────────────
-
-  zoomSlider.addEventListener("input", () => {
-    setZoomPercent(Number(zoomSlider.value));
-  });
-
-  imageAreaEl.addEventListener("wheel", (event) => {
-    if (!event.ctrlKey) {
-      return;
-    }
-    event.preventDefault();
-    const current = Math.round(transformState.scale * 100);
-    const next = event.deltaY < 0 ? current + 8 : current - 8;
-    setZoomPercent(next);
-  }, { passive: false });
-
-  imageAreaEl.addEventListener("mousedown", (event) => {
-    if (event.button !== 0) {
-      return;
-    }
-    if (event.target?.closest(".image-preview-nav") || event.target?.closest(".image-preview-it-btn")) {
-      return;
-    }
-    dragState.active = true;
-    dragState.lastX = event.clientX;
-    dragState.lastY = event.clientY;
-    imageAreaEl.classList.add("is-panning");
-  });
-
-  window.addEventListener("mousemove", (event) => {
-    if (!dragState.active) {
-      return;
-    }
-    const dx = event.clientX - dragState.lastX;
-    const dy = event.clientY - dragState.lastY;
-    dragState.lastX = event.clientX;
-    dragState.lastY = event.clientY;
-    nudgePan(dx, dy);
-  });
-
-  window.addEventListener("mouseup", () => {
-    dragState.active = false;
-    imageAreaEl.classList.remove("is-panning");
-  });
-
-  function stopPanHold() {
-    if (!panHoldState.timer) {
-      return;
-    }
-    clearInterval(panHoldState.timer);
-    panHoldState.timer = null;
-  }
-
-  function startPanHold(dx, dy) {
-    stopPanHold();
-    nudgePan(dx, dy);
-    panHoldState.timer = setInterval(() => {
-      nudgePan(dx, dy);
-    }, 45);
-  }
-
-  panButtons.forEach((button) => {
-    const direction = String(button.dataset.pan || "");
-    const step = 18;
-    const byDirection = {
-      up: [0, -step],
-      down: [0, step],
-      left: [-step, 0],
-      right: [step, 0],
-    };
-    const tuple = byDirection[direction] || [0, 0];
-
-    button.addEventListener("mousedown", (event) => {
-      event.preventDefault();
-      startPanHold(tuple[0], tuple[1]);
-    });
-    button.addEventListener("mouseup", stopPanHold);
-    button.addEventListener("mouseleave", stopPanHold);
-    button.addEventListener("click", () => {
-      nudgePan(tuple[0], tuple[1]);
-    });
-  });
-
-  window.addEventListener("mouseup", stopPanHold);
-
-  overlay.querySelectorAll(".image-preview-it-btn").forEach(btn => {
-    btn.addEventListener("click", () => {
-      const action = btn.dataset.action;
-      if (action === "zoom-in")  { setZoomPercent(Math.round(transformState.scale * 100) + 25); }
-      if (action === "zoom-out") { setZoomPercent(Math.round(transformState.scale * 100) - 25); }
-      if (action === "fit")      { resetTransformState(); }
-      const activeViewer = videoEl.classList.contains("hidden") ? imageEl : videoEl;
-      if (action === "rotate-left")  { transformState.rotation -= 90; renderTransform(); }
-      if (action === "rotate-right") { transformState.rotation += 90; renderTransform(); }
-      if (action === "flip-h")       { transformState.flipX = transformState.flipX * -1; renderTransform(); }
-      if (action === "fullscreen" && activeViewer.requestFullscreen) { activeViewer.requestFullscreen(); }
-    });
-  });
-
-  // ── Stars ─────────────────────────────────────────────────────────────────
+  // ── RATING ────────────────────────────────────────────────────────
 
   function setRating(value) {
     currentRating = value;
     stars.forEach(s => s.classList.toggle("active", Number(s.dataset.value) <= value));
   }
-
   stars.forEach(s => s.addEventListener("click", () => setRating(Number(s.dataset.value))));
 
-  // ── Tags ──────────────────────────────────────────────────────────────────
+  // ── TAGS ──────────────────────────────────────────────────────────
 
   function addTag(label) {
     if (!label) return;
     const span = document.createElement("span");
-    span.className = "image-preview-tag";
-    span.textContent = label;
+    span.className = "ipp-tag";
     const rm = document.createElement("button");
-    rm.className = "image-preview-tag-rm";
+    rm.className = "ipp-tag-rm";
     rm.textContent = "×";
     rm.type = "button";
     rm.setAttribute("aria-label", `Remove tag ${label}`);
     rm.addEventListener("click", () => span.remove());
-    span.appendChild(rm);
+    span.append(document.createTextNode(label), rm);
     tagRow.appendChild(span);
   }
 
   tagAddBtn.addEventListener("click", () => { addTag(tagInput.value.trim()); tagInput.value = ""; });
   tagInput.addEventListener("keydown", e => { if (e.key === "Enter") { addTag(tagInput.value.trim()); tagInput.value = ""; } });
 
-  // ── Nav ───────────────────────────────────────────────────────────────────
-
-  prevBtn.addEventListener("click", () => onNavigate("prev"));
-  nextBtn.addEventListener("click", () => onNavigate("next"));
-
-  // ── Top-bar actions ───────────────────────────────────────────────────────
-
-  exportBtn.addEventListener("click", async () => {
-    if (!currentDetails?.path) {
-      setStatus("No file selected to export.");
-      return;
-    }
-    const result = await onExport(currentDetails);
-    setStatus(result?.ok ? "Export started." : `Export failed: ${result?.message || "Unknown error"}`);
-  });
-
-  deleteBtn.addEventListener("click", async () => {
-    if (!currentDetails?.path) {
-      setStatus("No file selected to delete.");
-      return;
-    }
-    const result = await onDelete(currentDetails);
-    if (result?.ok) { close(); setStatus("Image deleted."); }
-    else setStatus(`Delete failed: ${result?.message || "Unknown error"}`);
-  });
-
-  async function handleAddToAlbumAction() {
-    if (albumActionInFlight) {
-      return;
-    }
-    albumActionInFlight = true;
-    if (!currentDetails?.path) {
-      setStatus("No file selected to add to album.");
-      albumActionInFlight = false;
-      return;
-    }
-    try {
-      setStatus("Opening album picker...");
-      const result = await onAddToAlbum(currentDetails);
-      setStatus(result?.ok ? String(result?.message || "Added to album.") : `Could not add: ${result?.message || "Unknown error"}`);
-    } catch (error) {
-      setStatus(`Could not add: ${String(error?.message || error)}`);
-    } finally {
-      albumActionInFlight = false;  
-    }
-  }
-
-  albumBtn.addEventListener("click", async (event) => {
-    event.preventDefault();
-    event.stopPropagation();
-    await handleAddToAlbumAction();
-  });
-
-  albumBtn.addEventListener("pointerup", async (event) => {
-    event.preventDefault();
-    event.stopPropagation();
-    await handleAddToAlbumAction();
-  });
-
-  albumBtn.addEventListener("keydown", async (event) => {
-    if (event.key !== "Enter" && event.key !== " ") {
-      return;
-    }
-    event.preventDefault();
-    event.stopPropagation();
-    await handleAddToAlbumAction();
-  });
-
-  panel.addEventListener("click", async (event) => {
-    const target = event.target;
-    if (!(target instanceof Element)) {
-      return;
-    }
-    const clickedAlbumButton = target.closest(".image-preview-album-btn");
-    if (!clickedAlbumButton) {
-      return;
-    }
-    event.preventDefault();
-    event.stopPropagation();
-    await handleAddToAlbumAction();
-  });
-
-  if (shareBtn) {
-    shareBtn.addEventListener("click", async () => {
-      if (!currentDetails?.path) {
-        setStatus("No file selected to share.");
-        return;
-      }
-      const result = await onShareLink(currentDetails);
-      setStatus(result?.ok ? "Share link copied." : `Could not share: ${result?.message || "Unknown error"}`);
-    });
-  }
-
-  copyBtn.addEventListener("click", async () => {
-    if (!currentDetails) return;
-    const result = await onCopyText(toMetadataText(currentDetails));
-    setStatus(result?.ok ? "Copied media metadata." : `Could not copy: ${result?.message || "Unknown error"}`);
-  });
-
-  openBtn.addEventListener("click", async () => {
-    if (!currentDetails?.path) return;
-    const result = await onOpenSourceFolder(currentDetails.path);
-    setStatus(result?.ok ? "Opened source folder." : `Could not open: ${result?.message || "Unknown error"}`);
-  });
-
-  // ── Helpers ───────────────────────────────────────────────────────────────
+  // ── META GRID RENDER ──────────────────────────────────────────────
 
   function renderMetaGrid(el, pairs) {
     el.innerHTML = pairs
@@ -758,303 +815,276 @@ export function createImagePreviewPanel(options = {}) {
       .join("");
   }
 
-  /**
-   * Renders the AI description area.
-   * - For videos with timestamped descriptions: renders a scrollable timeline.
-   * - For images or plain descriptions: renders a simple card as before.
-   *
-   * Clicking a timestamp badge on a video seeks the video element to that time.
-   */
-  // Builds one timeline item DOM node
-  function buildTimelineItem({ label, seekSeconds, text }) {
-    const item = document.createElement("div");
-    item.className = "image-preview-ai-timeline-item";
-    item.setAttribute("role", "listitem");
-    item.dataset.tsLabel = label;
+  // ── STATUS STRIP ──────────────────────────────────────────────────
 
-    // ── Header row: badge + expand toggle ────────────────────────────────
-    const header = document.createElement("div");
-    header.className = "image-preview-ai-ts-header";
+  function renderStatusStrip(details) {
+    const cm = details?.cloud_metadata || {};
+    const localStatus = details?.status || "ok";
+    const cloudStatus = cm.status || "unknown";
+
+    statusStrip.innerHTML = "";
+
+    const localBadge = document.createElement("span");
+    localBadge.className = `ipp-badge ${localStatus === "ok" || localStatus === "indexed" ? "green" : "amber"}`;
+    localBadge.textContent = localStatus === "ok" ? "Indexed" : localStatus;
+    statusStrip.appendChild(localBadge);
+
+    const cloudBadge = document.createElement("span");
+    cloudBadge.className = `ipp-badge ${cloudStatus === "ok" ? "green" : cloudStatus === "unknown" ? "muted" : "amber"}`;
+    cloudBadge.textContent = `Cloud: ${cloudStatus}`;
+    statusStrip.appendChild(cloudBadge);
+  }
+
+  // ── AI DESCRIPTION ────────────────────────────────────────────────
+
+  function buildTimelineItem({ label, seekSeconds, text }, videoElement) {
+    const item = document.createElement("div");
+    item.className = "ipp-tl-item";
+
+    const hdr = document.createElement("div");
+    hdr.className = "ipp-tl-hdr";
 
     const badge = document.createElement("button");
-    badge.className = "image-preview-ai-ts-badge";
+    badge.className = "ipp-tl-badge";
     badge.type = "button";
     badge.textContent = label;
     badge.setAttribute("aria-label", `Jump to ${label}`);
-    badge.title = seekSeconds != null ? `Seek to ${label}` : label;
 
     if (seekSeconds != null) {
       badge.addEventListener("click", (e) => {
         e.stopPropagation();
-        if (!videoEl.classList.contains("hidden")) {
-          videoEl.currentTime = seekSeconds;
-          void videoEl.play().catch(() => {});
+        if (!videoElement.classList.contains("hidden")) {
+          videoElement.currentTime = seekSeconds;
+          videoElement.play().catch(() => {});
         }
-        aiTsSelect.value = label;
-        filterTimelineItems(label);
       });
     } else {
       badge.disabled = true;
     }
 
-    // Chevron toggle button
-    const toggle = document.createElement("button");
-    toggle.className = "image-preview-ai-ts-toggle";
-    toggle.type = "button";
-    toggle.setAttribute("aria-expanded", "false");
-    toggle.setAttribute("aria-label", "Expand description");
-    toggle.innerHTML = `<svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M2 3.5l3 3 3-3"/></svg>`;
-
-    header.appendChild(badge);
-    header.appendChild(toggle);
-
-    // ── Collapsed preview (2-line clamp) ─────────────────────────────────
     const preview = document.createElement("p");
-    preview.className = "image-preview-ai-ts-preview";
+    preview.className = "ipp-tl-preview";
     preview.textContent = text || "—";
 
-    // ── Full text (hidden by default) ─────────────────────────────────────
+    const chevron = document.createElement("span");
+    chevron.className = "ipp-tl-chevron";
+    chevron.innerHTML = ICONS.chevronDown;
+
     const full = document.createElement("p");
-    full.className = "image-preview-ai-ts-full";
+    full.className = "ipp-tl-full";
     full.textContent = text || "—";
-    full.setAttribute("aria-hidden", "true");
 
-    // ── Expand / collapse logic ───────────────────────────────────────────
-    let expanded = false;
+    hdr.append(badge, preview, chevron);
 
-    function setExpanded(next) {
-      expanded = next;
-      toggle.setAttribute("aria-expanded", String(expanded));
-      toggle.setAttribute("aria-label", expanded ? "Collapse description" : "Expand description");
-      item.classList.toggle("image-preview-ai-timeline-item--expanded", expanded);
-      preview.setAttribute("aria-hidden", String(expanded));
-      full.setAttribute("aria-hidden", String(!expanded));
-    }
-
-    // Clicking the header row (anywhere except the badge itself) toggles
-    header.addEventListener("click", (e) => {
-      if (e.target === badge || badge.contains(e.target)) return;
-      setExpanded(!expanded);
-    });
-    toggle.addEventListener("click", (e) => {
-      e.stopPropagation();
-      setExpanded(!expanded);
+    hdr.addEventListener("click", (e) => {
+      if (badge.contains(e.target)) return;
+      item.classList.toggle("expanded");
     });
 
-    item.appendChild(header);
-    item.appendChild(preview);
-    item.appendChild(full);
+    item.append(hdr, full);
     return item;
-  }
-
-  // Shows/hides timeline items based on dropdown selection
-  function filterTimelineItems(selectedLabel) {
-    const items = aiDesc.querySelectorAll(".image-preview-ai-timeline-item");
-    items.forEach(item => {
-      const match = !selectedLabel || item.dataset.tsLabel === selectedLabel;
-      item.classList.toggle("hidden", !match);
-      item.classList.toggle("image-preview-ai-timeline-item--active", !!selectedLabel && match);
-    });
   }
 
   function renderAIDescription(description, isVideo) {
     aiDesc.innerHTML = "";
 
-    // Reset dropdown
-    aiTsSelect.innerHTML = "<option value=\"\" >All timeframes</option>";
-    aiTsSelect.classList.add("hidden");
-
     if (!description) {
       const card = document.createElement("div");
-      card.className = "image-preview-ai-card";
+      card.className = "ipp-ai-card";
       card.textContent = "No description available.";
       aiDesc.appendChild(card);
-      aiDescLabel.textContent = "AI description";
+      aiDescLabel.textContent = "Description";
       return;
     }
 
     const parsed = isVideo ? parseTimestampedDescription(description) : null;
 
     if (!parsed) {
-      // Plain description — single card, no dropdown
       const card = document.createElement("div");
-      card.className = "image-preview-ai-card";
+      card.className = "ipp-ai-text";
       card.textContent = description;
       aiDesc.appendChild(card);
-      aiDescLabel.textContent = "AI description";
+      aiDescLabel.textContent = "Description";
       return;
     }
 
     aiDescLabel.textContent = "Timeline";
 
-    // Populate and show the dropdown
-    parsed.segments.forEach(({ label }) => {
-      const opt = document.createElement("option");
-      opt.value = label;
-      opt.textContent = label;
-      aiTsSelect.appendChild(opt);
-    });
-    aiTsSelect.classList.remove("hidden");
-
-    // Dropdown change handler — filter visible items + seek video
-    aiTsSelect.onchange = () => {
-      const selected = aiTsSelect.value;
-      filterTimelineItems(selected);
-      if (selected) {
-        const seg = parsed.segments.find(s => s.label === selected);
-        if (seg?.seekSeconds != null && !videoEl.classList.contains("hidden")) {
-          videoEl.currentTime = seg.seekSeconds;
-          void videoEl.play().catch(() => {});
-        }
-      }
-    };
-
-    // Optional preamble
     if (parsed.preamble) {
       const pre = document.createElement("div");
-      pre.className = "image-preview-ai-card image-preview-ai-preamble";
+      pre.className = "ipp-ai-text";
+      pre.style.marginBottom = "8px";
       pre.textContent = parsed.preamble;
       aiDesc.appendChild(pre);
     }
 
-    // Timeline
     const timeline = document.createElement("div");
-    timeline.className = "image-preview-ai-timeline";
-    timeline.setAttribute("role", "list");
-    parsed.segments.forEach(seg => timeline.appendChild(buildTimelineItem(seg)));
+    timeline.className = "ipp-timeline";
+    parsed.segments.forEach(seg => timeline.appendChild(buildTimelineItem(seg, videoEl)));
     aiDesc.appendChild(timeline);
   }
 
-  /**
-   * Converts a timestamp string like "1:23", "0:05", "1:23:45" into total seconds.
-   * Returns null if parsing fails.
-   */
-  function parseTimestampToSeconds(ts) {
-    const parts = String(ts || "").trim().split(":").map(Number);
-    if (parts.some(isNaN)) return null;
-    if (parts.length === 2) return parts[0] * 60 + parts[1];
-    if (parts.length === 3) return parts[0] * 3600 + parts[1] * 60 + parts[2];
-    return null;
+  // ── SCORE / TAG SECTIONS ──────────────────────────────────────────
+
+  function renderObjectsList(details) {
+    objectsList.innerHTML = "";
+    const cm = details?.cloud_metadata || {};
+
+    const addTagRow = (label, values) => {
+      const rows = Array.isArray(values) ? values.filter(Boolean) : [];
+      if (!rows.length) return;
+      const row = document.createElement("div");
+      row.style.cssText = "display:flex;gap:6px;align-items:flex-start;padding:3px 0;";
+      row.innerHTML = `<span style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:#54575f;width:96px;flex-shrink:0;padding-top:2px">${label}</span>
+        <span style="font-size:11px;color:#8a8d96;line-height:1.6">${rows.join(", ")}</span>`;
+      objectsList.appendChild(row);
+    };
+
+    const addScoreRow = (label, value) => {
+      const score = Number(value);
+      if (!Number.isFinite(score)) return;
+      const pct = Math.max(0, Math.min(100, Math.round(score)));
+      const row = document.createElement("div");
+      row.className = "ipp-score-row";
+      row.innerHTML = `
+        <span class="ipp-score-label">${label}</span>
+        <div class="ipp-score-bar"><div class="ipp-score-fill" style="width:${pct}%"></div></div>
+        <span class="ipp-score-val">${pct}</span>`;
+      objectsList.appendChild(row);
+    };
+
+    const addScalarRow = (label, value) => {
+      const v = String(value || "").trim();
+      if (!v) return;
+      const row = document.createElement("div");
+      row.style.cssText = "display:flex;gap:6px;padding:3px 0;";
+      row.innerHTML = `<span style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:#54575f;width:96px;flex-shrink:0">${label}</span>
+        <span style="font-size:11px;color:#8a8d96">${v}</span>`;
+      objectsList.appendChild(row);
+    };
+
+    addScoreRow("Social media",  cm?.socialMediaScore);
+    addScoreRow("Instagram",     cm?.instagramScore);
+    addTagRow("Scene",           cm?.sceneTags);
+    addTagRow("Objects",         cm?.objectTags);
+    addTagRow("Activity",        cm?.activityTags);
+    addTagRow("Aspect ratio",    cm?.aspectRatioSuitability);
+    addScalarRow("Aesthetic",    cm?.aestheticStyle);
+    addScalarRow("Editing",      cm?.editingLevel);
+    addScalarRow("Complexity",   cm?.visualComplexity);
+    addScalarRow("Hero element", cm?.heroElement);
+    addScalarRow("Depth of field", cm?.depthOfField);
   }
 
-  function populateInfoTab(details) {
+  // ── POPULATE SECTIONS ─────────────────────────────────────────────
+
+  function populateFileSection(details) {
     const lm = details?.local_metadata || {};
     const cm = details?.cloud_metadata || {};
 
-    cloudStatus.textContent = `Cloud: ${cm.status || "unknown"}`;
-    cloudStatus.className    = `image-preview-status-badge ${cm.status === "ok" ? "status-ok" : "status-cloud"}`;
-
     renderMetaGrid(fileDetails, [
-      ["Filename", details?.path?.split("/").pop() || ""],
-      ["Size",     lm.size_bytes ? (lm.size_bytes / 1048576).toFixed(1) + " MB" : ""],
+      ["Filename",   details?.path?.split("/").pop() || ""],
+      ["Size",       lm.size_bytes ? `${(lm.size_bytes / 1048576).toFixed(1)} MB` : ""],
       ["Dimensions", lm.width && lm.height ? `${lm.width} × ${lm.height} px` : ""],
-      ["Format",   lm.format || ""],
-      ["Analyzed", cm.analyzed_at ? new Date(cm.analyzed_at).toLocaleDateString() : ""],
+      ["Format",     lm.format || ""],
+      ["Analyzed",   cm.analyzed_at ? new Date(cm.analyzed_at).toLocaleDateString() : ""],
     ]);
 
     const meta = details?.metadata || {};
     renderMetaGrid(exifDetails, [
-      ["Camera",       meta.camera || ""],
-      ["Lens",         meta.lens   || ""],
-      ["Focal length", meta.focal_length || ""],
-      ["Aperture",     meta.aperture    || ""],
-      ["Shutter",      meta.shutter     || ""],
-      ["ISO",          meta.iso         || ""],
+      ["Camera",    meta.camera        || ""],
+      ["Lens",      meta.lens          || ""],
+      ["Focal",     meta.focal_length  || ""],
+      ["Aperture",  meta.aperture      || ""],
+      ["Shutter",   meta.shutter       || ""],
+      ["ISO",       meta.iso           || ""],
     ]);
 
     if (meta.rating) setRating(Number(meta.rating));
   }
 
-  function populateAITab(details) {
+  function populateAISection(details) {
     const cm = details?.cloud_metadata || {};
     const isVideo = details?.media_type === "video";
-
     renderAIDescription(cm.description || "", isVideo);
-
+    renderObjectsList(details);
     ocrText.textContent = cm.ocr?.all_text?.trim() || "No text detected.";
+  }
 
-    objectsList.innerHTML = "";
-    const sceneTags = Array.isArray(cm?.sceneTags) ? cm.sceneTags : [];
-    const objectTags = Array.isArray(cm?.objectTags) ? cm.objectTags : [];
-    const activityTags = Array.isArray(cm?.activityTags) ? cm.activityTags : [];
-    const aspectRatioSuitability = Array.isArray(cm?.aspectRatioSuitability) ? cm.aspectRatioSuitability : [];
+  function populateTagsSection(details) {
+    tagRow.innerHTML = "";
+    const cm = details?.cloud_metadata || {};
+    const all = Array.from(new Set([
+      ...(Array.isArray(details?.metadata?.tags) ? details.metadata.tags : []),
+      ...(Array.isArray(cm?.sceneTags)   ? cm.sceneTags   : []),
+      ...(Array.isArray(cm?.objectTags)  ? cm.objectTags  : []),
+      ...(Array.isArray(cm?.activityTags)? cm.activityTags: []),
+    ]));
+    all.forEach(t => addTag(t));
+  }
 
-    const addTagSection = (label, values) => {
-      const rows = Array.isArray(values) ? values.filter(Boolean) : [];
-      if (rows.length === 0) {
-        return;
-      }
-      const row = document.createElement("div");
-      row.className = "image-preview-conf-row";
-      row.innerHTML = `
-        <span class="image-preview-conf-label">${label}</span>
-        <span class="image-preview-conf-pct">${rows.join(", ")}</span>`;
-      objectsList.appendChild(row);
-    };
+  // ── NAV ───────────────────────────────────────────────────────────
 
-    const addScalarSection = (label, value) => {
-      const normalized = String(value || "").trim();
-      if (!normalized) {
-        return;
-      }
-      const row = document.createElement("div");
-      row.className = "image-preview-conf-row";
-      row.innerHTML = `
-        <span class="image-preview-conf-label">${label}</span>
-        <span class="image-preview-conf-pct">${normalized}</span>`;
-      objectsList.appendChild(row);
-    };
+  prevBtn.addEventListener("click", () => onNavigate("prev"));
+  nextBtn.addEventListener("click", () => onNavigate("next"));
 
-    const addScoreSection = (label, value) => {
-      const score = Number(value);
-      if (!Number.isFinite(score)) {
-        return;
-      }
-      const pct = Math.max(0, Math.min(100, Math.round(score)));
-      const row = document.createElement("div");
-      row.className = "image-preview-conf-row";
-      row.innerHTML = `
-        <span class="image-preview-conf-label">${label}</span>
-        <div class="image-preview-conf-bar"><div class="image-preview-conf-fill" style="width:${pct}%"></div></div>
-        <span class="image-preview-conf-pct">${pct}</span>`;
-      objectsList.appendChild(row);
-    };
+  // ── TOP-BAR ACTIONS ───────────────────────────────────────────────
 
-    addTagSection("Scene Tags", sceneTags);
-    addTagSection("Object Tags", objectTags);
-    addTagSection("Activity Tags", activityTags);
-    addScoreSection("Social Media Score", cm?.socialMediaScore);
-    addScoreSection("Instagram Score", cm?.instagramScore);
-    addTagSection("Aspect Ratio Suitability", aspectRatioSuitability);
-    addScalarSection("Aesthetic Style", cm?.aestheticStyle);
-    addScalarSection("Editing Level", cm?.editingLevel);
-    addScalarSection("Visual Complexity", cm?.visualComplexity);
-    addScalarSection("Hero Element", cm?.heroElement);
-    addScalarSection("Depth of Field", cm?.depthOfField);
+  exportBtn.addEventListener("click", async () => {
+    if (!currentDetails?.path) { setStatus("No file selected."); return; }
+    const r = await onExport(currentDetails);
+    setStatus(r?.ok ? "Export started." : `Export failed: ${r?.message || "Unknown error"}`);
+  });
 
-    const entries = Array.isArray(cm?.ocr?.entries) ? cm.ocr.entries : [];
-    if (entries.length > 0) {
-      const ocrRow = document.createElement("div");
-      ocrRow.className = "image-preview-conf-row";
-      ocrRow.innerHTML = `
-        <span class="image-preview-conf-label">OCR Entries</span>
-        <span class="image-preview-conf-pct">${entries.length}</span>`;
-      objectsList.appendChild(ocrRow);
+  deleteBtn.addEventListener("click", async () => {
+    if (!currentDetails?.path) { setStatus("No file selected."); return; }
+    const r = await onDelete(currentDetails);
+    if (r?.ok) { close(); setStatus("Image deleted."); }
+    else setStatus(`Delete failed: ${r?.message || "Unknown error"}`);
+  });
+
+  async function handleAddToAlbum() {
+    if (albumActionInFlight) return;
+    albumActionInFlight = true;
+    if (!currentDetails?.path) { setStatus("No file selected."); albumActionInFlight = false; return; }
+    try {
+      setStatus("Opening album picker…");
+      const r = await onAddToAlbum(currentDetails);
+      setStatus(r?.ok ? String(r?.message || "Added to album.") : `Could not add: ${r?.message || "Unknown error"}`);
+    } catch (err) {
+      setStatus(`Could not add: ${String(err?.message || err)}`);
+    } finally {
+      albumActionInFlight = false;
     }
   }
 
-  function populateTags(details) {
-    tagRow.innerHTML = "";
-    const metadataTags = Array.isArray(details?.metadata?.tags) ? details.metadata.tags : [];
-    const cm = details?.cloud_metadata || {};
-    const sceneTags = Array.isArray(cm?.sceneTags) ? cm.sceneTags : [];
-    const objectTags = Array.isArray(cm?.objectTags) ? cm.objectTags : [];
-    const activityTags = Array.isArray(cm?.activityTags) ? cm.activityTags : [];
-    const tags = Array.from(new Set([...metadataTags, ...sceneTags, ...objectTags, ...activityTags]));
-    tags.forEach(t => addTag(t));
+  for (const evtName of ["click", "pointerup"]) {
+    albumBtn.addEventListener(evtName, (e) => { e.preventDefault(); e.stopPropagation(); handleAddToAlbum(); });
   }
+  albumBtn.addEventListener("keydown", (e) => {
+    if (e.key !== "Enter" && e.key !== " ") return;
+    e.preventDefault(); e.stopPropagation(); handleAddToAlbum();
+  });
 
-  // ── Open / close ──────────────────────────────────────────────────────────
+  shareBtn.addEventListener("click", async () => {
+    if (!currentDetails?.path) { setStatus("No file selected."); return; }
+    const r = await onShareLink(currentDetails);
+    setStatus(r?.ok ? "Share link copied." : `Could not share: ${r?.message || "Unknown error"}`);
+  });
+
+  copyBtn.addEventListener("click", async () => {
+    if (!currentDetails) return;
+    const r = await onCopyText(toMetadataText(currentDetails));
+    setStatus(r?.ok ? "Copied metadata JSON." : `Could not copy: ${r?.message || "Unknown error"}`);
+  });
+
+  openBtn.addEventListener("click", async () => {
+    if (!currentDetails?.path) return;
+    const r = await onOpenSourceFolder(currentDetails.path);
+    setStatus(r?.ok ? "Opened source folder." : `Could not open: ${r?.message || "Unknown error"}`);
+  });
+
+  // ── OPEN / CLOSE ──────────────────────────────────────────────────
 
   function close() {
     overlay.classList.add("hidden");
@@ -1069,86 +1099,61 @@ export function createImagePreviewPanel(options = {}) {
   }
 
   async function openForRow(row, siblingCount) {
-    const imagePath = String(row?.path || row?.image_path || "");
-    const mediaType = normalizeMediaType(row?.media_type || row?.metadata?.media_type, imagePath);
-    const pathSegments = splitPathSegments(imagePath);
-    titleEl.textContent =
-      row?.metadata?.title ||
-      pathSegments[pathSegments.length - 1] ||
-      `${mediaType === "video" ? "Video" : "Image"} details`;
+    const imagePath  = String(row?.path || row?.image_path || "");
+    const mediaType  = normalizeMediaType(row?.media_type || row?.metadata?.media_type, imagePath);
+    const segments   = splitPathSegments(imagePath);
 
-    const folderEl = overlay.querySelector(".breadcrumb-folder");
-    if (folderEl) folderEl.textContent = pathSegments[pathSegments.length - 2] || "Folder";
-
-    if (siblingCount) {
-      imgCount.textContent = `${mediaType === "video" ? "Item" : "Image"} ${row._index || "?"} of ${siblingCount}`;
-    }
+    titleEl.textContent = row?.metadata?.title || segments.at(-1) || `${mediaType === "video" ? "Video" : "Image"} details`;
+    if (folderEl) folderEl.textContent = segments.at(-2) || "Folder";
+    if (siblingCount) imgCount.textContent = `${mediaType === "video" ? "Item" : "Image"} ${row._index ?? "?"} of ${siblingCount}`;
 
     await applyPreviewImageSource(imagePath, row?.preview_src, mediaType);
     resetTransformState();
 
-    metaEl.textContent = "Loading…";
-    // Show a loading state in the description area
-    aiDesc.innerHTML = '<div class="image-preview-ai-card">Loading…</div>';
+    metaRaw.textContent = "Loading…";
+    aiDesc.innerHTML = `<div class="ipp-ai-card">Loading…</div>`;
 
     currentDetails = {
-      path: imagePath,
-      image_path: imagePath,
-      media_type: mediaType,
-      status: row?.status || "ok",
-      metadata: row?.metadata || {},
-      local_metadata: row?.local_metadata || null,
-      cloud_metadata: row?.cloud_metadata || null,
+      path: imagePath, image_path: imagePath, media_type: mediaType,
+      status: row?.status || "ok", metadata: row?.metadata || {},
+      local_metadata: row?.local_metadata || null, cloud_metadata: row?.cloud_metadata || null,
     };
 
-    populateInfoTab(currentDetails);
-    populateTags(currentDetails);
+    renderStatusStrip(currentDetails);
+    populateFileSection(currentDetails);
+    populateTagsSection(currentDetails);
     open();
 
     try {
       const resolved = await resolveDetails(row);
       currentDetails = { path: imagePath, media_type: mediaType, ...resolved };
       titleEl.textContent = currentDetails?.metadata?.title || titleEl.textContent;
-      metaEl.textContent  = toMetadataText(currentDetails);
-      populateInfoTab(currentDetails);
-      populateAITab(currentDetails);
-      populateTags(currentDetails);
-    } catch (error) {
-      currentDetails = {
-        path: imagePath,
-        media_type: mediaType,
-        status: "failed",
-        metadata: row?.metadata || {},
-        error: String(error?.message || error),
-      };
-      metaEl.textContent = toMetadataText(currentDetails);
+      metaRaw.textContent = toMetadataText(currentDetails);
+      renderStatusStrip(currentDetails);
+      populateFileSection(currentDetails);
+      populateAISection(currentDetails);
+      populateTagsSection(currentDetails);
+    } catch (err) {
+      currentDetails = { path: imagePath, media_type: mediaType, status: "failed", metadata: row?.metadata || {}, error: String(err?.message || err) };
+      metaRaw.textContent = toMetadataText(currentDetails);
     }
   }
 
-  // ── Global listeners ──────────────────────────────────────────────────────
+  // ── GLOBAL KEYBOARD ───────────────────────────────────────────────
+
+  window.addEventListener("keydown", (e) => {
+    if (overlay.classList.contains("hidden")) return;
+    if (e.key === "Escape")    close();
+    if (e.key === "ArrowUp")   nudgePan(0, -20);
+    if (e.key === "ArrowDown") nudgePan(0, 20);
+    if (e.key === "ArrowLeft"  && e.shiftKey) { nudgePan(-20, 0); return; }
+    if (e.key === "ArrowRight" && e.shiftKey) { nudgePan( 20, 0); return; }
+    if (e.key === "ArrowLeft")  onNavigate("prev");
+    if (e.key === "ArrowRight") onNavigate("next");
+  });
 
   closeBtn.addEventListener("click", close);
-
-  overlay.addEventListener("click", (event) => {
-    if (!panel.contains(event.target)) close();
-  });
-
-  window.addEventListener("keydown", (event) => {
-    if (overlay.classList.contains("hidden")) return;
-    if (event.key === "Escape")     close();
-    if (event.key === "ArrowUp")    nudgePan(0, -20);
-    if (event.key === "ArrowDown")  nudgePan(0, 20);
-    if (event.key === "ArrowLeft" && event.shiftKey) {
-      nudgePan(-20, 0);
-      return;
-    }
-    if (event.key === "ArrowRight" && event.shiftKey) {
-      nudgePan(20, 0);
-      return;
-    }
-    if (event.key === "ArrowLeft")  onNavigate("prev");
-    if (event.key === "ArrowRight") onNavigate("next");
-  });
+  overlay.addEventListener("click", (e) => { if (!panel.contains(e.target)) close(); });
 
   return { openForRow, close };
 }
