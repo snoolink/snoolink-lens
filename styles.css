@@ -645,6 +645,19 @@ select[multiple] option:checked {
   background: linear-gradient(120deg, rgba(110, 207, 255, 0.4), rgba(77, 164, 255, 0.26));
 }
 
+#wizard-screen {
+  height: calc(100vh - 70px);
+  width: 100%;
+}
+
+#wizardSearchFrame {
+  background: rgba(10, 12, 18, 0.75);
+  border: 1px solid rgba(148, 182, 255, 0.16);
+  border-radius: 12px;
+  height: 100%;
+  width: 100%;
+}
+
 /* ── Top Bar (file controls) ─────────────────── */
 
 #topbar {
@@ -1068,6 +1081,38 @@ select[multiple] option:checked {
   z-index: 5;
 }
 
+.result-download-btn {
+  align-items: center;
+  background: rgba(10, 16, 27, 0.72);
+  border: 1px solid rgba(188, 219, 255, 0.5);
+  border-radius: 999px;
+  color: #eef6ff;
+  display: inline-flex;
+  height: 30px;
+  justify-content: center;
+  position: absolute;
+  right: 10px;
+  top: 10px;
+  width: 30px;
+  z-index: 6;
+}
+
+.result-download-btn svg {
+  fill: none;
+  height: 16px;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 2;
+  width: 16px;
+}
+
+.result-download-btn:hover,
+.result-download-btn:focus-visible {
+  background: rgba(31, 72, 125, 0.86);
+  border-color: rgba(208, 230, 255, 0.9);
+}
+
 .search-result.visible {
   opacity: 1;
   transform: translateY(0);
@@ -1145,6 +1190,19 @@ select[multiple] option:checked {
   width: fit-content;
 }
 
+.search-result .result-timeframe-pill {
+  background: rgba(48, 114, 186, 0.72);
+  border: 1px solid rgba(165, 209, 255, 0.66);
+  border-radius: 999px;
+  color: #eaf5ff;
+  display: inline-block;
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  padding: 1px 7px;
+  width: fit-content;
+}
+
 .search-result .desc {
   line-clamp: 2;
   -webkit-line-clamp: 2;
@@ -1194,7 +1252,7 @@ select[multiple] option:checked {
   pointer-events: none;
   position: absolute;
   right: 10px;
-  top: 10px;
+  top: 46px;
   z-index: 3;
 }
 

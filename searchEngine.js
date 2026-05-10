@@ -224,6 +224,122 @@ function combineScore(parts) {
   return (semantic * 0.62) + (lexical * 0.23) + (fuzzy * 0.1) + (phrase * 0.05);
 }
 
+function normalizeVideoResultMode(value) {
+  return String(value || "").trim().toLowerCase() === "matching_timeframes"
+    ? "matching_timeframes"
+    : "full_video";
+}
+
+function toPreviewSrc(filePath) {
+  return `file:///${String(filePath || "").replaceAll("\\", "/")}`;
+}
+
+function safeNumber(value) {
+  const num = Number(value);
+  return Number.isFinite(num) ? num : null;
+}
+
+function getVideoAnalysisPayload(item) {
+  const rawVideo = item?.raw?.video_analysis;
+  if (rawVideo && typeof rawVideo === "object") {
+    return rawVideo;
+  }
+  const metaVideo = item?.metadata?.video_analysis;
+  if (metaVideo && typeof metaVideo === "object") {
+    return metaVideo;
+  }
+  return {};
+}
+
+function buildFrameText(frame) {
+  const parts = [
+    String(frame?.description || ""),
+    ...(Array.isArray(frame?.sceneTags) ? frame.sceneTags : []),
+    ...(Array.isArray(frame?.scene_tags) ? frame.scene_tags : []),
+    ...(Array.isArray(frame?.objectTags) ? frame.objectTags : []),
+    ...(Array.isArray(frame?.object_tags) ? frame.object_tags : []),
+    ...(Array.isArray(frame?.activityTags) ? frame.activityTags : []),
+    ...(Array.isArray(frame?.activity_tags) ? frame.activity_tags : []),
+    String(frame?.ocr?.all_text || ""),
+    String(frame?.ocr_all_text || ""),
+    String(frame?.ocr_text || ""),
+  ];
+  return parts.map((value) => String(value || "").trim()).filter(Boolean).join(" ");
+}
+
+function collectVideoFrameCandidates(item) {
+  const videoAnalysis = getVideoAnalysisPayload(item);
+  const frames = [
+    ...(Array.isArray(videoAnalysis?.frames) ? videoAnalysis.frames : []),
+    ...(Array.isArray(videoAnalysis?.frame_analyses) ? videoAnalysis.frame_analyses : []),
+  ];
+
+  const candidates = [];
+  for (const frame of frames) {
+    const second = safeNumber(frame?.second ?? frame?.timestamp_seconds ?? frame?.timestamp);
+    if (!Number.isFinite(second) || second < 0) {
+      continue;
+    }
+    const frameText = buildFrameText(frame);
+    if (!frameText) {
+      continue;
+    }
+
+    candidates.push({
+      second,
+      text: frameText,
+      description: String(frame?.description || "").trim(),
+    });
+  }
+
+  const bySecond = new Map();
+  for (const candidate of candidates) {
+    const key = Number(candidate.second.toFixed(3));
+    if (!bySecond.has(key) || bySecond.get(key).text.length < candidate.text.length) {
+      bySecond.set(key, candidate);
+    }
+  }
+  return Array.from(bySecond.values()).sort((a, b) => a.second - b.second);
+}
+
+function buildTimeframeWindow(frameSecond, frameIntervalSeconds, durationSeconds) {
+  const interval = Number.isFinite(Number(frameIntervalSeconds)) && Number(frameIntervalSeconds) > 0
+    ? Number(frameIntervalSeconds)
+    : 2;
+  const duration = Number(durationSeconds);
+
+  const start = Math.max(0, Number(frameSecond) - Math.max(1, interval * 0.5));
+  let end = start + Math.max(2, interval * 2);
+  if (Number.isFinite(duration) && duration > 0) {
+    end = Math.min(end, duration);
+  }
+  if (end <= start) {
+    end = start + Math.max(1.5, interval);
+  }
+
+  return {
+    start: Number(start.toFixed(3)),
+    end: Number(end.toFixed(3)),
+  };
+}
+
+function scoreFrameMatch(frameText, expandedTokens, queryTrigrams, expandedTrigrams, requiredPhrases) {
+  const text = String(frameText || "").toLowerCase();
+  if (!text) {
+    return 0;
+  }
+
+  const lexical = tokenOverlapScore(expandedTokens, new Set(tokenize(text)));
+  const frameTrigrams = buildCharNgrams(text, 3);
+  const fuzzy = Math.max(
+    jaccardSimilarity(queryTrigrams, frameTrigrams),
+    jaccardSimilarity(expandedTrigrams, frameTrigrams) * 0.95,
+  );
+  const phrase = phraseCoverageScore(requiredPhrases, text);
+
+  return (lexical * 0.62) + (fuzzy * 0.28) + (phrase * 0.1);
+}
+
 function extractCloudTagCandidates(item) {
   const metadata = item?.metadata || {};
   const raw = item?.raw || {};
@@ -928,6 +1044,7 @@ export async function runSemanticSearch(payload) {
     const topK = Math.max(1, Math.min(Number(payload?.topK || 20), 200));
     const minScoreInput = Number(payload?.minScore);
     const minScore = Number.isFinite(minScoreInput) ? Math.max(0, minScoreInput) : 0.001;
+    const videoResultMode = normalizeVideoResultMode(payload?.videoResultMode);
     const filePath = String(payload?.filePath || "");
 
     if (!filePath) {
@@ -962,6 +1079,7 @@ export async function runSemanticSearch(payload) {
         id: item.id,
         path: item.path,
         metadata: item.metadata,
+        clip_mode: "full_video",
       }));
       return { ok: true, results: fallback, filteredCount: filteredItems.length };
     }
@@ -1015,9 +1133,93 @@ export async function runSemanticSearch(payload) {
 
     scored.sort((a, b) => b.score - a.score);
 
+    if (videoResultMode === "matching_timeframes") {
+      const clipCandidates = [];
+
+      for (const scoredItem of scored) {
+        const itemMediaType = String(
+          scoredItem?.metadata?.media_type || getMediaTypeFromPath(scoredItem?.path || "", "image"),
+        ).toLowerCase();
+
+        if (itemMediaType !== "video") {
+          clipCandidates.push({ ...scoredItem, clip_mode: "full_video" });
+          continue;
+        }
+
+        const sourceItem = items.find((item) => item.id === scoredItem.id && item.path === scoredItem.path);
+        if (!sourceItem) {
+          clipCandidates.push({ ...scoredItem, clip_mode: "full_video" });
+          continue;
+        }
+
+        const videoAnalysis = getVideoAnalysisPayload(sourceItem);
+        const frameIntervalSeconds = Number(videoAnalysis?.frame_interval_seconds || 2);
+        const durationSeconds = Number(videoAnalysis?.duration_seconds);
+        const frameCandidates = collectVideoFrameCandidates(sourceItem);
+
+        if (frameCandidates.length === 0) {
+          clipCandidates.push({ ...scoredItem, clip_mode: "full_video" });
+          continue;
+        }
+
+        for (const frame of frameCandidates) {
+          const frameScore = scoreFrameMatch(
+            frame.text,
+            expandedTokens,
+            queryTrigrams,
+            expandedTrigrams,
+            expanded?.intent?.required_phrases,
+          );
+
+          if (frameScore < 0.12) {
+            continue;
+          }
+
+          const clipWindow = buildTimeframeWindow(frame.second, frameIntervalSeconds, durationSeconds);
+          const clipScore = Math.min(1, (Number(scoredItem.score) * 0.6) + (frameScore * 0.4) + 0.04);
+
+          clipCandidates.push({
+            ...scoredItem,
+            score: clipScore,
+            clip_mode: "matching_timeframe",
+            clip_start_seconds: clipWindow.start,
+            clip_end_seconds: clipWindow.end,
+            clip_match_second: Number(frame.second.toFixed(3)),
+            clip_match_text: frame.description || "",
+            preview_src: `${toPreviewSrc(scoredItem.path)}#t=${clipWindow.start},${clipWindow.end}`,
+          });
+        }
+      }
+
+      clipCandidates.sort((a, b) => Number(b.score || 0) - Number(a.score || 0));
+
+      const normalizedResults = (clipCandidates.length > 0 ? clipCandidates : scored)
+        .slice(0, topK)
+        .map((row) => ({
+          ...row,
+          clip_mode: row?.clip_mode || "full_video",
+        }));
+
+      return {
+        ok: true,
+        results: normalizedResults,
+        filteredCount: sourceItems.length,
+        queryExpansion: {
+          expanded: expanded.expandedQuery,
+          addedTerms: expanded.addedTerms,
+          intent: expanded.intent,
+          intentSource: expanded.intentSource,
+          intentFilteredCount: intentFilteredItems.length,
+        },
+      };
+    }
+
     return {
       ok: true,
-      results: scored.slice(0, topK),
+      results: scored.slice(0, topK).map((row) => ({
+        ...row,
+        clip_mode: "full_video",
+      })),
       filteredCount: sourceItems.length,
       queryExpansion: {
         expanded: expanded.expandedQuery,

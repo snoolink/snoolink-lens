@@ -4,6 +4,11 @@ import { createRequire } from "node:module";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import fs from "node:fs/promises";
 import fsSync from "node:fs";
+import {
+  BedrockRuntimeClient,
+  ConverseCommand,
+} from "@aws-sdk/client-bedrock-runtime";
+import { NodeHttpHandler } from "@smithy/node-http-handler";
 import { execFile } from "node:child_process";
 import { createHash } from "node:crypto";
 import { promisify } from "node:util";
@@ -55,6 +60,7 @@ const CLOUD_EXTRACTOR_MODULE_PATH = path.join(__dirname, "cloud-image-metadata-e
 const CLOUD_VIDEO_EXTRACTOR_MODULE_PATH = path.join(__dirname, "cloud-video-metadata-extractor.js");
 const PREVIEW_CONVERTIBLE_EXTENSIONS = new Set([".heic", ".heif", ".avif", ".tif", ".tiff"]);
 const PREVIEW_CACHE_DIR_PATH = path.join(DATA_DIR_PATH, "preview-cache");
+const DOWNLOAD_FOLDER_NAME = "Snoolink Lens";
 const CLOUD_GROUPS_OUTPUT_PATH = path.join(DATA_DIR_PATH, "cloud_index_groups.json");
 const LOCAL_GROUPS_OUTPUT_PATH = path.join(DATA_DIR_PATH, "local_index_groups.json");
 const LOCAL_FACE_CLUSTERS_OUTPUT_PATH = path.join(DATA_DIR_PATH, "local_face_clusters.json");
@@ -134,6 +140,23 @@ async function pathExists(targetPath) {
   } catch {
     return false;
   }
+}
+
+async function getUniquePathInDirectory(directoryPath, fileName) {
+  const safeFileName = String(fileName || "downloaded-file").trim() || "downloaded-file";
+  const parsed = path.parse(safeFileName);
+  const ext = parsed.ext || "";
+  const baseName = parsed.name || "downloaded-file";
+
+  let candidate = path.join(directoryPath, `${baseName}${ext}`);
+  let suffix = 1;
+
+  while (await pathExists(candidate)) {
+    candidate = path.join(directoryPath, `${baseName} (${suffix})${ext}`);
+    suffix += 1;
+  }
+
+  return candidate;
 }
 
 function cloneJsonSafe(value) {
@@ -287,6 +310,14 @@ function buildFallbackLocalMetadata(mediaPath, fallbackReason, mediaType = "imag
 
 function toPreviewSrc(filePath) {
   return `file:///${String(filePath || "").replaceAll("\\", "/")}`;
+}
+
+function normalizeVideoSearchResultMode(value) {
+  const raw = String(value || "").trim().toLowerCase();
+  if (raw === "matching_timeframes") {
+    return "matching_timeframes";
+  }
+  return "full_video";
 }
 
 async function loadMasterDirectory() {
@@ -1298,6 +1329,49 @@ async function transcodeMovPreviewToMp4(sourcePath, outputPath) {
   });
 }
 
+async function transcodeVideoTimeframePreviewToMp4(sourcePath, outputPath, startSeconds, endSeconds) {
+  const ffmpegBinary = await resolveFfmpegBinary();
+  const safeStart = Math.max(0, Number(startSeconds) || 0);
+  const safeEnd = Math.max(safeStart + 0.3, Number(endSeconds) || (safeStart + 3));
+
+  const args = [
+    "-hide_banner",
+    "-loglevel",
+    "error",
+    "-y",
+    "-ss",
+    String(safeStart),
+    "-to",
+    String(safeEnd),
+    "-i",
+    sourcePath,
+    "-map",
+    "0:v:0",
+    "-map",
+    "0:a:0?",
+    "-c:v",
+    "libx264",
+    "-preset",
+    "veryfast",
+    "-crf",
+    "20",
+    "-pix_fmt",
+    "yuv420p",
+    "-movflags",
+    "+faststart",
+    "-c:a",
+    "aac",
+    "-b:a",
+    "128k",
+    outputPath,
+  ];
+
+  await execFileAsync(ffmpegBinary, args, {
+    windowsHide: true,
+    maxBuffer: 30 * 1024 * 1024,
+  });
+}
+
 async function loadSharpModule() {
   if (cachedSharpModule) {
     return cachedSharpModule;
@@ -1312,9 +1386,14 @@ async function loadSharpModule() {
   }
 }
 
-async function resolvePreviewSrcForImage(imagePath, mediaTypeHint = "image") {
+async function resolvePreviewSrcForImage(imagePath, mediaTypeHint = "image", options = {}) {
   const normalizedPath = String(imagePath || "").trim();
   const mediaType = String(mediaTypeHint || getMediaTypeFromPath(normalizedPath, "image")).toLowerCase();
+  const clipStartSeconds = Number(options?.clipStartSeconds);
+  const clipEndSeconds = Number(options?.clipEndSeconds);
+  const hasClipRange = Number.isFinite(clipStartSeconds)
+    && Number.isFinite(clipEndSeconds)
+    && clipEndSeconds > clipStartSeconds;
   if (!normalizedPath) {
     return { ok: false, message: "imagePath is required." };
   }
@@ -1325,6 +1404,66 @@ async function resolvePreviewSrcForImage(imagePath, mediaTypeHint = "image") {
 
   const ext = path.extname(normalizedPath).toLowerCase();
   if (mediaType === "video") {
+    if (hasClipRange) {
+      await fs.mkdir(PREVIEW_CACHE_DIR_PATH, { recursive: true });
+
+      let sourceFingerprint = "";
+      try {
+        const stats = await fs.stat(normalizedPath);
+        sourceFingerprint = `${stats.size}:${Math.round(stats.mtimeMs)}`;
+      } catch {
+        sourceFingerprint = "";
+      }
+
+      const startKey = Number(clipStartSeconds.toFixed(3));
+      const endKey = Number(clipEndSeconds.toFixed(3));
+      const cacheKey = `video-clip-v1:${normalizedPath.toLowerCase()}:${sourceFingerprint}:${startKey}:${endKey}`;
+      const cacheFileName = `${createHash("sha1").update(cacheKey).digest("hex")}.mp4`;
+      const cacheFilePath = path.join(PREVIEW_CACHE_DIR_PATH, cacheFileName);
+
+      if (await pathExists(cacheFilePath)) {
+        rememberPreviewCache(cacheKey, cacheFilePath, "cache-video-clip");
+        return {
+          ok: true,
+          previewSrc: toPreviewSrc(cacheFilePath),
+          converted: true,
+          converter: "cache-video-clip",
+          imagePath: normalizedPath,
+          clipStartSeconds: startKey,
+          clipEndSeconds: endKey,
+        };
+      }
+
+      try {
+        await transcodeVideoTimeframePreviewToMp4(normalizedPath, cacheFilePath, startKey, endKey);
+        rememberPreviewCache(cacheKey, cacheFilePath, "ffmpeg-video-clip");
+        return {
+          ok: true,
+          previewSrc: toPreviewSrc(cacheFilePath),
+          converted: true,
+          converter: "ffmpeg-video-clip",
+          imagePath: normalizedPath,
+          clipStartSeconds: startKey,
+          clipEndSeconds: endKey,
+        };
+      } catch (error) {
+        const code = String(error?.code || "").toUpperCase();
+        const missingBinaryMessage =
+          code === "ENOENT"
+            ? "ffmpeg was not found. Install FFmpeg and/or set FFMPEG_PATH to the ffmpeg binary path."
+            : "";
+        return {
+          ok: true,
+          previewSrc: toPreviewSrc(normalizedPath),
+          converted: false,
+          imagePath: normalizedPath,
+          warning: missingBinaryMessage || String(error?.message || error),
+          clipStartSeconds: startKey,
+          clipEndSeconds: endKey,
+        };
+      }
+    }
+
     if (ext !== ".mov") {
       return {
         ok: true,
@@ -1868,6 +2007,7 @@ async function readUserSettings() {
     auto_expand_filters: false,
     auto_close_sidebar_on_settings_nav: true,
     gallery_video_autoplay: false,
+    video_search_result_mode: "full_video",
     enable_face_indexing: true,
     face_model_version: "face-api-ssd-v1",
     face_min_detection_confidence: 0.3,
@@ -1922,6 +2062,9 @@ async function readUserSettings() {
         payload?.gallery_video_autoplay === undefined
           ? defaults.gallery_video_autoplay
           : Boolean(payload?.gallery_video_autoplay),
+      video_search_result_mode: normalizeVideoSearchResultMode(
+        payload?.video_search_result_mode ?? defaults.video_search_result_mode,
+      ),
       enable_face_indexing:
         payload?.enable_face_indexing === undefined
           ? defaults.enable_face_indexing
@@ -2103,6 +2246,7 @@ async function writeUserSettings(settings) {
       settings?.gallery_video_autoplay === undefined
         ? false
         : Boolean(settings?.gallery_video_autoplay),
+    video_search_result_mode: normalizeVideoSearchResultMode(settings?.video_search_result_mode),
     enable_face_indexing:
       settings?.enable_face_indexing === undefined
         ? true
@@ -3321,6 +3465,92 @@ async function resolveDefaultMetadataFilePath() {
   return "";
 }
 
+function parseBedrockConverseText(response) {
+  const outputs = response?.output?.message?.content;
+  if (!Array.isArray(outputs)) {
+    return "";
+  }
+
+  return outputs
+    .map((part) => {
+      if (typeof part?.text === "string") {
+        return part.text;
+      }
+      if (part?.text && typeof part.text?.toString === "function") {
+        return String(part.text);
+      }
+      return "";
+    })
+    .join("\n")
+    .trim();
+}
+
+async function generateWizardPlanWithBedrock(payload) {
+  const request = payload && typeof payload === "object" ? payload : {};
+  const systemPrompt = String(request.systemPrompt || "").trim();
+  const userPrompt = String(request.userPrompt || "").trim();
+  const maxTokens = Number.isFinite(Number(request.maxTokens))
+    ? Math.max(256, Math.min(4000, Number(request.maxTokens)))
+    : 2200;
+
+  if (!systemPrompt || !userPrompt) {
+    return { ok: false, message: "Wizard request is missing required prompts." };
+  }
+
+  await ensureEnvFileExists();
+  const envSettings = await readEnvSettings();
+  const region = String(envSettings.aws_region || process.env.AWS_REGION || "us-east-1").trim();
+  const modelId = String(
+    process.env.BEDROCK_QUERY_MODEL || envSettings.model || process.env.BEDROCK_VISION_MODEL || "qwen.qwen3-vl-235b-a22b",
+  ).trim();
+  const accessKeyId = String(envSettings.aws_key || process.env.AWS_ACCESS_KEY_ID || "").trim();
+  const secretAccessKey = String(envSettings.secret_key || process.env.AWS_SECRET_ACCESS_KEY || "").trim();
+
+  if (!accessKeyId || !secretAccessKey) {
+    return {
+      ok: false,
+      message:
+        "AWS credentials are missing. Configure AWS Access Key and Secret Key in App Settings first.",
+    };
+  }
+
+  const client = new BedrockRuntimeClient({
+    region,
+    requestHandler: new NodeHttpHandler(),
+    credentials: {
+      accessKeyId,
+      secretAccessKey,
+    },
+  });
+
+  const command = new ConverseCommand({
+    modelId,
+    system: [{ text: systemPrompt }],
+    messages: [{ role: "user", content: [{ text: userPrompt }] }],
+    inferenceConfig: {
+      maxTokens,
+      temperature: 0.25,
+      topP: 0.95,
+    },
+  });
+
+  try {
+    const response = await client.send(command);
+    const text = parseBedrockConverseText(response)
+      .replace(/^```(?:json)?\s*/i, "")
+      .replace(/\s*```$/i, "")
+      .trim();
+
+    if (!text) {
+      return { ok: false, message: "Bedrock returned an empty response." };
+    }
+
+    return { ok: true, text, modelId, region };
+  } catch (error) {
+    return { ok: false, message: String(error?.message || error) };
+  }
+}
+
 function createWindow() {
   const appIconPath = path.join(__dirname, "assets", "app-icon-32.ico");
 
@@ -3383,16 +3613,21 @@ ipcMain.handle("semantic-search", async (_event, payload) => {
     allowedImagePaths = Array.from(allowed);
   }
 
+  const settings = await readUserSettings();
   const minMatchFromPayload = Number(payload?.minScore);
   let effectiveMinScore = minMatchFromPayload;
   if (!Number.isFinite(effectiveMinScore)) {
-    const settings = await readUserSettings();
     effectiveMinScore = Number(settings?.min_match_score || 0.001);
   }
+
+  const effectiveVideoResultMode = normalizeVideoSearchResultMode(
+    payload?.videoResultMode ?? settings?.video_search_result_mode,
+  );
 
   const runPayload = {
     ...(payload || {}),
     minScore: effectiveMinScore,
+    videoResultMode: effectiveVideoResultMode,
     allowedImagePaths,
   };
 
@@ -3413,6 +3648,10 @@ ipcMain.handle("semantic-search", async (_event, payload) => {
   }
 
   return result;
+});
+
+ipcMain.handle("wizard-generate-plan", async (_event, payload) => {
+  return generateWizardPlanWithBedrock(payload);
 });
 
 ipcMain.handle("get-default-metadata-file", async () => {
@@ -3584,30 +3823,34 @@ ipcMain.handle("open-original-source-folder", async (_event, imagePath) => {
 ipcMain.handle("export-media-file", async (_event, payload) => {
   try {
     const imagePath = String(payload?.imagePath || "").trim();
-    if (!imagePath) {
-      return { ok: false, message: "imagePath is required." };
+    const sourcePathRaw = String(payload?.sourcePath || "").trim();
+    if (!imagePath && !sourcePathRaw) {
+      return { ok: false, message: "imagePath or sourcePath is required." };
     }
 
-    const sourcePath = path.resolve(imagePath);
+    let sourcePath = "";
+    if (sourcePathRaw) {
+      if (sourcePathRaw.startsWith("file://")) {
+        sourcePath = fileURLToPath(sourcePathRaw);
+      } else {
+        sourcePath = path.resolve(sourcePathRaw);
+      }
+    } else {
+      sourcePath = path.resolve(imagePath);
+    }
+
     if (!(await pathExists(sourcePath))) {
       return { ok: false, message: "Source file not found." };
     }
 
-    const defaultName = path.basename(sourcePath);
-    const defaultDir = app.getPath("downloads");
-    const saveResult = await dialog.showSaveDialog({
-      title: "Export Media File",
-      defaultPath: path.join(defaultDir, defaultName),
-      buttonLabel: "Export",
-    });
+    const desktopDir = app.getPath("desktop");
+    const targetDir = path.join(desktopDir, DOWNLOAD_FOLDER_NAME);
+    await fs.mkdir(targetDir, { recursive: true });
 
-    if (saveResult.canceled || !saveResult.filePath) {
-      return { ok: false, message: "Export cancelled." };
-    }
-
-    const targetPath = path.resolve(saveResult.filePath);
+    const sourceName = path.basename(sourcePath);
+    const targetPath = await getUniquePathInDirectory(targetDir, sourceName);
     await fs.copyFile(sourcePath, targetPath);
-    return { ok: true, path: targetPath };
+    return { ok: true, path: targetPath, directory: targetDir };
   } catch (error) {
     return { ok: false, message: String(error?.message || error) };
   }
@@ -3665,7 +3908,10 @@ ipcMain.handle("get-image-preview-src", async (_event, payload) => {
   try {
     const imagePath = String(payload?.imagePath || "").trim();
     const mediaType = String(payload?.mediaType || getMediaTypeFromPath(imagePath, "image"));
-    return await resolvePreviewSrcForImage(imagePath, mediaType);
+    return await resolvePreviewSrcForImage(imagePath, mediaType, {
+      clipStartSeconds: payload?.clipStartSeconds,
+      clipEndSeconds: payload?.clipEndSeconds,
+    });
   } catch (error) {
     return { ok: false, message: String(error?.message || error) };
   }

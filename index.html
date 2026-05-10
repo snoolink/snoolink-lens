@@ -210,6 +210,13 @@
                       Autoplay videos in gallery
                     </label>
                   </div>
+                  <div class="settings-field">
+                    <label for="settingsVideoSearchResultMode">Video search results</label>
+                    <select id="settingsVideoSearchResultMode">
+                      <option value="full_video">Return full video</option>
+                      <option value="matching_timeframes">Return matching timeframes (clip-like)</option>
+                    </select>
+                  </div>
                 </div>
 
                 <div class="settings-block">
@@ -277,6 +284,14 @@
           </section>
           <section id="faces-screen" class="hidden">
             <div id="facesUiMount"></div>
+          </section>
+          <section id="wizard-screen" class="hidden" aria-label="Wizard Search Workspace">
+            <iframe
+              id="wizardSearchFrame"
+              src="./wizard-search.html"
+              title="Wizard Search"
+              loading="lazy"
+            ></iframe>
           </section>
           <!-- <section id="settings-screen" class="hidden">
             <div class="settings-screen-card">

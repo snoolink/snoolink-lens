@@ -31,6 +31,7 @@ const settingsResultsDensitySelect = document.getElementById("settingsResultsDen
 const settingsAutoExpandFiltersInput = document.getElementById("settingsAutoExpandFilters");
 const settingsAutoCloseSidebarOnSettingsNavInput = document.getElementById("settingsAutoCloseSidebarOnSettingsNav");
 const settingsGalleryVideoAutoplayInput = document.getElementById("settingsGalleryVideoAutoplay");
+const settingsVideoSearchResultModeSelect = document.getElementById("settingsVideoSearchResultMode");
 const settingsEnableFaceIndexingInput = document.getElementById("settingsEnableFaceIndexing");
 const settingsFaceModelVersionInput = document.getElementById("settingsFaceModelVersion");
 const settingsFaceMinConfidenceInput = document.getElementById("settingsFaceMinConfidence");
@@ -65,11 +66,14 @@ const openSidebarBtn = document.getElementById("openSidebarBtn");
 const closeSidebarBtn = document.getElementById("closeSidebarBtn");
 const sidebarMidToggleBtn = document.getElementById("sidebarMidToggleBtn");
 const openAppSettingsLink = document.getElementById("openAppSettingsLink");
+const openWizardWorkspaceBtn = document.getElementById("openWizardWorkspaceBtn");
 const openFacesWorkspaceBtn = document.getElementById("openFacesWorkspaceBtn");
 const backToHomeBtn = document.getElementById("backToHomeBtn");
 const homeScreen = document.getElementById("home-screen");
 const settingsScreen = document.getElementById("settings-screen");
 const facesScreen = document.getElementById("faces-screen");
+const wizardScreen = document.getElementById("wizard-screen");
+const wizardSearchFrame = document.getElementById("wizardSearchFrame");
 const facesRefreshBtn = document.getElementById("facesRefreshBtn");
 const facesRebuildBtn = document.getElementById("facesRebuildBtn");
 const facesStatusEl = document.getElementById("facesStatus");
@@ -185,6 +189,7 @@ const userSettingsState = {
   autoExpandFilters: false,
   autoCloseSidebarOnSettingsNav: true,
   galleryVideoAutoplay: false,
+  videoSearchResultMode: "full_video",
   enableFaceIndexing: true,
   faceModelVersion: "face-api-ssd-v1",
   faceMinDetectionConfidence: 0.3,
@@ -264,6 +269,9 @@ function showSettingsScreen() {
   if (facesScreen) {
     facesScreen.classList.add("hidden");
   }
+  if (wizardScreen) {
+    wizardScreen.classList.add("hidden");
+  }
   if (settingsScreen) {
     settingsScreen.classList.remove("hidden");
   }
@@ -278,6 +286,9 @@ function showFacesScreen() {
   }
   if (settingsScreen) {
     settingsScreen.classList.add("hidden");
+  }
+  if (wizardScreen) {
+    wizardScreen.classList.add("hidden");
   }
   if (facesScreen) {
     facesScreen.classList.remove("hidden");
@@ -294,11 +305,35 @@ function showHomeScreen() {
   if (facesScreen) {
     facesScreen.classList.add("hidden");
   }
+  if (wizardScreen) {
+    wizardScreen.classList.add("hidden");
+  }
   if (homeScreen) {
     homeScreen.classList.remove("hidden");
   }
   if (backToHomeBtn) {
     backToHomeBtn.classList.add("hidden");
+  }
+}
+
+function showWizardScreen() {
+  if (homeScreen) {
+    homeScreen.classList.add("hidden");
+  }
+  if (settingsScreen) {
+    settingsScreen.classList.add("hidden");
+  }
+  if (facesScreen) {
+    facesScreen.classList.add("hidden");
+  }
+  if (wizardScreen) {
+    wizardScreen.classList.remove("hidden");
+  }
+  if (backToHomeBtn) {
+    backToHomeBtn.classList.remove("hidden");
+  }
+  if (wizardSearchFrame && !wizardSearchFrame.getAttribute("src")) {
+    wizardSearchFrame.setAttribute("src", "./wizard-search.html");
   }
 }
 
@@ -1266,6 +1301,10 @@ function buildFiltersPayload() {
       if (!key || !enabled.has(key)) {
         continue;
       }
+      // Built-in filters are handled above; ignore any accidental duplicate dynamic control.
+      if (Object.prototype.hasOwnProperty.call(payload, key)) {
+        continue;
+      }
       payload[key] = String(input.value || "any");
     }
 
@@ -1340,7 +1379,12 @@ function renderDynamicFilters() {
     if (!enabled.has(def.key)) {
       continue;
     }
-    if (def.key === "containsPeople" || def.key === "containsText" || def.key === "mediaType") {
+    if (
+      def.key === "containsPeople"
+      || def.key === "containsText"
+      || def.key === "mediaType"
+      || def.key === "ocrTextQuery"
+    ) {
       continue;
     }
 
@@ -1540,6 +1584,9 @@ async function loadSettingsUiState() {
         settings.gallery_video_autoplay === undefined
           ? false
           : Boolean(settings.gallery_video_autoplay);
+      userSettingsState.videoSearchResultMode = normalizeVideoSearchResultMode(
+        settings.video_search_result_mode,
+      );
       userSettingsState.enableFaceIndexing = Boolean(settings.enable_face_indexing);
       userSettingsState.faceModelVersion = String(settings.face_model_version || "face-api-ssd-v1");
       userSettingsState.faceMinDetectionConfidence = Number.isFinite(Number(settings.face_min_detection_confidence))
@@ -1568,6 +1615,9 @@ async function loadSettingsUiState() {
       }
       if (settingsGalleryVideoAutoplayInput) {
         settingsGalleryVideoAutoplayInput.checked = userSettingsState.galleryVideoAutoplay;
+      }
+      if (settingsVideoSearchResultModeSelect) {
+        settingsVideoSearchResultModeSelect.value = userSettingsState.videoSearchResultMode;
       }
       if (settingsEnableFaceIndexingInput) {
         settingsEnableFaceIndexingInput.checked = userSettingsState.enableFaceIndexing;
@@ -1640,6 +1690,23 @@ function getFileExtension(filePath) {
   return value.slice(lastDot);
 }
 
+function normalizeVideoSearchResultMode(value) {
+  return String(value || "").trim().toLowerCase() === "matching_timeframes"
+    ? "matching_timeframes"
+    : "full_video";
+}
+
+function formatSecondsLabel(value) {
+  const total = Math.max(0, Number(value) || 0);
+  const mins = Math.floor(total / 60);
+  const secs = Math.floor(total % 60);
+  const ms = Math.round((total - Math.floor(total)) * 1000);
+  if (ms > 0) {
+    return `${String(mins).padStart(2, "0")}:${String(secs).padStart(2, "0")}.${String(ms).padStart(3, "0")}`;
+  }
+  return `${String(mins).padStart(2, "0")}:${String(secs).padStart(2, "0")}`;
+}
+
 async function setCardImageSource(img, card, imagePath, preferredPreviewSrc) {
   const mediaType = normalizeMediaType(card?.dataset?.mediaType, imagePath);
   const video = card?.querySelector?.(".search-result-video");
@@ -1651,6 +1718,11 @@ async function setCardImageSource(img, card, imagePath, preferredPreviewSrc) {
     }
 
     const preferredVideoSrc = String(preferredPreviewSrc || "").trim();
+    const clipStart = Number(card?.dataset?.clipStartSeconds || "");
+    const clipEnd = Number(card?.dataset?.clipEndSeconds || "");
+    const clipFragment = Number.isFinite(clipStart) && Number.isFinite(clipEnd) && clipEnd > clipStart
+      ? `#t=${clipStart},${clipEnd}`
+      : "";
     let directVideoSrc = preferredVideoSrc || normalizeImageSrc(imagePath);
     const sourceExt = getFileExtension(imagePath);
     const previewExt = getFileExtension(preferredVideoSrc);
@@ -1660,15 +1732,24 @@ async function setCardImageSource(img, card, imagePath, preferredPreviewSrc) {
       const previewApi = window.desktopAPI?.getMediaPreviewSrc || window.desktopAPI?.getImagePreviewSrc;
       if (previewApi) {
         try {
-          const previewResult = await previewApi({ imagePath, mediaType });
+          const previewResult = await previewApi({
+            imagePath,
+            mediaType,
+            clipStartSeconds: Number.isFinite(clipStart) ? clipStart : undefined,
+            clipEndSeconds: Number.isFinite(clipEnd) ? clipEnd : undefined,
+          });
           const previewSrc = String(previewResult?.previewSrc || "").trim();
           if (previewResult?.ok && previewSrc) {
-            directVideoSrc = previewSrc;
+            directVideoSrc = clipFragment ? `${previewSrc}${clipFragment}` : previewSrc;
           }
         } catch {
           // Keep direct source.
         }
       }
+    }
+
+    if (clipFragment && directVideoSrc && !directVideoSrc.includes("#t=")) {
+      directVideoSrc = `${directVideoSrc}${clipFragment}`;
     }
 
     if (!video || !directVideoSrc) {
@@ -1802,9 +1883,79 @@ async function resolveImageDetails(row) {
   };
 }
 
+async function downloadMediaToDesktop(details) {
+  const imagePath = String(details?.path || details?.image_path || "").trim();
+  if (!imagePath) {
+    return { ok: false, message: "No file selected." };
+  }
+  if (!window.desktopAPI?.exportMediaFile) {
+    return { ok: false, message: "Desktop API unavailable." };
+  }
+
+  const result = await window.desktopAPI.exportMediaFile({ imagePath });
+  if (result?.ok) {
+    const savedPath = String(result?.path || "").trim();
+    setStatus(savedPath ? `Downloaded to ${savedPath}` : "Downloaded to Desktop/Snoolink Lens.");
+    return result;
+  }
+
+  const message = String(result?.message || "Download failed.");
+  setStatus(`Download failed: ${message}`);
+  return result;
+}
+
+async function downloadMediaFromSearchResult(row) {
+  const imagePath = String(row?.path || row?.image_path || "").trim();
+  if (!imagePath) {
+    return { ok: false, message: "No file selected." };
+  }
+
+  const isTrimmedVideo = String(row?.clip_mode || "") === "matching_timeframe";
+  if (!isTrimmedVideo) {
+    return downloadMediaToDesktop(row);
+  }
+
+  const clipStartSeconds = Number(row?.clip_start_seconds);
+  const clipEndSeconds = Number(row?.clip_end_seconds);
+  const previewApi = window.desktopAPI?.getMediaPreviewSrc || window.desktopAPI?.getImagePreviewSrc;
+
+  let sourcePath = String(row?.preview_src || "").trim();
+  if (previewApi && Number.isFinite(clipStartSeconds) && Number.isFinite(clipEndSeconds)) {
+    try {
+      const preview = await previewApi({
+        imagePath,
+        mediaType: "video",
+        clipStartSeconds,
+        clipEndSeconds,
+      });
+      const previewSrc = String(preview?.previewSrc || "").trim();
+      if (preview?.ok && previewSrc) {
+        sourcePath = previewSrc;
+      }
+    } catch {
+      // Fall through to any existing preview source.
+    }
+  }
+
+  if (!window.desktopAPI?.exportMediaFile) {
+    return { ok: false, message: "Desktop API unavailable." };
+  }
+
+  const result = await window.desktopAPI.exportMediaFile({ imagePath, sourcePath });
+  if (result?.ok) {
+    const savedPath = String(result?.path || "").trim();
+    setStatus(savedPath ? `Downloaded trimmed clip to ${savedPath}` : "Downloaded trimmed clip.");
+    return result;
+  }
+
+  const message = String(result?.message || "Download failed.");
+  setStatus(`Download failed: ${message}`);
+  return result;
+}
+
 const imagePreviewPanel = createImagePreviewPanel({
   normalizeImageSrc,
-  resolvePreviewSrc: async (imagePath, mediaType = "image") => {
+  resolvePreviewSrc: async (imagePath, mediaType = "image", details = null) => {
     const previewApi = window.desktopAPI?.getMediaPreviewSrc || window.desktopAPI?.getImagePreviewSrc;
     if (!previewApi) {
       return {
@@ -1813,7 +1964,15 @@ const imagePreviewPanel = createImagePreviewPanel({
         converted: false,
       };
     }
-    return previewApi({ imagePath, mediaType });
+
+    const clipStartSeconds = Number(details?.clip_start_seconds);
+    const clipEndSeconds = Number(details?.clip_end_seconds);
+    return previewApi({
+      imagePath,
+      mediaType,
+      clipStartSeconds: Number.isFinite(clipStartSeconds) ? clipStartSeconds : undefined,
+      clipEndSeconds: Number.isFinite(clipEndSeconds) ? clipEndSeconds : undefined,
+    });
   },
   resolveDetails: resolveImageDetails,
   onOpenSourceFolder: async (imagePath) => {
@@ -1835,14 +1994,7 @@ const imagePreviewPanel = createImagePreviewPanel({
     }
   },
   onExport: async (details) => {
-    const imagePath = String(details?.path || details?.image_path || "").trim();
-    if (!imagePath) {
-      return { ok: false, message: "No file selected." };
-    }
-    if (!window.desktopAPI?.exportMediaFile) {
-      return { ok: false, message: "Desktop API unavailable." };
-    }
-    return window.desktopAPI.exportMediaFile({ imagePath });
+    return downloadMediaFromSearchResult(details);
   },
   onDelete: async (details) => {
     const imagePath = String(details?.path || details?.image_path || "").trim();
@@ -1998,6 +2150,9 @@ function renderResults(results, options = {}) {
     const desc = row.metadata?.description || "No description";
     const tags = Array.isArray(row.metadata?.tags) ? row.metadata.tags.join(", ") : "";
     const objects = Array.isArray(row.metadata?.objects) ? row.metadata.objects.join(", ") : "";
+    const isTimeframeClip = String(row?.clip_mode || "") === "matching_timeframe";
+    const clipStartSeconds = Number(row?.clip_start_seconds);
+    const clipEndSeconds = Number(row?.clip_end_seconds);
 
     node.querySelector(".title").textContent = title;
     node.querySelector(".score").textContent = isWelcome ? "Library" : `Score: ${Number(row.score || 0).toFixed(3)}`;
@@ -2009,6 +2164,18 @@ function renderResults(results, options = {}) {
     const img = node.querySelector(".search-result-background");
     const card = node.querySelector(".search-result");
     card.dataset.mediaType = mediaType;
+    if (isTimeframeClip && Number.isFinite(clipStartSeconds) && Number.isFinite(clipEndSeconds)) {
+      card.dataset.clipStartSeconds = String(clipStartSeconds);
+      card.dataset.clipEndSeconds = String(clipEndSeconds);
+
+      const clipPill = document.createElement("span");
+      clipPill.className = "result-timeframe-pill";
+      clipPill.textContent = `Clip ${formatSecondsLabel(clipStartSeconds)} - ${formatSecondsLabel(clipEndSeconds)}`;
+      const infoEl = node.querySelector(".search-result-info");
+      if (infoEl) {
+        infoEl.insertBefore(clipPill, infoEl.querySelector(".desc") || null);
+      }
+    }
 
     if (isWelcome) {
       const stage = String(row.indexing_stage || "none");
@@ -2063,6 +2230,28 @@ function renderResults(results, options = {}) {
     if (selectCheckbox.checked) {
       card.classList.add("selected");
     }
+
+    const downloadBtn = document.createElement("button");
+    downloadBtn.type = "button";
+    downloadBtn.className = "result-download-btn";
+    downloadBtn.title = "Download original file";
+    downloadBtn.setAttribute("aria-label", `Download ${title}`);
+    downloadBtn.innerHTML = `
+      <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+        <path d="M12 3v10" />
+        <path d="m7 10 5 5 5-5" />
+        <path d="M5 20h14" />
+      </svg>
+    `;
+    downloadBtn.addEventListener("click", (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      void downloadMediaFromSearchResult(row);
+    });
+    downloadBtn.addEventListener("keydown", (event) => {
+      event.stopPropagation();
+    });
+    card.appendChild(downloadBtn);
 
     card.addEventListener("click", () => {
       activePreviewPath = imagePath;
@@ -2302,6 +2491,7 @@ async function doSearch() {
     query: albumFromQuery.cleanedQuery,
     topK: Number(topKInput.value || 20),
     minScore: Number(userSettingsState.minMatchScore || 0.001),
+    videoResultMode: normalizeVideoSearchResultMode(userSettingsState.videoSearchResultMode),
     filters: {
       ...filtersPayload,
       albumIds: mergedAlbumIds,
@@ -2422,6 +2612,9 @@ if (saveUserSettingsBtn) {
         settingsAutoCloseSidebarOnSettingsNavInput?.checked,
       );
       userSettingsState.galleryVideoAutoplay = Boolean(settingsGalleryVideoAutoplayInput?.checked);
+      userSettingsState.videoSearchResultMode = normalizeVideoSearchResultMode(
+        settingsVideoSearchResultModeSelect?.value,
+      );
       userSettingsState.enableFaceIndexing = Boolean(settingsEnableFaceIndexingInput?.checked);
       userSettingsState.faceModelVersion = String(settingsFaceModelVersionInput?.value || "face-api-ssd-v1").trim() || "face-api-ssd-v1";
       const faceMinConfidenceInputValue = Number(settingsFaceMinConfidenceInput?.value);
@@ -2451,6 +2644,7 @@ if (saveUserSettingsBtn) {
         auto_expand_filters: userSettingsState.autoExpandFilters,
         auto_close_sidebar_on_settings_nav: userSettingsState.autoCloseSidebarOnSettingsNav,
         gallery_video_autoplay: userSettingsState.galleryVideoAutoplay,
+        video_search_result_mode: userSettingsState.videoSearchResultMode,
         enable_face_indexing: userSettingsState.enableFaceIndexing,
         face_model_version: userSettingsState.faceModelVersion,
         face_min_detection_confidence: userSettingsState.faceMinDetectionConfidence,
@@ -2555,6 +2749,15 @@ if (openFacesWorkspaceBtn) {
   openFacesWorkspaceBtn.addEventListener("click", async () => {
     showFacesScreen();
     await loadFaceClustersForSettings();
+    if (userSettingsState.autoCloseSidebarOnSettingsNav) {
+      closeSidebar();
+    }
+  });
+}
+
+if (openWizardWorkspaceBtn) {
+  openWizardWorkspaceBtn.addEventListener("click", () => {
+    showWizardScreen();
     if (userSettingsState.autoCloseSidebarOnSettingsNav) {
       closeSidebar();
     }
@@ -2907,6 +3110,11 @@ for (const dockButton of sidebarIconDockButtons) {
     openSidebar();
     if (sectionTarget === "settings-nav-section") {
       showSettingsScreen();
+      return;
+    }
+
+    if (sectionTarget === "wizard-nav-section") {
+      showWizardScreen();
       return;
     }
 

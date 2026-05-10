@@ -513,7 +513,7 @@ export function createImagePreviewPanel(options = {}) {
     </div>
     <div class="ipp-topbar-actions">
       <button class="ipp-btn accent ipp-album-btn"  type="button">Add to album</button>
-      <button class="ipp-btn ipp-export-btn"         type="button">Export</button>
+      <button class="ipp-btn ipp-export-btn"         type="button">Download</button>
       <button class="ipp-btn danger ipp-delete-btn"  type="button">Delete</button>
       <button class="ipp-close-btn" type="button" aria-label="Close preview">✕</button>
     </div>
@@ -677,6 +677,7 @@ export function createImagePreviewPanel(options = {}) {
 
   // Tracks the active highlight segment { startSecs, endSecs }
   let _activeHighlight = null;
+  let _lockPlaybackToHighlight = false;
   // Tracks all timeline segment items for active-segment styling
   let _timelineItems = [];
 
@@ -697,6 +698,7 @@ export function createImagePreviewPanel(options = {}) {
 
   function clearVideoHighlight() {
     _activeHighlight = null;
+    _lockPlaybackToHighlight = false;
     videoHighlightTrack.classList.remove("visible");
     _timelineItems.forEach(item => item.el.classList.remove("active-segment"));
   }
@@ -712,6 +714,18 @@ export function createImagePreviewPanel(options = {}) {
 
   function updateProgressFill() {
     if (!videoEl.duration || !isFinite(videoEl.duration)) return;
+
+    if (
+      _lockPlaybackToHighlight
+      && _activeHighlight?.endSecs != null
+      && videoEl.currentTime >= _activeHighlight.endSecs
+    ) {
+      videoEl.currentTime = _activeHighlight.startSecs;
+      if (videoEl.paused) {
+        videoEl.play().catch(() => {});
+      }
+      return;
+    }
 
     // Fade highlight when we've moved past the segment end
     if (_activeHighlight?.endSecs != null && videoEl.currentTime > _activeHighlight.endSecs + 1) {
@@ -829,7 +843,7 @@ export function createImagePreviewPanel(options = {}) {
     if (videoEl.paused) videoEl.play().catch(() => {});
   }
 
-  async function applyPreviewImageSource(imagePath, preferredPreviewSrc, mediaType) {
+  async function applyPreviewImageSource(imagePath, preferredPreviewSrc, mediaType, previewContext = null) {
     const normalized = normalizeMediaType(mediaType, imagePath);
 
     if (normalized === "video") {
@@ -840,9 +854,11 @@ export function createImagePreviewPanel(options = {}) {
       videoHighlightTrack.style.display = "";
       let src = String(preferredPreviewSrc || "").trim() || normalizeImageSrc(imagePath);
       try {
-        const res = await resolvePreviewSrc(imagePath, normalized);
-        const s = String(res?.previewSrc || "").trim();
-        if (res?.ok && s) src = s;
+        if (!preferredPreviewSrc) {
+          const res = await resolvePreviewSrc(imagePath, normalized, previewContext || currentDetails || {});
+          const s = String(res?.previewSrc || "").trim();
+          if (res?.ok && s) src = s;
+        }
       } catch { /* keep normalized */ }
 
       let fallbackAttempted = false;
@@ -850,7 +866,7 @@ export function createImagePreviewPanel(options = {}) {
         if (fallbackAttempted) { videoEl.src = ""; return; }
         fallbackAttempted = true;
         try {
-          const fb = await resolvePreviewSrc(imagePath, normalized);
+          const fb = await resolvePreviewSrc(imagePath, normalized, previewContext || currentDetails || {});
           const s = String(fb?.previewSrc || "").trim();
           if (fb?.ok && s && s !== videoEl.src) { videoEl.src = s; videoEl.play().catch(() => {}); return; }
         } catch { /* ignore */ }
@@ -862,6 +878,23 @@ export function createImagePreviewPanel(options = {}) {
       videoEl.playsInline = true;
       videoEl.currentTime = 0;
       videoEl.play().catch(() => {});
+
+      const clipStartSeconds = Number(previewContext?.clip_start_seconds);
+      const clipEndSeconds = Number(previewContext?.clip_end_seconds);
+      if (Number.isFinite(clipStartSeconds) && Number.isFinite(clipEndSeconds) && clipEndSeconds > clipStartSeconds) {
+        _lockPlaybackToHighlight = true;
+        _activeHighlight = { startSecs: clipStartSeconds, endSecs: clipEndSeconds };
+        const applyClipWindow = () => {
+          applyVideoHighlight(clipStartSeconds, clipEndSeconds);
+          videoEl.currentTime = clipStartSeconds;
+          videoEl.play().catch(() => {});
+        };
+        if (videoEl.duration && isFinite(videoEl.duration)) {
+          applyClipWindow();
+        } else {
+          videoEl.addEventListener("loadedmetadata", applyClipWindow, { once: true });
+        }
+      }
       return;
     }
 
@@ -1174,7 +1207,7 @@ export function createImagePreviewPanel(options = {}) {
   exportBtn.addEventListener("click", async () => {
     if (!currentDetails?.path) { setStatus("No file selected."); return; }
     const r = await onExport(currentDetails);
-    setStatus(r?.ok ? "Export started." : `Export failed: ${r?.message || "Unknown error"}`);
+    setStatus(r?.ok ? "Download complete." : `Download failed: ${r?.message || "Unknown error"}`);
   });
 
   deleteBtn.addEventListener("click", async () => {
@@ -1253,7 +1286,7 @@ export function createImagePreviewPanel(options = {}) {
     clearVideoHighlight();
     _timelineItems = [];
 
-    await applyPreviewImageSource(imagePath, row?.preview_src, mediaType);
+    await applyPreviewImageSource(imagePath, row?.preview_src, mediaType, row);
     resetTransformState();
 
     metaRaw.textContent = "Loading…";
@@ -1263,6 +1296,9 @@ export function createImagePreviewPanel(options = {}) {
       path: imagePath, image_path: imagePath, media_type: mediaType,
       status: row?.status || "ok", metadata: row?.metadata || {},
       local_metadata: row?.local_metadata || null, cloud_metadata: row?.cloud_metadata || null,
+      clip_mode: row?.clip_mode || null,
+      clip_start_seconds: row?.clip_start_seconds,
+      clip_end_seconds: row?.clip_end_seconds,
     };
 
     renderStatusStrip(currentDetails);
@@ -1272,7 +1308,14 @@ export function createImagePreviewPanel(options = {}) {
 
     try {
       const resolved = await resolveDetails(row);
-      currentDetails = { path: imagePath, media_type: mediaType, ...resolved };
+      currentDetails = {
+        path: imagePath,
+        media_type: mediaType,
+        ...resolved,
+        clip_mode: row?.clip_mode || null,
+        clip_start_seconds: row?.clip_start_seconds,
+        clip_end_seconds: row?.clip_end_seconds,
+      };
       titleEl.textContent = currentDetails?.metadata?.title || titleEl.textContent;
       metaRaw.textContent = toMetadataText(currentDetails);
       renderStatusStrip(currentDetails);

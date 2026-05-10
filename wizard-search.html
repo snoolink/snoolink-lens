@@ -1,0 +1,476 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Snoolink Lens Wizard Search</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --bg: #1e1e1e; --surface: rgba(15, 21, 34, 0.88); --surface2: rgba(20, 28, 45, 0.92);
+    --border: rgba(146, 180, 236, 0.24); --border-hover: rgba(180, 211, 255, 0.45);
+    --text: #e8efff; --text-muted: #b4c4de; --text-dim: #87a1c4;
+    --accent: #68b6ff; --accent-dark: #4d8dde; --danger: #ff8c8c; --info: #88c6ff;
+    --green: #7ecba1;
+  }
+  body { background: radial-gradient(ellipse at 50% 0%, #2a2a3a 0%, #1e1e1e 70%); color: var(--text); font-family: "Segoe UI", "Rubik", system-ui, sans-serif; font-weight: 400; min-height: 100vh; line-height: 1.6; }
+  body::before { content: ''; position: fixed; inset: 0; background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.045'/%3E%3C/svg%3E"); pointer-events: none; z-index: 0; }
+  .container { max-width: 920px; margin: 0 auto; padding: 44px 24px 72px; position: relative; z-index: 1; background: linear-gradient(180deg, rgba(16, 22, 36, 0.82), rgba(11, 16, 28, 0.75)); border: 1px solid rgba(150, 186, 243, 0.22); border-radius: 18px; box-shadow: 0 24px 54px rgba(0,0,0,0.36); }
+  header { margin-bottom: 48px; }
+  .eyebrow { font-size: 11px; letter-spacing: 0.15em; text-transform: uppercase; color: var(--accent); font-weight: 500; margin-bottom: 12px; display: flex; align-items: center; gap: 8px; }
+  .eyebrow::before { content: ''; display: block; width: 24px; height: 1px; background: var(--accent); }
+  h1 { font-size: clamp(30px, 5vw, 50px); font-weight: 700; line-height: 1.08; color: var(--text); margin-bottom: 12px; letter-spacing: -0.02em; }
+  h1 em { font-style: italic; color: var(--accent); }
+  .subtitle { font-size: 15px; color: var(--text-muted); max-width: 520px; }
+  .input-section { margin-bottom: 28px; }
+  .quote-label { font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--text-dim); font-weight: 500; margin-bottom: 10px; display: block; }
+  .quote-wrapper { position: relative; }
+  textarea { width: 100%; min-height: 110px; resize: vertical; background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 16px 20px 36px; font-family: inherit; font-size: 16px; color: var(--text); line-height: 1.6; transition: border-color 0.2s; outline: none; }
+  textarea::placeholder { color: var(--text-dim); font-style: italic; }
+  textarea:focus { border-color: var(--border-hover); }
+  .char-count { position: absolute; bottom: 12px; right: 16px; font-size: 11px; color: var(--text-dim); }
+  .options-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; margin-bottom: 20px; }
+  .opt-group { display: flex; flex-direction: column; gap: 6px; }
+  .opt-label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-dim); font-weight: 500; }
+  select { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 9px 12px; font-family: inherit; font-size: 13px; color: var(--text); cursor: pointer; outline: none; transition: border-color 0.2s; appearance: none; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%2387a1c4' stroke-width='2'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 10px center; padding-right: 30px; }
+  select:focus { border-color: var(--border-hover); }
+  .gen-btn { width: 100%; padding: 14px 24px; background: linear-gradient(120deg, #63b8ff, #4b8be0); border: none; border-radius: 10px; font-family: inherit; font-size: 14px; font-weight: 600; color: #071324; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; transition: filter 0.2s, transform 0.1s; letter-spacing: 0.02em; }
+  .gen-btn:hover { filter: brightness(1.07); }
+  .gen-btn:active { transform: scale(0.99); }
+  .gen-btn:disabled { opacity: 0.45; cursor: not-allowed; transform: none; }
+  .spinner { display: inline-block; width: 14px; height: 14px; border: 2px solid rgba(7,19,36,0.2); border-top-color: #071324; border-radius: 50%; animation: spin 0.7s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .error-msg { font-size: 13px; color: var(--danger); padding: 10px 14px; border: 1px solid rgba(224,112,112,0.3); border-radius: 8px; margin-top: 12px; }
+  .divider { width: 100%; height: 1px; background: var(--border); margin: 40px 0; }
+  #results { display: none; }
+  .section-label { font-size: 10px; text-transform: uppercase; letter-spacing: 0.12em; color: var(--text-dim); font-weight: 500; margin-bottom: 14px; }
+  .analysis-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 8px; margin-bottom: 36px; }
+  .pill { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 12px 14px; }
+  .pill-label { font-size: 10px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.07em; margin-bottom: 4px; }
+  .pill-val { font-size: 13px; color: var(--text); font-weight: 400; }
+  .bg-cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 24px; }
+  @media (max-width: 560px) { .bg-cards { grid-template-columns: 1fr; } }
+  .bg-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 16px; cursor: pointer; transition: border-color 0.2s, background 0.2s; }
+  .bg-card:hover { border-color: var(--border-hover); }
+  .bg-card.selected { border-color: var(--accent); background: rgba(232,201,126,0.06); }
+  .card-icon { font-size: 22px; margin-bottom: 8px; }
+  .card-type { font-size: 10px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--accent); font-weight: 500; margin-bottom: 4px; }
+  .card-title { font-size: 13px; font-weight: 500; color: var(--text); margin-bottom: 6px; }
+  .card-desc { font-size: 12px; color: var(--text-muted); line-height: 1.5; }
+  .prompt-area { margin-bottom: 28px; }
+  .prompt-block { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 16px 18px; margin-bottom: 10px; }
+  .prompt-block-label { font-size: 10px; text-transform: uppercase; letter-spacing: 0.1em; color: var(--accent); font-weight: 500; margin-bottom: 8px; }
+  .prompt-text { font-size: 13px; color: var(--text-muted); line-height: 1.75; }
+  .copy-row { display: flex; gap: 8px; flex-wrap: wrap; }
+  .copy-btn { padding: 8px 14px; background: transparent; border: 1px solid var(--border); border-radius: 8px; font-family: inherit; font-size: 12px; color: var(--text-muted); cursor: pointer; display: flex; align-items: center; gap: 6px; transition: border-color 0.2s, color 0.2s; }
+  .copy-btn:hover { border-color: var(--border-hover); color: var(--text); }
+  .copy-btn svg { width: 13px; height: 13px; stroke: currentColor; }
+  .director-note { border-left: 2px solid var(--accent); padding: 14px 18px; background: rgba(232,201,126,0.05); border-radius: 0 8px 8px 0; margin-bottom: 36px; }
+  .director-note p { font-family: inherit; font-style: italic; font-size: 15px; color: var(--text-muted); line-height: 1.7; }
+
+  /* ── Gallery search section ─────────────────────────── */
+  .gallery-section { margin-bottom: 36px; }
+  .gallery-intro { font-size: 13px; color: var(--text-muted); margin-bottom: 16px; line-height: 1.6; }
+  .clip-list { display: flex; flex-direction: column; gap: 10px; }
+  .clip-row {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 10px; padding: 14px 16px;
+    display: grid; grid-template-columns: 1fr auto;
+    align-items: start; gap: 12px;
+  }
+  .clip-row-left { display: flex; flex-direction: column; gap: 6px; }
+  .clip-number { font-size: 10px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--accent); font-weight: 500; }
+  .clip-keywords { font-size: 13px; color: var(--text); line-height: 1.5; }
+  .clip-meta { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-top: 2px; }
+  .clip-tag { font-size: 11px; padding: 2px 9px; border-radius: 999px; border: 1px solid var(--border); color: var(--text-dim); }
+  .clip-tag.duration { border-color: rgba(126,203,161,0.3); color: var(--green); background: rgba(126,203,161,0.07); }
+  .clip-tag.scene { border-color: rgba(126,184,232,0.3); color: var(--info); background: rgba(126,184,232,0.07); }
+  .clip-copy-btn { padding: 7px 12px; background: transparent; border: 1px solid var(--border); border-radius: 8px; font-family: inherit; font-size: 11px; color: var(--text-muted); cursor: pointer; display: flex; align-items: center; gap: 5px; white-space: nowrap; transition: border-color 0.2s, color 0.2s; }
+  .clip-copy-btn:hover { border-color: var(--border-hover); color: var(--text); }
+  .clip-copy-btn svg { width: 11px; height: 11px; stroke: currentColor; }
+  .gallery-copy-all { margin-top: 12px; }
+
+  /* Caption tabs */
+  .caption-tabs { display: flex; gap: 6px; margin-bottom: 14px; flex-wrap: wrap; }
+  .cap-tab { padding: 6px 16px; background: transparent; border: 1px solid var(--border); border-radius: 999px; font-family: inherit; font-size: 12px; color: var(--text-muted); cursor: pointer; transition: all 0.15s; }
+  .cap-tab:hover { border-color: var(--border-hover); color: var(--text); }
+  .cap-tab.active { border-color: var(--accent); color: var(--accent); background: rgba(232,201,126,0.07); }
+  .caption-block { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 18px 20px; margin-bottom: 10px; }
+  .caption-text { font-family: inherit; font-size: 15px; color: var(--text); line-height: 1.75; white-space: pre-wrap; }
+
+  /* Hashtags */
+  .hashtag-section { margin-bottom: 40px; }
+  .tag-group-label { font-size: 10px; text-transform: uppercase; letter-spacing: 0.1em; color: var(--text-dim); font-weight: 500; margin-bottom: 10px; margin-top: 16px; }
+  .tag-group-label:first-child { margin-top: 0; }
+  .hashtag-cloud { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 4px; }
+  .hashtag-pill { padding: 5px 13px; background: rgba(232,201,126,0.08); border: 1px solid rgba(232,201,126,0.2); border-radius: 999px; font-size: 12px; color: var(--accent); cursor: pointer; transition: background 0.15s; user-select: all; }
+  .hashtag-pill:hover { background: rgba(232,201,126,0.16); }
+  .hashtag-pill.niche { background: rgba(126,184,232,0.07); border-color: rgba(126,184,232,0.2); color: var(--info); }
+  .hashtag-pill.niche:hover { background: rgba(126,184,232,0.15); }
+
+  footer { margin-top: 60px; text-align: center; font-size: 12px; color: var(--text-dim); }
+</style>
+</head>
+<body>
+<div class="container">
+  <header>
+    <div class="eyebrow">Travel Content · Personal Profile</div>
+    <h1>Reel <em>Prompt</em><br>Generator</h1>
+    <p class="subtitle">Paste your quote — get gallery search keywords for your personal videos, background prompts, captions, and hashtags.</p>
+  </header>
+
+  <div class="input-section">
+    <label class="quote-label" for="quoteInput">Your quote or caption</label>
+    <div class="quote-wrapper">
+      <textarea id="quoteInput" maxlength="500" placeholder='"Not all those who wander are lost."'></textarea>
+      <span class="char-count" id="charCount">0 / 500</span>
+    </div>
+  </div>
+
+  <div class="options-row">
+    <div class="opt-group">
+      <span class="opt-label">Reel style</span>
+      <select id="styleSelect">
+        <option value="cinematic travel">Cinematic travel</option>
+        <option value="aesthetic lofi">Aesthetic / lofi</option>
+        <option value="adventure">Adventure</option>
+        <option value="slow travel">Slow travel</option>
+        <option value="dark moody">Dark / moody</option>
+        <option value="golden hour">Golden hour</option>
+      </select>
+    </div>
+    <div class="opt-group">
+      <span class="opt-label">Clip duration</span>
+      <select id="clipDuration">
+        <option value="3">3 seconds</option>
+        <option value="4">4 seconds</option>
+        <option value="5">5 seconds</option>
+        <option value="6" selected>6 seconds (default)</option>
+        <option value="8">8 seconds</option>
+        <option value="10">10 seconds</option>
+      </select>
+    </div>
+    <div class="opt-group">
+      <span class="opt-label">Output format</span>
+      <select id="formatSelect">
+        <option value="stock">Gallery keywords only</option>
+        <option value="ai">AI video prompt only</option>
+        <option value="both" selected>Both</option>
+      </select>
+    </div>
+  </div>
+
+  <button class="gen-btn" id="genBtn" onclick="generate()">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 14c.2-1 .7-1.7 1.5-2.5 1-.9 1.5-2.2 1.5-3.5A6 6 0 0 0 6 8c0 1 .2 2.2 1.5 3.5.7.7 1.3 1.5 1.5 2.5"/><path d="M9 18h6"/><path d="M10 22h4"/></svg>
+    Generate prompts, captions &amp; hashtags
+  </button>
+
+  <div id="errorMsg"></div>
+
+  <div id="results">
+    <div class="divider"></div>
+
+    <div class="section-label">Quote analysis</div>
+    <div class="analysis-grid" id="analysisGrid"></div>
+
+    <div class="section-label">Personal gallery search — clip by clip</div>
+    <div class="gallery-section" id="gallerySection"></div>
+
+    <div class="section-label">Background video options</div>
+    <div class="bg-cards" id="bgCards"></div>
+    <div class="prompt-area" id="promptArea"></div>
+
+    <div class="section-label">Director's note</div>
+    <div class="director-note"><p id="directorNote"></p></div>
+
+    <div class="section-label">Captions</div>
+    <div class="caption-tabs" id="captionTabs"></div>
+    <div class="caption-block">
+      <p class="caption-text" id="captionText"></p>
+    </div>
+    <div class="copy-row" style="margin-top:10px; margin-bottom:36px;">
+      <button class="copy-btn" onclick="copyEl('captionText', this)">
+        <svg viewBox="0 0 24 24" fill="none" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+        Copy caption
+      </button>
+    </div>
+
+    <div class="section-label">Hashtags</div>
+    <div class="hashtag-section" id="hashtagSection"></div>
+  </div>
+
+  <footer>Powered by AWS Bedrock &middot; Travel content · Personal profile</footer>
+</div>
+
+<script>
+function getDesktopApi() {
+  if (window.desktopAPI) {
+    return window.desktopAPI;
+  }
+  if (window.parent && window.parent !== window && window.parent.desktopAPI) {
+    return window.parent.desktopAPI;
+  }
+  return null;
+}
+
+const quoteInput = document.getElementById('quoteInput');
+const charCount  = document.getElementById('charCount');
+const genBtn     = document.getElementById('genBtn');
+const results    = document.getElementById('results');
+const errorDiv   = document.getElementById('errorMsg');
+
+quoteInput.addEventListener('input', () => {
+  charCount.textContent = quoteInput.value.length + ' / 500';
+});
+
+async function generate() {
+  const quote = quoteInput.value.trim();
+  if (!quote) { showError('Please enter a quote first.'); return; }
+
+  const style        = document.getElementById('styleSelect').value;
+  const clipDuration = document.getElementById('clipDuration').value;   // seconds, default 6
+  const format       = document.getElementById('formatSelect').value;
+
+  genBtn.disabled = true;
+  genBtn.innerHTML = '<span class="spinner"></span> Analyzing quote...';
+  errorDiv.innerHTML = '';
+  results.style.display = 'none';
+
+  const systemPrompt = `You are an expert travel content creator, Instagram Reel director, copywriter, and social media strategist. The creator uses their own personal travel video library — so all search keywords must describe real, searchable moments a traveller would have filmed themselves.
+
+Analyze the given quote and return ONLY a valid JSON object with this exact structure, no markdown fences, no explanation:
+
+{
+  "mood": "one-word mood",
+  "emotion": "2-3 word emotion",
+  "theme": "3-5 word theme",
+  "pace": "slow or medium or fast",
+  "colorPalette": "4-6 word palette",
+  "galleryClips": [
+    {
+      "clipNumber": 1,
+      "searchKeywords": "2-4 plain English words to search in a personal video gallery (e.g. 'sunset beach walking barefoot')",
+      "sceneType": "one of: landscape / street / golden-hour / aerial / portrait / detail / action / night",
+      "tip": "one sentence on exactly what moment to look for in that clip"
+    }
+  ],
+  "backgroundOptions": [
+    {
+      "type": "category",
+      "icon": "single emoji",
+      "title": "short title",
+      "description": "1-2 sentences why this fits",
+      "stockTerms": "3-5 comma-separated stock footage keywords",
+      "aiPrompt": "60-80 word AI video generation prompt with camera, lighting, movement, atmosphere, color grading"
+    }
+  ],
+  "directorNote": "1-2 sentence visual direction and text placement tip",
+  "captions": {
+    "short": "Punchy 1-2 line caption under 80 chars with 1-2 emojis",
+    "medium": "3-5 line caption with hook, reflection, CTA. Use actual newline characters between lines. 2-3 emojis.",
+    "long": "8-12 line storytelling caption. Hook, meaning, emotion, CTA. Actual newlines between paragraphs. 3-5 emojis."
+  },
+  "hashtags": {
+    "broad": ["#tag1","#tag2","#tag3","#tag4","#tag5","#tag6","#tag7","#tag8","#tag9","#tag10"],
+    "niche":  ["#tag1","#tag2","#tag3","#tag4","#tag5","#tag6","#tag7","#tag8","#tag9","#tag10"]
+  }
+}
+
+galleryClips rules:
+- Generate exactly enough clips to fill the reel duration when each clip is CLIP_DURATION seconds long. Calculate: Math.ceil(reelDuration / clipDuration) clips. The reel duration is 30 seconds by default unless specified.
+- Each searchKeywords must be plain English, concrete, and searchable in a phone gallery (e.g. 'narrow alley cobblestone steps', 'coffee cup terrace morning').
+- Vary sceneType across clips for visual rhythm.
+- All hashtags start with #. Return exactly 10 broad and 10 niche hashtags.`;
+
+  // Calculate number of clips needed for a ~30s reel at chosen clip duration
+  const reelDuration = 30;
+  const clipSec = parseInt(clipDuration, 10);
+  const numClips = Math.ceil(reelDuration / clipSec);
+
+  const userMsg = `Quote: "${quote}"
+Reel style: ${style}
+Clip duration: ${clipDuration} seconds each
+Number of clips needed: ${numClips} (for a ~${reelDuration}s reel)
+Output format: ${format}`;
+
+  try {
+    const desktopApi = getDesktopApi();
+    if (!desktopApi || typeof desktopApi.wizardGeneratePlan !== 'function') {
+      throw new Error('Wizard backend bridge unavailable. Please restart the app.');
+    }
+
+    const response = await desktopApi.wizardGeneratePlan({
+      systemPrompt,
+      userPrompt: userMsg,
+      maxTokens: 2200
+    });
+    if (!response?.ok) {
+      throw new Error(response?.message || 'Bedrock request failed');
+    }
+
+    const raw = String(response.text || '');
+    const clean = raw.replace(/```json|```/g, '').trim();
+    renderResults(JSON.parse(clean), format, clipSec);
+  } catch(e) {
+    showError('Error: ' + (e.message || 'Something went wrong. Check AWS settings and Bedrock model access, then try again.'));
+  } finally {
+    genBtn.disabled = false;
+    genBtn.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 14c.2-1 .7-1.7 1.5-2.5 1-.9 1.5-2.2 1.5-3.5A6 6 0 0 0 6 8c0 1 .2 2.2 1.5 3.5.7.7 1.3 1.5 1.5 2.5"/><path d="M9 18h6"/><path d="M10 22h4"/></svg> Generate prompts, captions &amp; hashtags';
+  }
+}
+
+function renderResults(d, format, clipSec) {
+  // Analysis pills
+  const fields = [
+    { label: 'Mood', val: d.mood }, { label: 'Emotion', val: d.emotion },
+    { label: 'Theme', val: d.theme }, { label: 'Pace', val: d.pace },
+    { label: 'Color palette', val: d.colorPalette }
+  ];
+  document.getElementById('analysisGrid').innerHTML = fields.map(f =>
+    `<div class="pill"><div class="pill-label">${f.label}</div><div class="pill-val">${f.val}</div></div>`
+  ).join('');
+
+  // Gallery clips
+  if (d.galleryClips && d.galleryClips.length) {
+    renderGalleryClips(d.galleryClips, clipSec);
+  }
+
+  // Background video cards
+  window._bgData = d.backgroundOptions;
+  window._format = format;
+  document.getElementById('bgCards').innerHTML = d.backgroundOptions.map((opt, i) =>
+    `<div class="bg-card${i===0?' selected':''}" id="card-${i}" onclick="selectCard(${i})">
+      <div class="card-icon">${opt.icon}</div>
+      <div class="card-type">${opt.type}</div>
+      <div class="card-title">${opt.title}</div>
+      <div class="card-desc">${opt.description}</div>
+    </div>`
+  ).join('');
+  showPrompts(d.backgroundOptions[0], format);
+
+  document.getElementById('directorNote').textContent = d.directorNote;
+
+  if (d.captions) { window._captions = d.captions; renderCaptions('short'); }
+  if (d.hashtags)  { renderHashtags(d.hashtags); }
+
+  results.style.display = 'block';
+  results.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+function renderGalleryClips(clips, clipSec) {
+  const ci = `<svg viewBox="0 0 24 24" fill="none" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>`;
+
+  const allKeywords = clips.map(c => c.searchKeywords).join(' | ');
+
+  const rows = clips.map((clip, i) => `
+    <div class="clip-row">
+      <div class="clip-row-left">
+        <span class="clip-number">Clip ${clip.clipNumber || i+1}</span>
+        <span class="clip-keywords">${clip.searchKeywords}</span>
+        <div class="clip-meta">
+          <span class="clip-tag duration">${clipSec}s</span>
+          <span class="clip-tag scene">${clip.sceneType || ''}</span>
+          <span class="clip-tag">${clip.tip || ''}</span>
+        </div>
+      </div>
+      <button class="clip-copy-btn" onclick="copyRaw('${clip.searchKeywords.replace(/'/g,"\\'")}', this)">${ci} Copy</button>
+    </div>`
+  ).join('');
+
+  document.getElementById('gallerySection').innerHTML = `
+    <p class="gallery-intro">Search these terms in your personal video library — one clip per row. Each clip runs <strong style="color:var(--green)">${clipSec} seconds</strong>.</p>
+    <div class="clip-list">${rows}</div>
+    <div class="copy-row gallery-copy-all">
+      <button class="copy-btn" id="copyAllClipsBtn">${ci} Copy all search terms</button>
+    </div>`;
+
+  document.getElementById('copyAllClipsBtn').onclick = function() { copyRaw(allKeywords, this); };
+}
+
+function selectCard(i) {
+  document.querySelectorAll('.bg-card').forEach((c, idx) => c.classList.toggle('selected', idx === i));
+  showPrompts(window._bgData[i], window._format);
+}
+
+function showPrompts(opt, format) {
+  let html = '';
+  if (format === 'stock' || format === 'both') {
+    html += `<div class="prompt-block"><div class="prompt-block-label">Stock footage keywords</div><p class="prompt-text" id="stock-text">${opt.stockTerms}</p></div>`;
+  }
+  if (format === 'ai' || format === 'both') {
+    html += `<div class="prompt-block"><div class="prompt-block-label">AI video generation prompt</div><p class="prompt-text" id="ai-text">${opt.aiPrompt}</p></div>`;
+  }
+  const ci = `<svg viewBox="0 0 24 24" fill="none" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>`;
+  html += `<div class="copy-row">
+    ${(format==='stock'||format==='both') ? `<button class="copy-btn" onclick="copyEl('stock-text',this)">${ci} Copy keywords</button>` : ''}
+    ${(format==='ai'||format==='both')    ? `<button class="copy-btn" onclick="copyEl('ai-text',this)">${ci} Copy AI prompt</button>` : ''}
+  </div>`;
+  document.getElementById('promptArea').innerHTML = html;
+}
+
+function renderCaptions(active) {
+  const tabs = [{ key:'short', label:'Short' }, { key:'medium', label:'Medium' }, { key:'long', label:'Long' }];
+  document.getElementById('captionTabs').innerHTML = tabs.map(t =>
+    `<button class="cap-tab${t.key===active?' active':''}" onclick="switchCaption('${t.key}')">${t.label}</button>`
+  ).join('');
+  document.getElementById('captionText').textContent = (window._captions || {})[active] || '';
+}
+
+function switchCaption(key) {
+  document.querySelectorAll('.cap-tab').forEach(t => t.classList.toggle('active', t.textContent.toLowerCase() === key));
+  document.getElementById('captionText').textContent = (window._captions || {})[key] || '';
+}
+
+function renderHashtags(hashtags) {
+  const ci = `<svg viewBox="0 0 24 24" fill="none" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>`;
+  const broad = (hashtags.broad||[]).map(t => `<span class="hashtag-pill" onclick="copyTag(this)">${t}</span>`).join('');
+  const niche  = (hashtags.niche||[]).map(t => `<span class="hashtag-pill niche" onclick="copyTag(this)">${t}</span>`).join('');
+  const all    = [...(hashtags.broad||[]), ...(hashtags.niche||[])];
+
+  document.getElementById('hashtagSection').innerHTML = `
+    <div class="tag-group-label">Broad — high reach</div>
+    <div class="hashtag-cloud">${broad}</div>
+    <div class="tag-group-label">Niche — targeted community</div>
+    <div class="hashtag-cloud">${niche}</div>
+    <div class="copy-row" style="margin-top:16px;">
+      <button class="copy-btn" id="copyAllBtn">${ci} Copy all (20 tags)</button>
+      <button class="copy-btn" id="copyBroadBtn">${ci} Copy broad only</button>
+      <button class="copy-btn" id="copyNicheBtn">${ci} Copy niche only</button>
+    </div>`;
+
+  document.getElementById('copyAllBtn').onclick   = function() { copyRaw(all.join(' '), this); };
+  document.getElementById('copyBroadBtn').onclick = function() { copyRaw((hashtags.broad||[]).join(' '), this); };
+  document.getElementById('copyNicheBtn').onclick = function() { copyRaw((hashtags.niche||[]).join(' '), this); };
+}
+
+function copyTag(el) {
+  navigator.clipboard.writeText(el.textContent).then(() => {
+    const orig = el.textContent; el.textContent = '✓';
+    setTimeout(() => el.textContent = orig, 1200);
+  });
+}
+
+function copyRaw(text, btn) {
+  navigator.clipboard.writeText(text).then(() => {
+    const orig = btn.innerHTML;
+    btn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg> Copied!';
+    setTimeout(() => btn.innerHTML = orig, 1800);
+  });
+}
+
+function copyEl(id, btn) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  navigator.clipboard.writeText(el.textContent).then(() => {
+    const orig = btn.innerHTML;
+    btn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg> Copied!';
+    setTimeout(() => btn.innerHTML = orig, 1800);
+  });
+}
+
+function showError(msg) {
+  errorDiv.innerHTML = `<div class="error-msg">${msg}</div>`;
+}
+</script>
+</body>
+</html>

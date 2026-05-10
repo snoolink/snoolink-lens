@@ -71,6 +71,12 @@
   width: 22px;
 }
 
+.settings-section .section-icon .section-icon-img {
+  height: 14px;
+  object-fit: contain;
+  width: 14px;
+}
+
 .settings-section.section-scan .settings-section-header {
   background: rgba(51, 124, 214, 0.18);
   border: 1px solid rgba(93, 160, 245, 0.32);
@@ -124,6 +130,23 @@
 .sidebar-icon-dock-btn.section-settings {
   background: rgba(214, 160, 92, 0.25);
   border-color: rgba(239, 198, 143, 0.5);
+}
+
+.settings-section.section-wizard .settings-section-header {
+  background: rgba(120, 90, 196, 0.2);
+  border: 1px solid rgba(163, 131, 236, 0.34);
+}
+
+.settings-section.section-wizard .section-icon,
+.sidebar-icon-dock-btn.section-wizard {
+  background: rgba(151, 117, 235, 0.26);
+  border-color: rgba(194, 172, 250, 0.5);
+}
+
+.sidebar-icon-dock-img {
+  height: 16px;
+  object-fit: contain;
+  width: 16px;
 }
 
 #settings-sidebar.collapsed #sidebar-content {

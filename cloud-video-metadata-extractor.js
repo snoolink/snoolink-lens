@@ -208,19 +208,19 @@ function pickFrameIntervalSeconds(durationSeconds) {
   }
 
   if (duration < 6) {
-    return 1;
-  }
-  if (duration < 15) {
-    return 1.5;
-  }
-  if (duration < 30) {
     return 2;
   }
-  if (duration < 60) {
+  if (duration < 15) {
     return 3;
   }
+  if (duration < 30) {
+    return 4;
+  }
+  if (duration < 60) {
+    return 5;
+  }
 
-  return 5;
+  return 10;
 }
 
 async function extractFramesByInterval(videoPath, outputDir, frameIntervalSeconds) {
