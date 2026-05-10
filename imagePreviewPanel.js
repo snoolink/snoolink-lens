@@ -14,9 +14,9 @@ const PANEL_CSS = `
 
 .ipp-panel {
   display: grid;
-  grid-template-columns: 1fr 320px;
-  grid-template-rows: 48px 1fr 64px;
-  grid-template-areas: "topbar topbar" "viewer sidebar" "filmstrip filmstrip";
+  grid-template-columns: 1fr 380px;
+  grid-template-rows: 48px 1fr auto 64px;
+  grid-template-areas: "topbar topbar" "viewer sidebar" "vtoolbar sidebar" "filmstrip filmstrip";
   width: 100%; height: 100%;
   background: #141518;
   font-family: 'DM Sans', system-ui, sans-serif;
@@ -102,13 +102,45 @@ const PANEL_CSS = `
   pointer-events: none;
 }
 
-.ipp-vtoolbar {
-  position: absolute; bottom: 12px; left: 50%; transform: translateX(-50%);
-  display: flex; align-items: center; gap: 2px;
-  background: rgba(14,15,17,0.85); border: 1px solid rgba(255,255,255,0.12);
-  border-radius: 30px; padding: 4px 8px;
-  backdrop-filter: blur(12px); z-index: 2;
+/* ── VIDEO TIMELINE HIGHLIGHT — overlaid on native <video> controls ── */
+/*
+  We overlay a thin progress track on top of the native video seekbar.
+  The native seekbar sits ~12px from the bottom of the controls bar.
+  We cannot truly inject into shadow DOM, so we position a pointer-events-none
+  overlay that visually lines up with the native timeline track.
+*/
+.ipp-video-highlight-track {
+  position: absolute;
+  left: 0; right: 0;
+  /* Chrome/Edge native controls bar is ~40px tall; seekbar thumb centre ≈ 28px from bottom of controls */
+  bottom: 28px;
+  height: 4px;
+  pointer-events: none;
+  z-index: 3;
+  opacity: 0;
+  transition: opacity .3s;
 }
+.ipp-video-highlight-track.visible { opacity: 1; }
+.ipp-video-highlight-segment {
+  position: absolute;
+  top: 0; height: 100%;
+  background: rgba(91,127,255,0.55);
+  border-radius: 2px;
+  transition: opacity .3s;
+  box-shadow: 0 0 4px rgba(91,127,255,0.7);
+}
+
+/* ── VIEWER TOOLBAR (below viewer) ── */
+.ipp-vtoolbar-row {
+  grid-area: vtoolbar;
+  display: flex; align-items: center; justify-content: center;
+  gap: 2px;
+  background: #141518;
+  border-top: 1px solid rgba(255,255,255,0.07);
+  border-bottom: 1px solid rgba(255,255,255,0.07);
+  padding: 6px 16px;
+}
+
 .ipp-vt-btn {
   width: 30px; height: 30px; background: transparent; border: none;
   color: #8a8d96; cursor: pointer; border-radius: 50%;
@@ -219,10 +251,12 @@ const PANEL_CSS = `
   transition: border-color .15s;
 }
 .ipp-tl-item:hover { border-color: rgba(255,255,255,0.12); }
+.ipp-tl-item.active-segment { border-color: rgba(91,127,255,0.4); background: rgba(91,127,255,0.04); }
 .ipp-tl-hdr {
   display: flex; align-items: center; gap: 7px;
   padding: 7px 10px; cursor: pointer; background: #1a1c20;
 }
+.ipp-tl-item.active-segment .ipp-tl-hdr { background: rgba(91,127,255,0.08); }
 .ipp-tl-badge {
   font-family: 'IBM Plex Mono', monospace; font-size: 10px; font-weight: 500;
   color: #5b7fff; background: rgba(91,127,255,.15);
@@ -230,6 +264,9 @@ const PANEL_CSS = `
   padding: 2px 7px; cursor: pointer; transition: background .12s; white-space: nowrap;
 }
 .ipp-tl-badge:hover { background: rgba(91,127,255,.25); }
+.ipp-tl-item.active-segment .ipp-tl-badge {
+  background: rgba(91,127,255,.3); border-color: rgba(91,127,255,.5);
+}
 .ipp-tl-preview {
   font-size: 11.5px; color: #8a8d96; flex: 1;
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin: 0;
@@ -490,19 +527,26 @@ export function createImagePreviewPanel(options = {}) {
     <button class="ipp-nav prev" type="button" aria-label="Previous image">&#8592;</button>
     <img  class="ipp-img"   alt="Selected preview" />
     <video class="ipp-video hidden" controls preload="auto" playsinline webkit-playsinline="true"></video>
+    <div class="ipp-video-highlight-track">
+      <div class="ipp-video-highlight-segment"></div>
+    </div>
     <button class="ipp-nav next" type="button" aria-label="Next image">&#8594;</button>
     <span class="ipp-zoom-badge">100%</span>
-    <div class="ipp-vtoolbar">
-      <button class="ipp-vt-btn" data-action="fit"          title="Fit to screen">${ICONS.fit}</button>
-      <button class="ipp-vt-btn" data-action="zoom-in"      title="Zoom in">${ICONS.zoomIn}</button>
-      <button class="ipp-vt-btn" data-action="zoom-out"     title="Zoom out">${ICONS.zoomOut}</button>
-      <div class="ipp-vt-sep"></div>
-      <button class="ipp-vt-btn" data-action="rotate-left"  title="Rotate left">${ICONS.rotateLeft}</button>
-      <button class="ipp-vt-btn" data-action="rotate-right" title="Rotate right">${ICONS.rotateRight}</button>
-      <button class="ipp-vt-btn" data-action="flip-h"       title="Flip horizontal">${ICONS.flipH}</button>
-      <div class="ipp-vt-sep"></div>
-      <button class="ipp-vt-btn" data-action="fullscreen"   title="Fullscreen">${ICONS.fullscreen}</button>
-    </div>
+  `;
+
+  // Viewer toolbar row — sits BELOW the viewer in the grid
+  const vtoolbarRow = document.createElement("div");
+  vtoolbarRow.className = "ipp-vtoolbar-row";
+  vtoolbarRow.innerHTML = `
+    <button class="ipp-vt-btn" data-action="fit"          title="Fit to screen">${ICONS.fit}</button>
+    <button class="ipp-vt-btn" data-action="zoom-in"      title="Zoom in">${ICONS.zoomIn}</button>
+    <button class="ipp-vt-btn" data-action="zoom-out"     title="Zoom out">${ICONS.zoomOut}</button>
+    <div class="ipp-vt-sep"></div>
+    <button class="ipp-vt-btn" data-action="rotate-left"  title="Rotate left">${ICONS.rotateLeft}</button>
+    <button class="ipp-vt-btn" data-action="rotate-right" title="Rotate right">${ICONS.rotateRight}</button>
+    <button class="ipp-vt-btn" data-action="flip-h"       title="Flip horizontal">${ICONS.flipH}</button>
+    <div class="ipp-vt-sep"></div>
+    <button class="ipp-vt-btn" data-action="fullscreen"   title="Fullscreen">${ICONS.fullscreen}</button>
   `;
 
   // Sidebar — built from discrete sections
@@ -515,7 +559,20 @@ export function createImagePreviewPanel(options = {}) {
   statusStrip.className = "ipp-status-strip";
   sidebar.appendChild(statusStrip);
 
-  // ── Section: File & Camera ──
+  // ── Section: AI Analysis — open by default ──
+  const secAI = makeSection("ipp-sec-ai", "AI analysis", `
+    <div class="ipp-sub-label" style="margin-top:0" id="ipp-ai-desc-label">Description</div>
+    <div class="ipp-ai-description"></div>
+    <div class="ipp-divider"></div>
+    <div class="ipp-sub-label">Scores &amp; attributes</div>
+    <div class="ipp-objects-list"></div>
+    <div class="ipp-divider"></div>
+    <div class="ipp-sub-label">OCR text</div>
+    <pre class="ipp-ocr">No text detected.</pre>
+  `, false /* open */);
+  sidebar.appendChild(secAI);
+
+  // ── Section: File & Camera — collapsed by default ──
   const secFile = makeSection("ipp-sec-file", "File details", `
     <dl class="ipp-meta-grid ipp-file-details"></dl>
     <div class="ipp-divider"></div>
@@ -526,23 +583,10 @@ export function createImagePreviewPanel(options = {}) {
     <div class="ipp-rating">
       ${[1,2,3,4,5].map(i => `<button class="ipp-star" data-value="${i}" type="button" aria-label="${i} star">★</button>`).join("")}
     </div>
-  `);
+  `, true /* collapsed */);
   sidebar.appendChild(secFile);
 
-  // ── Section: AI Analysis ──
-  const secAI = makeSection("ipp-sec-ai", "AI analysis", `
-    <div class="ipp-sub-label" style="margin-top:0" id="ipp-ai-desc-label">Description</div>
-    <div class="ipp-ai-description"></div>
-    <div class="ipp-divider"></div>
-    <div class="ipp-sub-label">Scores &amp; attributes</div>
-    <div class="ipp-objects-list"></div>
-    <div class="ipp-divider"></div>
-    <div class="ipp-sub-label">OCR text</div>
-    <pre class="ipp-ocr">No text detected.</pre>
-  `);
-  sidebar.appendChild(secAI);
-
-  // ── Section: Tags & Notes ──
+  // ── Section: Tags & Notes — collapsed by default ──
   const secTags = makeSection("ipp-sec-tags", "Tags &amp; notes", `
     <div class="ipp-sub-label" style="margin-top:0">Tags</div>
     <div class="ipp-tag-cloud ipp-tag-row"></div>
@@ -553,10 +597,10 @@ export function createImagePreviewPanel(options = {}) {
     <div class="ipp-divider"></div>
     <div class="ipp-sub-label">Notes</div>
     <textarea class="ipp-notes" placeholder="Add a note…" rows="4"></textarea>
-  `);
+  `, true /* collapsed */);
   sidebar.appendChild(secTags);
 
-  // ── Section: Raw JSON (collapsed by default) ──
+  // ── Section: Raw JSON — collapsed by default ──
   const secRaw = makeSection("ipp-sec-raw", "Raw metadata", `
     <pre class="ipp-raw-pre ipp-meta-raw"></pre>
     <div class="ipp-raw-actions">
@@ -584,6 +628,7 @@ export function createImagePreviewPanel(options = {}) {
   panel.appendChild(topbar);
   panel.appendChild(viewer);
   panel.appendChild(sidebar);
+  panel.appendChild(vtoolbarRow);
   panel.appendChild(filmstripBar);
 
   overlay.appendChild(panel);
@@ -591,33 +636,35 @@ export function createImagePreviewPanel(options = {}) {
 
   // ── Element refs ──────────────────────────────────────────────────
 
-  const imageEl      = overlay.querySelector(".ipp-img");
-  const videoEl      = overlay.querySelector(".ipp-video");
-  const titleEl      = overlay.querySelector(".ipp-title");
-  const folderEl     = overlay.querySelector(".ipp-bc-folder");
-  const zoomBadge    = overlay.querySelector(".ipp-zoom-badge");
-  const prevBtn      = overlay.querySelector(".ipp-nav.prev");
-  const nextBtn      = overlay.querySelector(".ipp-nav.next");
-  const albumBtn     = overlay.querySelector(".ipp-album-btn");
-  const exportBtn    = overlay.querySelector(".ipp-export-btn");
-  const deleteBtn    = overlay.querySelector(".ipp-delete-btn");
-  const closeBtn     = overlay.querySelector(".ipp-close-btn");
-  const copyBtn      = overlay.querySelector(".ipp-copy-btn");
-  const openBtn      = overlay.querySelector(".ipp-open-btn");
-  const shareBtn     = overlay.querySelector(".ipp-share-btn");
-  const fileDetails  = overlay.querySelector(".ipp-file-details");
-  const exifDetails  = overlay.querySelector(".ipp-exif-details");
-  const metaRaw      = overlay.querySelector(".ipp-meta-raw");
-  const aiDesc       = overlay.querySelector(".ipp-ai-description");
-  const aiDescLabel  = overlay.querySelector("#ipp-ai-desc-label");
-  const ocrText      = overlay.querySelector(".ipp-ocr");
-  const objectsList  = overlay.querySelector(".ipp-objects-list");
-  const tagRow       = overlay.querySelector(".ipp-tag-row");
-  const tagInput     = overlay.querySelector(".ipp-tag-input");
-  const tagAddBtn    = overlay.querySelector(".ipp-tag-add-btn");
-  const imgCount     = overlay.querySelector(".ipp-img-count");
-  const filmstrip    = overlay.querySelector(".ipp-filmstrip");
-  const stars        = overlay.querySelectorAll(".ipp-star");
+  const imageEl             = overlay.querySelector(".ipp-img");
+  const videoEl             = overlay.querySelector(".ipp-video");
+  const videoHighlightTrack = overlay.querySelector(".ipp-video-highlight-track");
+  const videoHighlightSeg   = overlay.querySelector(".ipp-video-highlight-segment");
+  const titleEl             = overlay.querySelector(".ipp-title");
+  const folderEl            = overlay.querySelector(".ipp-bc-folder");
+  const zoomBadge           = overlay.querySelector(".ipp-zoom-badge");
+  const prevBtn             = overlay.querySelector(".ipp-nav.prev");
+  const nextBtn             = overlay.querySelector(".ipp-nav.next");
+  const albumBtn            = overlay.querySelector(".ipp-album-btn");
+  const exportBtn           = overlay.querySelector(".ipp-export-btn");
+  const deleteBtn           = overlay.querySelector(".ipp-delete-btn");
+  const closeBtn            = overlay.querySelector(".ipp-close-btn");
+  const copyBtn             = overlay.querySelector(".ipp-copy-btn");
+  const openBtn             = overlay.querySelector(".ipp-open-btn");
+  const shareBtn            = overlay.querySelector(".ipp-share-btn");
+  const fileDetails         = overlay.querySelector(".ipp-file-details");
+  const exifDetails         = overlay.querySelector(".ipp-exif-details");
+  const metaRaw             = overlay.querySelector(".ipp-meta-raw");
+  const aiDesc              = overlay.querySelector(".ipp-ai-description");
+  const aiDescLabel         = overlay.querySelector("#ipp-ai-desc-label");
+  const ocrText             = overlay.querySelector(".ipp-ocr");
+  const objectsList         = overlay.querySelector(".ipp-objects-list");
+  const tagRow              = overlay.querySelector(".ipp-tag-row");
+  const tagInput            = overlay.querySelector(".ipp-tag-input");
+  const tagAddBtn           = overlay.querySelector(".ipp-tag-add-btn");
+  const imgCount            = overlay.querySelector(".ipp-img-count");
+  const filmstrip           = overlay.querySelector(".ipp-filmstrip");
+  const stars               = overlay.querySelectorAll(".ipp-star");
 
   let currentDetails = null;
   let currentRating  = 0;
@@ -625,6 +672,70 @@ export function createImagePreviewPanel(options = {}) {
 
   const transformState = { scale: 1, translateX: 0, translateY: 0, rotation: 0, flipX: 1 };
   const dragState = { active: false, lastX: 0, lastY: 0 };
+
+  // ── VIDEO TIMELINE HIGHLIGHT ──────────────────────────────────────
+
+  // Tracks the active highlight segment { startSecs, endSecs }
+  let _activeHighlight = null;
+  // Tracks all timeline segment items for active-segment styling
+  let _timelineItems = [];
+
+  function applyVideoHighlight(startSecs, endSecs) {
+    _activeHighlight = { startSecs, endSecs };
+    const dur = videoEl.duration;
+    if (!dur || !isFinite(dur)) return;
+
+    const startPct = Math.max(0, Math.min(100, (startSecs / dur) * 100));
+    const effectiveEnd = endSecs != null ? endSecs : Math.min(dur, startSecs + 5);
+    const endPct = Math.max(0, Math.min(100, (effectiveEnd / dur) * 100));
+
+    videoHighlightSeg.style.left  = `${startPct}%`;
+    videoHighlightSeg.style.width = `${endPct - startPct}%`;
+    videoHighlightSeg.style.opacity = "1";
+    videoHighlightTrack.classList.add("visible");
+  }
+
+  function clearVideoHighlight() {
+    _activeHighlight = null;
+    videoHighlightTrack.classList.remove("visible");
+    _timelineItems.forEach(item => item.el.classList.remove("active-segment"));
+  }
+
+  function updateActiveTimelineSegment(currentTime) {
+    if (!_timelineItems.length) return;
+    _timelineItems.forEach(({ el, startSecs, endSecs }) => {
+      const after  = currentTime >= startSecs;
+      const before = endSecs == null ? true : currentTime < endSecs;
+      el.classList.toggle("active-segment", after && before);
+    });
+  }
+
+  function updateProgressFill() {
+    if (!videoEl.duration || !isFinite(videoEl.duration)) return;
+
+    // Fade highlight when we've moved past the segment end
+    if (_activeHighlight?.endSecs != null && videoEl.currentTime > _activeHighlight.endSecs + 1) {
+      videoHighlightSeg.style.opacity = "0.3";
+    } else if (_activeHighlight) {
+      videoHighlightSeg.style.opacity = "1";
+    }
+
+    updateActiveTimelineSegment(videoEl.currentTime);
+  }
+
+  videoEl.addEventListener("timeupdate", updateProgressFill);
+
+  videoEl.addEventListener("loadedmetadata", () => {
+    updateProgressFill();
+    // Re-apply pending highlight now that duration is known
+    if (_activeHighlight) {
+      applyVideoHighlight(_activeHighlight.startSecs, _activeHighlight.endSecs);
+    }
+  });
+
+  videoEl.addEventListener("ended", () => {
+    clearVideoHighlight();
+  });
 
   // ── TRANSFORM ─────────────────────────────────────────────────────
 
@@ -663,7 +774,7 @@ export function createImagePreviewPanel(options = {}) {
   }
 
   // Viewer toolbar actions
-  overlay.querySelectorAll(".ipp-vt-btn").forEach(btn => {
+  vtoolbarRow.querySelectorAll(".ipp-vt-btn").forEach(btn => {
     btn.addEventListener("click", () => {
       const action = btn.dataset.action;
       const pct = Math.round(transformState.scale * 100);
@@ -725,6 +836,8 @@ export function createImagePreviewPanel(options = {}) {
       imageEl.classList.add("hidden");
       imageEl.src = "";
       videoEl.classList.remove("hidden");
+      // Show highlight track only for video
+      videoHighlightTrack.style.display = "";
       let src = String(preferredPreviewSrc || "").trim() || normalizeImageSrc(imagePath);
       try {
         const res = await resolvePreviewSrc(imagePath, normalized);
@@ -755,6 +868,7 @@ export function createImagePreviewPanel(options = {}) {
     videoEl.pause();
     videoEl.src = "";
     videoEl.classList.add("hidden");
+    videoHighlightTrack.style.display = "none";
     let src = String(preferredPreviewSrc || "").trim() || normalizeImageSrc(imagePath);
     try {
       if (!preferredPreviewSrc) {
@@ -837,7 +951,7 @@ export function createImagePreviewPanel(options = {}) {
 
   // ── AI DESCRIPTION ────────────────────────────────────────────────
 
-  function buildTimelineItem({ label, seekSeconds, text }, videoElement) {
+  function buildTimelineItem({ label, seekSeconds, endSeconds, text }, videoElement) {
     const item = document.createElement("div");
     item.className = "ipp-tl-item";
 
@@ -856,6 +970,19 @@ export function createImagePreviewPanel(options = {}) {
         if (!videoElement.classList.contains("hidden")) {
           videoElement.currentTime = seekSeconds;
           videoElement.play().catch(() => {});
+
+          // Apply highlight — defer if metadata not yet loaded
+          const doHighlight = () => applyVideoHighlight(seekSeconds, endSeconds ?? null);
+          if (videoElement.duration && isFinite(videoElement.duration)) {
+            doHighlight();
+          } else {
+            videoElement.addEventListener("loadedmetadata", doHighlight, { once: true });
+          }
+
+          // Mark this item active immediately; timeupdate will refine
+          _timelineItems.forEach(ti => ti.el.classList.remove("active-segment"));
+          item.classList.add("active-segment");
+          item.classList.add("expanded");
         }
       });
     } else {
@@ -887,6 +1014,7 @@ export function createImagePreviewPanel(options = {}) {
 
   function renderAIDescription(description, isVideo) {
     aiDesc.innerHTML = "";
+    _timelineItems = [];
 
     if (!description) {
       const card = document.createElement("div");
@@ -920,7 +1048,20 @@ export function createImagePreviewPanel(options = {}) {
 
     const timeline = document.createElement("div");
     timeline.className = "ipp-timeline";
-    parsed.segments.forEach(seg => timeline.appendChild(buildTimelineItem(seg, videoEl)));
+
+    parsed.segments.forEach((seg, i) => {
+      const endSeconds = parsed.segments[i + 1]?.seekSeconds ?? null;
+      const item = buildTimelineItem({ ...seg, endSeconds }, videoEl);
+      timeline.appendChild(item);
+
+      // Register for active-segment tracking
+      _timelineItems.push({
+        el: item,
+        startSecs: seg.seekSeconds ?? 0,
+        endSecs: endSeconds,
+      });
+    });
+
     aiDesc.appendChild(timeline);
   }
 
@@ -1090,6 +1231,7 @@ export function createImagePreviewPanel(options = {}) {
     overlay.classList.add("hidden");
     overlay.setAttribute("aria-hidden", "true");
     document.body.classList.remove("preview-open");
+    clearVideoHighlight();
   }
 
   function open() {
@@ -1106,6 +1248,10 @@ export function createImagePreviewPanel(options = {}) {
     titleEl.textContent = row?.metadata?.title || segments.at(-1) || `${mediaType === "video" ? "Video" : "Image"} details`;
     if (folderEl) folderEl.textContent = segments.at(-2) || "Folder";
     if (siblingCount) imgCount.textContent = `${mediaType === "video" ? "Item" : "Image"} ${row._index ?? "?"} of ${siblingCount}`;
+
+    // Reset highlight state when opening a new item
+    clearVideoHighlight();
+    _timelineItems = [];
 
     await applyPreviewImageSource(imagePath, row?.preview_src, mediaType);
     resetTransformState();
