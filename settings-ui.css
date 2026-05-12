@@ -393,24 +393,9 @@ body.results-density-cinematic .search-result {
   padding: 1.4rem;
 }
 
+/* Keep settings content centered in the visible area beside the sidebar */
 #settings-sidebar:not(.collapsed) ~ #main-content #settings-screen {
-  justify-content: flex-start;
-  padding-left: 14px;
-  padding-right: 14px;
-  box-sizing: border-box;
-  width: 100%;
-}
-
-#settings-sidebar:not(.collapsed) ~ #main-content #settings-screen .settings-card {
-  flex: 1 1 auto;
-  max-width: 100%;
-  width: 100%;
-  margin-left: 0;
-  margin-right: 0;
-}
-
-#settings-sidebar:not(.collapsed) ~ #main-content #settings-screen .settings-grid {
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  padding-left: clamp(250px, 24vw, 336px);
 }
 
 #settings-sidebar.collapsed ~ #main-content #settings-screen {
@@ -423,7 +408,7 @@ body.results-density-cinematic .search-result {
 
 #settings-sidebar.collapsed ~ #main-content #settings-screen .settings-card {
   flex: 1 1 auto;
-  max-width: 100%;
+  max-width: 1180px;
   width: 100%;
 }
 
@@ -437,33 +422,13 @@ body.results-density-cinematic .search-result {
   }
 }
 
-@media (min-width: 1600px) {
-  #settings-sidebar.collapsed ~ #main-content #settings-screen .settings-grid {
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-  }
-}
-
-/* Standard 1200–1599px: 3 columns */
-@media (min-width: 1200px) and (max-width: 1599px) {
-  #settings-sidebar.collapsed ~ #main-content #settings-screen .settings-grid {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-  }
-}
-
-/* Mid 900–1199px: 2 columns */
-@media (min-width: 900px) and (max-width: 1199px) {
-  #settings-sidebar.collapsed ~ #main-content #settings-screen .settings-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-}
-
-/* under 900px: 1 column (both states) */
-@media (max-width: 899px) {
+@media (max-width: 900px) {
   #settings-sidebar:not(.collapsed) ~ #main-content #settings-screen .settings-grid,
   #settings-sidebar.collapsed ~ #main-content #settings-screen .settings-grid {
     grid-template-columns: 1fr;
   }
 }
+
 
 #settings-screen .settings-header {
   border-bottom: 1px dashed rgba(146, 177, 234, 0.35);
