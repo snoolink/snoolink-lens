@@ -212,8 +212,14 @@ const albumsState = {
 
 const selectedImagePaths = new Set();
 const CONVERTIBLE_PREVIEW_EXTENSIONS = new Set([".heic", ".heif", ".avif", ".tif", ".tiff"]);
+const CARD_MEDIA_ROOT_MARGIN = "1400px 0px 1400px 0px";
+const CARD_MEDIA_SWEEP_DEBOUNCE_MS = 120;
 let previewRows = [];
 let activePreviewPath = "";
+let pendingSingleCloudIndexPath = "";
+const cardMediaState = new WeakMap();
+let cardMediaObserver = null;
+let cardMediaSweepTimer = null;
 
 function isValidAlbumId(value) {
   const id = Number(value);
@@ -799,15 +805,26 @@ function bindScanAndIndexEvents() {
     pushLog(indexLogs, String(payload?.message || ""));
   });
 
-  window.desktopAPI.onIndexComplete((payload) => {
+  window.desktopAPI.onIndexComplete(async (payload) => {
+    const indexedPath = pendingSingleCloudIndexPath;
+
     if (payload?.ok) {
-      setStatus("Indexing complete.");
+      pendingSingleCloudIndexPath = "";
+      setStatus(indexedPath ? "Cloud indexing complete." : "Indexing complete.");
       pushLog(indexLogs, `Indexed ${payload.success}/${payload.total} files.`);
       if (payload.outputPath) {
         filePathInput.value = payload.outputPath;
         resetValidationState();
       }
-      if (!scanUiState.hasSearchRun) {
+      if (indexedPath) {
+        await refreshResultsForCurrentControls();
+        if (activePreviewPath && activePreviewPath === indexedPath) {
+          const updatedRow = previewRows.find((row) => String(row?.path || row?.image_path || "").trim() === indexedPath);
+          if (updatedRow) {
+            void imagePreviewPanel.openForRow(updatedRow, previewRows.length);
+          }
+        }
+      } else if (!scanUiState.hasSearchRun) {
         void loadWelcomeGalleryFromMasterDirectory();
       }
       void loadFaceClustersForSettings();
@@ -816,12 +833,18 @@ function bindScanAndIndexEvents() {
     }
 
     if (payload?.cancelled) {
-      setStatus("Indexing cancelled.");
+      pendingSingleCloudIndexPath = "";
+      setStatus(indexedPath ? "Cloud indexing cancelled." : "Indexing cancelled.");
       pushLog(indexLogs, "Indexing cancelled.");
       return;
     }
 
-    setStatus(`Indexing failed: ${String(payload?.message || "Unknown error")}`);
+    pendingSingleCloudIndexPath = "";
+    setStatus(
+      indexedPath
+        ? `Cloud indexing failed: ${String(payload?.message || "Unknown error")}`
+        : `Indexing failed: ${String(payload?.message || "Unknown error")}`,
+    );
     pushLog(indexLogs, `Indexing failed: ${String(payload?.message || "Unknown error")}`);
   });
 }
@@ -842,10 +865,141 @@ function setFiltersExpanded(expanded) {
 }
 
 function clearResults() {
+  releaseAllResultCardMedia();
   resultsEl.innerHTML = "";
   selectedImagePaths.clear();
   updateAlbumActionButtons();
   searchAligner.classList.remove("searching");
+}
+
+function ensureCardMediaObserver() {
+  if (cardMediaObserver || typeof IntersectionObserver !== "function") {
+    return;
+  }
+
+  cardMediaObserver = new IntersectionObserver((entries) => {
+    for (const entry of entries) {
+      const card = entry.target;
+      if (!(card instanceof HTMLElement)) {
+        continue;
+      }
+
+      if (entry.isIntersecting) {
+        void ensureResultCardMediaLoaded(card);
+      } else {
+        releaseResultCardMedia(card);
+      }
+    }
+  }, {
+    root: null,
+    rootMargin: CARD_MEDIA_ROOT_MARGIN,
+    threshold: 0.01,
+  });
+}
+
+function trackResultCardMedia(card, img, imagePath, preferredPreviewSrc) {
+  if (!card || !img || !imagePath) {
+    return;
+  }
+
+  ensureCardMediaObserver();
+  cardMediaState.set(card, {
+    img,
+    imagePath,
+    preferredPreviewSrc: String(preferredPreviewSrc || "").trim(),
+    loaded: false,
+    loading: false,
+  });
+
+  cardMediaObserver?.observe(card);
+  if (!cardMediaObserver) {
+    scheduleCardMediaSweep();
+  }
+}
+
+function scheduleCardMediaSweep() {
+  if (cardMediaObserver) {
+    return;
+  }
+
+  if (cardMediaSweepTimer) {
+    clearTimeout(cardMediaSweepTimer);
+  }
+
+  cardMediaSweepTimer = setTimeout(() => {
+    cardMediaSweepTimer = null;
+    void sweepResultCardMedia();
+  }, CARD_MEDIA_SWEEP_DEBOUNCE_MS);
+}
+
+async function sweepResultCardMedia() {
+  const cards = Array.from(resultsEl.querySelectorAll(".search-result"));
+  const viewportHeight = window.innerHeight || document.documentElement.clientHeight || 0;
+
+  for (const card of cards) {
+    const state = cardMediaState.get(card);
+    if (!state) {
+      continue;
+    }
+
+    const rect = card.getBoundingClientRect();
+    const nearViewport = rect.bottom >= -1400 && rect.top <= viewportHeight + 1400;
+    if (nearViewport) {
+      await ensureResultCardMediaLoaded(card);
+    } else {
+      releaseResultCardMedia(card);
+    }
+  }
+}
+
+async function ensureResultCardMediaLoaded(card) {
+  const state = cardMediaState.get(card);
+  if (!state || state.loaded || state.loading) {
+    return;
+  }
+
+  state.loading = true;
+  try {
+    await setCardImageSource(state.img, card, state.imagePath, state.preferredPreviewSrc);
+    state.loaded = true;
+  } catch {
+    state.loaded = false;
+  } finally {
+    state.loading = false;
+  }
+}
+
+function releaseResultCardMedia(card) {
+  const state = cardMediaState.get(card);
+  if (!state || !state.loaded) {
+    return;
+  }
+
+  const img = state.img;
+  if (img instanceof HTMLImageElement) {
+    img.classList.add("hidden");
+    img.removeAttribute("src");
+    img.removeAttribute("data-preview-fallback-tried");
+  }
+
+  const video = card.querySelector(".search-result-video");
+  if (video instanceof HTMLVideoElement) {
+    video.pause();
+    video.removeAttribute("src");
+    video.classList.add("hidden");
+    video.load();
+  }
+
+  card.classList.remove("no-image");
+  state.loaded = false;
+}
+
+function releaseAllResultCardMedia() {
+  const cards = Array.from(resultsEl.querySelectorAll(".search-result"));
+  for (const card of cards) {
+    releaseResultCardMedia(card);
+    cardMediaObserver?.unobserve(card);
+  }
 }
 
 function updateWelcomeCounts() {
@@ -1720,13 +1874,12 @@ async function setCardImageSource(img, card, imagePath, preferredPreviewSrc) {
     const preferredVideoSrc = String(preferredPreviewSrc || "").trim();
     const clipStart = Number(card?.dataset?.clipStartSeconds || "");
     const clipEnd = Number(card?.dataset?.clipEndSeconds || "");
-    const clipFragment = Number.isFinite(clipStart) && Number.isFinite(clipEnd) && clipEnd > clipStart
-      ? `#t=${clipStart},${clipEnd}`
-      : "";
     let directVideoSrc = preferredVideoSrc || normalizeImageSrc(imagePath);
     const sourceExt = getFileExtension(imagePath);
     const previewExt = getFileExtension(preferredVideoSrc);
     const shouldResolveVideoPreview = !preferredVideoSrc || sourceExt === ".mov" || previewExt === ".mov";
+    let resolvedClipStart = clipStart;
+    let resolvedClipEnd = clipEnd;
 
     if (shouldResolveVideoPreview) {
       const previewApi = window.desktopAPI?.getMediaPreviewSrc || window.desktopAPI?.getImagePreviewSrc;
@@ -1736,20 +1889,19 @@ async function setCardImageSource(img, card, imagePath, preferredPreviewSrc) {
             imagePath,
             mediaType,
             clipStartSeconds: Number.isFinite(clipStart) ? clipStart : undefined,
-            clipEndSeconds: Number.isFinite(clipEnd) ? clipEnd : undefined,
+            clipEndSeconds: Number.isFinite(clipEnd) ? clipEnd : undefined
+            // Do NOT set forceTranscode here; fallback is handled in onerror below
           });
           const previewSrc = String(previewResult?.previewSrc || "").trim();
           if (previewResult?.ok && previewSrc) {
-            directVideoSrc = clipFragment ? `${previewSrc}${clipFragment}` : previewSrc;
+            directVideoSrc = previewSrc;
+            if (previewResult?.clipStartSeconds != null) resolvedClipStart = Number(previewResult.clipStartSeconds);
+            if (previewResult?.clipEndSeconds != null) resolvedClipEnd = Number(previewResult.clipEndSeconds);
           }
         } catch {
           // Keep direct source.
         }
       }
-    }
-
-    if (clipFragment && directVideoSrc && !directVideoSrc.includes("#t=")) {
-      directVideoSrc = `${directVideoSrc}${clipFragment}`;
     }
 
     if (!video || !directVideoSrc) {
@@ -1763,13 +1915,68 @@ async function setCardImageSource(img, card, imagePath, preferredPreviewSrc) {
     video.muted = true;
     video.loop = true;
     video.playsInline = true;
-    if (userSettingsState.galleryVideoAutoplay) {
-      void video.play().catch(() => {});
+    // Seek and lock playback to timeframe if specified
+    if (Number.isFinite(resolvedClipStart) && Number.isFinite(resolvedClipEnd) && resolvedClipEnd > resolvedClipStart) {
+      const onLoaded = () => {
+        video.currentTime = resolvedClipStart;
+        if (userSettingsState.galleryVideoAutoplay) {
+          void video.play().catch(() => {});
+        }
+      };
+      if (video.readyState >= 1) {
+        onLoaded();
+      } else {
+        video.addEventListener("loadedmetadata", onLoaded, { once: true });
+      }
+      // Stop playback at end time
+      const onTimeUpdate = () => {
+        if (video.currentTime >= resolvedClipEnd) {
+          video.pause();
+          video.currentTime = resolvedClipStart;
+        }
+      };
+      video.addEventListener("timeupdate", onTimeUpdate);
+      video.addEventListener("emptied", () => {
+        video.removeEventListener("timeupdate", onTimeUpdate);
+      }, { once: true });
     } else {
-      video.pause();
-      video.currentTime = 0;
+      if (userSettingsState.galleryVideoAutoplay) {
+        void video.play().catch(() => {});
+      } else {
+        video.pause();
+        video.currentTime = 0;
+      }
     }
-    video.onerror = () => {
+    let fallbackAttempted = false;
+    video.onerror = async () => {
+      if (fallbackAttempted) {
+        video.classList.add("hidden");
+        card.classList.add("no-image");
+        return;
+      }
+      fallbackAttempted = true;
+      // Fallback: force transcoding to MP4
+      const previewApi = window.desktopAPI?.getMediaPreviewSrc || window.desktopAPI?.getImagePreviewSrc;
+      if (previewApi) {
+        try {
+          const previewResult = await previewApi({
+            imagePath,
+            mediaType,
+            clipStartSeconds: Number.isFinite(resolvedClipStart) ? resolvedClipStart : undefined,
+            clipEndSeconds: Number.isFinite(resolvedClipEnd) ? resolvedClipEnd : undefined,
+            forceTranscode: true
+          });
+          const previewSrc = String(previewResult?.previewSrc || "").trim();
+          if (previewResult?.ok && previewSrc && previewSrc !== video.src) {
+            video.src = previewSrc;
+            if (Number.isFinite(resolvedClipStart)) video.currentTime = resolvedClipStart;
+            if (userSettingsState.galleryVideoAutoplay) {
+              void video.play().catch(() => {});
+            }
+            return;
+          }
+        } catch { /* ignore */ }
+      }
       video.classList.add("hidden");
       card.classList.add("no-image");
     };
@@ -1953,6 +2160,38 @@ async function downloadMediaFromSearchResult(row) {
   return result;
 }
 
+async function startSingleItemCloudIndex(rowLike) {
+  const imagePath = String(rowLike?.path || rowLike?.image_path || "").trim();
+  if (!imagePath) {
+    return { ok: false, message: "No file selected." };
+  }
+  if (!window.desktopAPI?.startIndexing) {
+    return { ok: false, message: "Indexing APIs unavailable." };
+  }
+
+  pendingSingleCloudIndexPath = imagePath;
+  const result = window.desktopAPI?.cloudIndexSingleMedia
+    ? await window.desktopAPI.cloudIndexSingleMedia(imagePath)
+    : await window.desktopAPI.startIndexing({
+      files: [imagePath],
+      mode: "cloud",
+    });
+
+  if (!result?.ok) {
+    pendingSingleCloudIndexPath = "";
+    return {
+      ok: false,
+      message: String(result?.message || "Could not start cloud indexing."),
+    };
+  }
+
+  const name = imagePath.split(/[/\\]/).pop() || imagePath;
+  const message = `Cloud indexing started for ${name}.`;
+  setStatus(message);
+  pushLog(indexLogs, message);
+  return { ok: true, message };
+}
+
 const imagePreviewPanel = createImagePreviewPanel({
   normalizeImageSrc,
   resolvePreviewSrc: async (imagePath, mediaType = "image", details = null) => {
@@ -1995,6 +2234,9 @@ const imagePreviewPanel = createImagePreviewPanel({
   },
   onExport: async (details) => {
     return downloadMediaFromSearchResult(details);
+  },
+  onCloudIndex: async (details) => {
+    return startSingleItemCloudIndex(details);
   },
   onDelete: async (details) => {
     const imagePath = String(details?.path || details?.image_path || "").trim();
@@ -2253,6 +2495,28 @@ function renderResults(results, options = {}) {
     });
     card.appendChild(downloadBtn);
 
+    const cloudIndexBtn = document.createElement("button");
+    cloudIndexBtn.type = "button";
+    cloudIndexBtn.className = "result-cloud-index-btn";
+    cloudIndexBtn.title = "Cloud index this item";
+    cloudIndexBtn.setAttribute("aria-label", `Cloud index ${title}`);
+    cloudIndexBtn.innerHTML = `
+      <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+        <path d="M7 18h9a4 4 0 0 0 0-8 5 5 0 0 0-9.5-1.5A3.5 3.5 0 0 0 7 18z" />
+        <path d="M12 10v7" />
+        <path d="m9.5 14 2.5 3 2.5-3" />
+      </svg>
+    `;
+    cloudIndexBtn.addEventListener("click", (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      void startSingleItemCloudIndex(row);
+    });
+    cloudIndexBtn.addEventListener("keydown", (event) => {
+      event.stopPropagation();
+    });
+    card.appendChild(cloudIndexBtn);
+
     card.addEventListener("click", () => {
       activePreviewPath = imagePath;
       void imagePreviewPanel.openForRow(row, previewRows.length);
@@ -2274,7 +2538,7 @@ function renderResults(results, options = {}) {
       event.dataTransfer.effectAllowed = "copy";
     });
 
-    void setCardImageSource(img, card, imagePath, row.preview_src);
+    trackResultCardMedia(card, img, imagePath, row.preview_src);
 
     // Staggered reveal animation
     const delay = (existingCards + i) * 24 + Math.floor(Math.random() * 30);

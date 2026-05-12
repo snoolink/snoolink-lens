@@ -393,9 +393,24 @@ body.results-density-cinematic .search-result {
   padding: 1.4rem;
 }
 
-/* Keep settings content centered in the visible area beside the sidebar */
 #settings-sidebar:not(.collapsed) ~ #main-content #settings-screen {
-  padding-left: clamp(250px, 24vw, 336px);
+  justify-content: flex-start;
+  padding-left: 14px;
+  padding-right: 14px;
+  box-sizing: border-box;
+  width: 100%;
+}
+
+#settings-sidebar:not(.collapsed) ~ #main-content #settings-screen .settings-card {
+  flex: 1 1 auto;
+  max-width: 100%;
+  width: 100%;
+  margin-left: 0;
+  margin-right: 0;
+}
+
+#settings-sidebar:not(.collapsed) ~ #main-content #settings-screen .settings-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
 #settings-sidebar.collapsed ~ #main-content #settings-screen {

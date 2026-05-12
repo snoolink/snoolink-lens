@@ -489,6 +489,7 @@ export function createImagePreviewPanel(options = {}) {
   const onCopyText           = options.onCopyText           || (async () => ({ ok: false, message: "Action unavailable." }));
   const onDelete             = options.onDelete             || (async () => ({ ok: false, message: "Action unavailable." }));
   const onExport             = options.onExport             || (async () => ({ ok: false, message: "Action unavailable." }));
+  const onCloudIndex         = options.onCloudIndex         || (async () => ({ ok: false, message: "Action unavailable." }));
   const onAddToAlbum         = options.onAddToAlbum         || (async () => ({ ok: false, message: "Action unavailable." }));
   const onShareLink          = options.onShareLink          || (async () => ({ ok: false, message: "Action unavailable." }));
   const onNavigate           = options.onNavigate           || (() => {});
@@ -514,6 +515,7 @@ export function createImagePreviewPanel(options = {}) {
     <div class="ipp-topbar-actions">
       <button class="ipp-btn accent ipp-album-btn"  type="button">Add to album</button>
       <button class="ipp-btn ipp-export-btn"         type="button">Download</button>
+      <button class="ipp-btn ipp-cloud-index-btn"    type="button">Cloud index</button>
       <button class="ipp-btn danger ipp-delete-btn"  type="button">Delete</button>
       <button class="ipp-close-btn" type="button" aria-label="Close preview">✕</button>
     </div>
@@ -647,6 +649,7 @@ export function createImagePreviewPanel(options = {}) {
   const nextBtn             = overlay.querySelector(".ipp-nav.next");
   const albumBtn            = overlay.querySelector(".ipp-album-btn");
   const exportBtn           = overlay.querySelector(".ipp-export-btn");
+  const cloudIndexBtn       = overlay.querySelector(".ipp-cloud-index-btn");
   const deleteBtn           = overlay.querySelector(".ipp-delete-btn");
   const closeBtn            = overlay.querySelector(".ipp-close-btn");
   const copyBtn             = overlay.querySelector(".ipp-copy-btn");
@@ -850,14 +853,18 @@ export function createImagePreviewPanel(options = {}) {
       imageEl.classList.add("hidden");
       imageEl.src = "";
       videoEl.classList.remove("hidden");
-      // Show highlight track only for video
       videoHighlightTrack.style.display = "";
       let src = String(preferredPreviewSrc || "").trim() || normalizeImageSrc(imagePath);
+      let clipStartSeconds = Number(previewContext?.clip_start_seconds);
+      let clipEndSeconds = Number(previewContext?.clip_end_seconds);
       try {
         if (!preferredPreviewSrc) {
           const res = await resolvePreviewSrc(imagePath, normalized, previewContext || currentDetails || {});
           const s = String(res?.previewSrc || "").trim();
           if (res?.ok && s) src = s;
+          // Use returned clip times if present
+          if (res?.clipStartSeconds != null) clipStartSeconds = Number(res.clipStartSeconds);
+          if (res?.clipEndSeconds != null) clipEndSeconds = Number(res.clipEndSeconds);
         }
       } catch { /* keep normalized */ }
 
@@ -866,7 +873,8 @@ export function createImagePreviewPanel(options = {}) {
         if (fallbackAttempted) { videoEl.src = ""; return; }
         fallbackAttempted = true;
         try {
-          const fb = await resolvePreviewSrc(imagePath, normalized, previewContext || currentDetails || {});
+          // Fallback: force transcoding to MP4
+          const fb = await resolvePreviewSrc(imagePath, normalized, { ...(previewContext || currentDetails || {}), forceTranscode: true });
           const s = String(fb?.previewSrc || "").trim();
           if (fb?.ok && s && s !== videoEl.src) { videoEl.src = s; videoEl.play().catch(() => {}); return; }
         } catch { /* ignore */ }
@@ -879,8 +887,7 @@ export function createImagePreviewPanel(options = {}) {
       videoEl.currentTime = 0;
       videoEl.play().catch(() => {});
 
-      const clipStartSeconds = Number(previewContext?.clip_start_seconds);
-      const clipEndSeconds = Number(previewContext?.clip_end_seconds);
+      // If timeframe is specified, seek and lock playback to that window
       if (Number.isFinite(clipStartSeconds) && Number.isFinite(clipEndSeconds) && clipEndSeconds > clipStartSeconds) {
         _lockPlaybackToHighlight = true;
         _activeHighlight = { startSecs: clipStartSeconds, endSecs: clipEndSeconds };
@@ -894,6 +901,18 @@ export function createImagePreviewPanel(options = {}) {
         } else {
           videoEl.addEventListener("loadedmetadata", applyClipWindow, { once: true });
         }
+        // Stop playback at end time
+        const onTimeUpdate = () => {
+          if (videoEl.currentTime >= clipEndSeconds) {
+            videoEl.pause();
+            videoEl.currentTime = clipStartSeconds;
+          }
+        };
+        videoEl.addEventListener("timeupdate", onTimeUpdate);
+        // Remove listener on source change
+        videoEl.addEventListener("emptied", () => {
+          videoEl.removeEventListener("timeupdate", onTimeUpdate);
+        }, { once: true });
       }
       return;
     }
@@ -1208,6 +1227,12 @@ export function createImagePreviewPanel(options = {}) {
     if (!currentDetails?.path) { setStatus("No file selected."); return; }
     const r = await onExport(currentDetails);
     setStatus(r?.ok ? "Download complete." : `Download failed: ${r?.message || "Unknown error"}`);
+  });
+
+  cloudIndexBtn.addEventListener("click", async () => {
+    if (!currentDetails?.path) { setStatus("No file selected."); return; }
+    const r = await onCloudIndex(currentDetails);
+    setStatus(r?.ok ? String(r?.message || "Cloud indexing started.") : `Cloud indexing failed: ${r?.message || "Unknown error"}`);
   });
 
   deleteBtn.addEventListener("click", async () => {

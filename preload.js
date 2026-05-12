@@ -35,6 +35,10 @@ contextBridge.exposeInMainWorld("desktopAPI", {
   cancelScan: () => ipcRenderer.invoke("cancel-scan"),
 
   startIndexing: (payload) => ipcRenderer.invoke("start-indexing", payload),
+  cloudIndexSingleMedia: (imagePath) => ipcRenderer.invoke("start-indexing", {
+    mode: "cloud",
+    files: [String(imagePath || "").trim()],
+  }),
   pauseIndexing: () => ipcRenderer.invoke("pause-indexing"),
   resumeIndexing: () => ipcRenderer.invoke("resume-indexing"),
   cancelIndexing: () => ipcRenderer.invoke("cancel-indexing"),

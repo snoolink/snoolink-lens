@@ -32,6 +32,31 @@ const DATA_DIR_PATH = app.isPackaged
   : DEV_MODE
     ? WORKSPACE_DATA_DIR_PATH
     : MODULE_DATA_DIR_PATH;
+const APP_CACHE_SLUG = String(app.getName() || "snoolink-lens")
+  .toLowerCase()
+  .replace(/[^a-z0-9._-]+/g, "-");
+
+function configureChromiumCachePaths() {
+  const candidates = [
+    path.join(app.getPath("temp"), APP_CACHE_SLUG, "session-data"),
+    path.join(DATA_DIR_PATH, "session-data"),
+    path.join(app.getPath("userData"), "session-data"),
+  ];
+
+  for (const candidate of candidates) {
+    try {
+      fsSync.mkdirSync(candidate, { recursive: true });
+      app.setPath("sessionData", candidate);
+      app.commandLine.appendSwitch("disk-cache-dir", path.join(candidate, "Cache"));
+      return;
+    } catch {
+      // Try the next writable candidate.
+    }
+  }
+}
+
+configureChromiumCachePaths();
+
 const MASTER_DIRECTORY_PATH = path.join(DATA_DIR_PATH, "master_image_directory.json");
 const ALBUMS_DATA_PATH = path.join(DATA_DIR_PATH, "albums_data.json");
 const USER_SETTINGS_PATH = path.join(DATA_DIR_PATH, "app_settings.json");
@@ -1102,6 +1127,7 @@ let cachedFaceDetectorMode = "";
 let loggedSsdFallbackWarning = false;
 let cachedFfmpegBinary = "";
 const imagePreviewSrcCache = new Map();
+const PREVIEW_SRC_CACHE_MAX_ENTRIES = 240;
 
 function normalizeBinaryFromEnv(pathOrDir, binaryName) {
   const value = String(pathOrDir || "").trim();
@@ -1225,30 +1251,42 @@ async function resolveFfmpegBinary() {
   return cachedFfmpegBinary;
 }
 
-function getCachedPreviewPath(cacheKey) {
+function getCachedPreviewEntry(cacheKey) {
   const cached = imagePreviewSrcCache.get(cacheKey);
+  if (!cached?.path) {
+    return null;
+  }
+
+  // Touch entry to keep most recently used items longer.
+  imagePreviewSrcCache.delete(cacheKey);
+  imagePreviewSrcCache.set(cacheKey, cached);
+  return cached;
+}
+
+function getCachedPreviewPath(cacheKey) {
+  const cached = getCachedPreviewEntry(cacheKey);
   if (!cached?.path) {
     return "";
   }
   return String(cached.path || "");
 }
 
-function prunePreviewCacheMap(maxEntries = 400) {
-  if (imagePreviewSrcCache.size <= maxEntries) {
-    return;
-  }
-  const firstKey = imagePreviewSrcCache.keys().next().value;
-  if (firstKey) {
+function prunePreviewCacheMap(maxEntries = PREVIEW_SRC_CACHE_MAX_ENTRIES) {
+  while (imagePreviewSrcCache.size > maxEntries) {
+    const firstKey = imagePreviewSrcCache.keys().next().value;
+    if (!firstKey) {
+      break;
+    }
     imagePreviewSrcCache.delete(firstKey);
   }
 }
 
 function rememberPreviewCache(cacheKey, cacheFilePath, converter) {
-  prunePreviewCacheMap(400);
   imagePreviewSrcCache.set(cacheKey, {
     path: cacheFilePath,
     converter,
   });
+  prunePreviewCacheMap(PREVIEW_SRC_CACHE_MAX_ENTRIES);
 }
 
 async function transcodeMovPreviewToMp4(sourcePath, outputPath) {
@@ -1405,8 +1443,23 @@ async function resolvePreviewSrcForImage(imagePath, mediaTypeHint = "image", opt
   const ext = path.extname(normalizedPath).toLowerCase();
   if (mediaType === "video") {
     if (hasClipRange) {
+      // Only force transcoding if explicitly requested in options
+      const forceTranscode = options?.forceTranscode === true;
+      const startKey = Number(clipStartSeconds.toFixed(3));
+      const endKey = Number(clipEndSeconds.toFixed(3));
+      if (!forceTranscode) {
+        // Return original file path for timeframe preview, let renderer handle seeking
+        return {
+          ok: true,
+          previewSrc: toPreviewSrc(normalizedPath),
+          converted: false,
+          imagePath: normalizedPath,
+          clipStartSeconds: startKey,
+          clipEndSeconds: endKey,
+        };
+      }
+      // Fallback: legacy cache/transcode logic for .mov or forced
       await fs.mkdir(PREVIEW_CACHE_DIR_PATH, { recursive: true });
-
       let sourceFingerprint = "";
       try {
         const stats = await fs.stat(normalizedPath);
@@ -1414,13 +1467,9 @@ async function resolvePreviewSrcForImage(imagePath, mediaTypeHint = "image", opt
       } catch {
         sourceFingerprint = "";
       }
-
-      const startKey = Number(clipStartSeconds.toFixed(3));
-      const endKey = Number(clipEndSeconds.toFixed(3));
       const cacheKey = `video-clip-v1:${normalizedPath.toLowerCase()}:${sourceFingerprint}:${startKey}:${endKey}`;
       const cacheFileName = `${createHash("sha1").update(cacheKey).digest("hex")}.mp4`;
       const cacheFilePath = path.join(PREVIEW_CACHE_DIR_PATH, cacheFileName);
-
       if (await pathExists(cacheFilePath)) {
         rememberPreviewCache(cacheKey, cacheFilePath, "cache-video-clip");
         return {
@@ -1433,7 +1482,6 @@ async function resolvePreviewSrcForImage(imagePath, mediaTypeHint = "image", opt
           clipEndSeconds: endKey,
         };
       }
-
       try {
         await transcodeVideoTimeframePreviewToMp4(normalizedPath, cacheFilePath, startKey, endKey);
         rememberPreviewCache(cacheKey, cacheFilePath, "ffmpeg-video-clip");
@@ -1552,7 +1600,7 @@ async function resolvePreviewSrcForImage(imagePath, mediaTypeHint = "image", opt
     };
   }
 
-  const cached = imagePreviewSrcCache.get(normalizedPath);
+  const cached = getCachedPreviewEntry(normalizedPath);
   if (cached && (await pathExists(cached.path))) {
     return {
       ok: true,

@@ -1097,7 +1097,33 @@ select[multiple] option:checked {
   z-index: 6;
 }
 
+.result-cloud-index-btn {
+  align-items: center;
+  background: rgba(8, 36, 24, 0.78);
+  border: 1px solid rgba(146, 232, 183, 0.55);
+  border-radius: 999px;
+  color: #e9fff4;
+  display: inline-flex;
+  height: 30px;
+  justify-content: center;
+  left: 44px;
+  position: absolute;
+  top: 10px;
+  width: 30px;
+  z-index: 6;
+}
+
 .result-download-btn svg {
+  fill: none;
+  height: 16px;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 2;
+  width: 16px;
+}
+
+.result-cloud-index-btn svg {
   fill: none;
   height: 16px;
   stroke: currentColor;
@@ -1111,6 +1137,12 @@ select[multiple] option:checked {
 .result-download-btn:focus-visible {
   background: rgba(31, 72, 125, 0.86);
   border-color: rgba(208, 230, 255, 0.9);
+}
+
+.result-cloud-index-btn:hover,
+.result-cloud-index-btn:focus-visible {
+  background: rgba(19, 87, 57, 0.92);
+  border-color: rgba(186, 255, 219, 0.95);
 }
 
 .search-result.visible {
