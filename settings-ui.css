@@ -423,7 +423,7 @@ body.results-density-cinematic .search-result {
 
 #settings-sidebar.collapsed ~ #main-content #settings-screen .settings-card {
   flex: 1 1 auto;
-  max-width: 1180px;
+  max-width: 100%;
   width: 100%;
 }
 
@@ -437,13 +437,33 @@ body.results-density-cinematic .search-result {
   }
 }
 
-@media (max-width: 900px) {
+@media (min-width: 1600px) {
+  #settings-sidebar.collapsed ~ #main-content #settings-screen .settings-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+
+/* Standard 1200–1599px: 3 columns */
+@media (min-width: 1200px) and (max-width: 1599px) {
+  #settings-sidebar.collapsed ~ #main-content #settings-screen .settings-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+/* Mid 900–1199px: 2 columns */
+@media (min-width: 900px) and (max-width: 1199px) {
+  #settings-sidebar.collapsed ~ #main-content #settings-screen .settings-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+/* under 900px: 1 column (both states) */
+@media (max-width: 899px) {
   #settings-sidebar:not(.collapsed) ~ #main-content #settings-screen .settings-grid,
   #settings-sidebar.collapsed ~ #main-content #settings-screen .settings-grid {
     grid-template-columns: 1fr;
   }
 }
-
 
 #settings-screen .settings-header {
   border-bottom: 1px dashed rgba(146, 177, 234, 0.35);
