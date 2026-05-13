@@ -1425,6 +1425,58 @@ async function loadSharpModule() {
   }
 }
 
+async function renderImagePreviewPng(sourcePath) {
+  const sharp = await loadSharpModule();
+  let sharpError = null;
+
+  if (sharp) {
+    try {
+      const buffer = await sharp(sourcePath)
+        .rotate()
+        .resize({
+          width: 720,
+          height: 720,
+          fit: "inside",
+          withoutEnlargement: true,
+        })
+        .png({ quality: 86 })
+        .toBuffer();
+
+      if (buffer?.length) {
+        return {
+          ok: true,
+          buffer,
+          converter: "sharp",
+        };
+      }
+    } catch (error) {
+      sharpError = String(error?.message || error);
+    }
+  }
+
+  try {
+    const thumbnail = await nativeImage.createThumbnailFromPath(sourcePath, {
+      width: 720,
+      height: 720,
+    });
+
+    if (thumbnail && !thumbnail.isEmpty()) {
+      return {
+        ok: true,
+        buffer: thumbnail.toPNG(),
+        converter: "native-thumbnail",
+      };
+    }
+  } catch {
+    // Fall through.
+  }
+
+  return {
+    ok: false,
+    message: sharpError || "Could not convert preview.",
+  };
+}
+
 async function resolvePreviewSrcForImage(imagePath, mediaTypeHint = "image", options = {}) {
   const normalizedPath = String(imagePath || "").trim();
   const mediaType = String(mediaTypeHint || getMediaTypeFromPath(normalizedPath, "image")).toLowerCase();
@@ -1606,6 +1658,31 @@ async function resolvePreviewSrcForImage(imagePath, mediaTypeHint = "image", opt
     (ext === ".heic" && cacheTranscodedHeicPreview)
     || (ext === ".heif" && cacheTranscodedHeifPreview);
 
+  const shouldInlineDecodePreview =
+    (ext === ".heic" || ext === ".heif")
+    && !shouldCacheConvertedPreviewForExt;
+
+  if (shouldInlineDecodePreview) {
+    const rendered = await renderImagePreviewPng(normalizedPath);
+    if (rendered?.ok && rendered.buffer?.length) {
+      return {
+        ok: true,
+        previewSrc: `data:image/png;base64,${rendered.buffer.toString("base64")}`,
+        converted: true,
+        converter: `${rendered.converter}-inline`,
+        imagePath: normalizedPath,
+      };
+    }
+
+    return {
+      ok: true,
+      previewSrc: toPreviewSrc(normalizedPath),
+      converted: false,
+      imagePath: normalizedPath,
+      warning: String(rendered?.message || "Could not decode HEIC/HEIF preview."),
+    };
+  }
+
   if (!shouldCacheConvertedPreviewForExt) {
     return {
       ok: true,
@@ -1640,57 +1717,18 @@ async function resolvePreviewSrcForImage(imagePath, mediaTypeHint = "image", opt
   }
 
   await fs.mkdir(PREVIEW_CACHE_DIR_PATH, { recursive: true });
+  const rendered = await renderImagePreviewPng(normalizedPath);
+  if (rendered?.ok && rendered.buffer?.length) {
+    await fs.writeFile(cacheFilePath, rendered.buffer);
+    rememberPreviewCache(normalizedPath, cacheFilePath, rendered.converter);
 
-  const sharp = await loadSharpModule();
-  let sharpError = null;
-
-  if (sharp) {
-    try {
-      await sharp(normalizedPath)
-        .rotate()
-        .resize({
-          width: 720,
-          height: 720,
-          fit: "inside",
-          withoutEnlargement: true,
-        })
-        .png({ quality: 86 })
-        .toFile(cacheFilePath);
-
-      rememberPreviewCache(normalizedPath, cacheFilePath, "sharp");
-
-      return {
-        ok: true,
-        previewSrc: toPreviewSrc(cacheFilePath),
-        converted: true,
-        converter: "sharp",
-        imagePath: normalizedPath,
-      };
-    } catch (error) {
-      sharpError = String(error?.message || error);
-    }
-  }
-
-  try {
-    const thumbnail = await nativeImage.createThumbnailFromPath(normalizedPath, {
-      width: 720,
-      height: 720,
-    });
-
-    if (thumbnail && !thumbnail.isEmpty()) {
-      await fs.writeFile(cacheFilePath, thumbnail.toPNG());
-      rememberPreviewCache(normalizedPath, cacheFilePath, "native-thumbnail");
-
-      return {
-        ok: true,
-        previewSrc: toPreviewSrc(cacheFilePath),
-        converted: true,
-        converter: "native-thumbnail",
-        imagePath: normalizedPath,
-      };
-    }
-  } catch {
-    // Fall through to original path return.
+    return {
+      ok: true,
+      previewSrc: toPreviewSrc(cacheFilePath),
+      converted: true,
+      converter: rendered.converter,
+      imagePath: normalizedPath,
+    };
   }
 
   return {
@@ -1698,7 +1736,7 @@ async function resolvePreviewSrcForImage(imagePath, mediaTypeHint = "image", opt
     previewSrc: toPreviewSrc(normalizedPath),
     converted: false,
     imagePath: normalizedPath,
-    warning: sharpError || "Could not convert preview.",
+    warning: String(rendered?.message || "Could not convert preview."),
   };
 
 }
