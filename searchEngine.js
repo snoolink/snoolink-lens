@@ -6,6 +6,7 @@ import { getMediaTypeFromPath } from "./previewVideo.js";
 const inMemoryIndex = new Map();
 const jsonPayloadCache = new Map();
 const validationCache = new Map();
+const DEFAULT_FRAME_INTERVAL_SECONDS = 1;
 
 async function resolveMetadataPath(filePath) {
   const rawPath = String(filePath || "").trim();
@@ -302,19 +303,49 @@ function collectVideoFrameCandidates(item) {
   return Array.from(bySecond.values()).sort((a, b) => a.second - b.second);
 }
 
+function pickFrameIntervalSeconds(durationSeconds) {
+  const duration = Number(durationSeconds);
+  if (!Number.isFinite(duration) || duration <= 0) {
+    return DEFAULT_FRAME_INTERVAL_SECONDS;
+  }
+
+  if (duration < 6) {
+    return 2;
+  }
+  if (duration < 15) {
+    return 3;
+  }
+  if (duration < 30) {
+    return 4;
+  }
+  if (duration < 60) {
+    return 5;
+  }
+
+  return 10;
+}
+
+function normalizeFrameIntervalSeconds(frameIntervalSeconds, durationSeconds) {
+  const explicit = Number(frameIntervalSeconds);
+  if (Number.isFinite(explicit) && explicit > 0) {
+    return explicit;
+  }
+  return pickFrameIntervalSeconds(durationSeconds);
+}
+
 function buildTimeframeWindow(frameSecond, frameIntervalSeconds, durationSeconds) {
-  const interval = Number.isFinite(Number(frameIntervalSeconds)) && Number(frameIntervalSeconds) > 0
-    ? Number(frameIntervalSeconds)
-    : 2;
+  const interval = normalizeFrameIntervalSeconds(frameIntervalSeconds, durationSeconds);
   const duration = Number(durationSeconds);
 
-  const start = Math.max(0, Number(frameSecond) - Math.max(1, interval * 0.5));
-  let end = start + Math.max(2, interval * 2);
+  const safeSecond = Math.max(0, Number(frameSecond) || 0);
+  const bucketIndex = Math.floor(safeSecond / interval);
+  const start = bucketIndex * interval;
+  let end = start + interval;
   if (Number.isFinite(duration) && duration > 0) {
     end = Math.min(end, duration);
   }
   if (end <= start) {
-    end = start + Math.max(1.5, interval);
+    end = start + interval;
   }
 
   return {
@@ -1162,6 +1193,7 @@ export async function runSemanticSearch(payload) {
           continue;
         }
 
+        const clipsByWindow = new Map();
         for (const frame of frameCandidates) {
           const frameScore = scoreFrameMatch(
             frame.text,
@@ -1178,7 +1210,8 @@ export async function runSemanticSearch(payload) {
           const clipWindow = buildTimeframeWindow(frame.second, frameIntervalSeconds, durationSeconds);
           const clipScore = Math.min(1, (Number(scoredItem.score) * 0.6) + (frameScore * 0.4) + 0.04);
 
-          clipCandidates.push({
+          const clipKey = `${clipWindow.start}:${clipWindow.end}`;
+          const nextClip = {
             ...scoredItem,
             score: clipScore,
             clip_mode: "matching_timeframe",
@@ -1187,8 +1220,15 @@ export async function runSemanticSearch(payload) {
             clip_match_second: Number(frame.second.toFixed(3)),
             clip_match_text: frame.description || "",
             preview_src: `${toPreviewSrc(scoredItem.path)}#t=${clipWindow.start},${clipWindow.end}`,
-          });
+          };
+
+          const existing = clipsByWindow.get(clipKey);
+          if (!existing || Number(nextClip.score) > Number(existing.score || 0)) {
+            clipsByWindow.set(clipKey, nextClip);
+          }
         }
+
+        clipCandidates.push(...clipsByWindow.values());
       }
 
       clipCandidates.sort((a, b) => Number(b.score || 0) - Number(a.score || 0));

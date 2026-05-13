@@ -1,0 +1,205 @@
+/* User Settings page styles */
+
+#settings-screen {
+  display: flex;
+  justify-content: center;
+  padding: 22px 14px 36px;
+}
+
+#settings-screen .settings-card {
+  background:
+    linear-gradient(155deg, rgba(12, 18, 28, 0.84), rgba(15, 20, 33, 0.84)),
+    radial-gradient(circle at 96% 2%, rgba(106, 187, 255, 0.18), transparent 42%);
+  border: 1px solid rgba(132, 172, 243, 0.25);
+  border-radius: 18px;
+  box-shadow: 0 26px 70px rgba(0, 0, 0, 0.35);
+  flex: 0 1 1180px;
+  margin-left: 0;
+  max-width: 1180px;
+  width: 100%;
+  padding: 1.4rem;
+}
+
+#settings-sidebar:not(.collapsed) ~ #main-content #settings-screen {
+  justify-content: flex-start;
+  padding-left: 14px;
+  padding-right: 14px;
+  box-sizing: border-box;
+  width: 100%;
+}
+
+#settings-sidebar:not(.collapsed) ~ #main-content #settings-screen .settings-card {
+  flex: 1 1 auto;
+  max-width: 100%;
+  width: 100%;
+  margin-left: 0;
+  margin-right: 0;
+}
+
+#settings-sidebar:not(.collapsed) ~ #main-content #settings-screen .settings-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+#settings-sidebar.collapsed ~ #main-content #settings-screen {
+  justify-content: flex-start;
+  padding-left: 14px;
+  padding-right: 14px;
+  box-sizing: border-box;
+  width: 100%;
+}
+
+#settings-sidebar.collapsed ~ #main-content #settings-screen .settings-card {
+  flex: 1 1 auto;
+  max-width: 1180px;
+  width: 100%;
+}
+
+#settings-sidebar.collapsed ~ #main-content #settings-screen .settings-grid {
+  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+}
+
+@media (max-width: 1100px) {
+  #settings-sidebar:not(.collapsed) ~ #main-content #settings-screen .settings-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 900px) {
+  #settings-sidebar:not(.collapsed) ~ #main-content #settings-screen .settings-grid,
+  #settings-sidebar.collapsed ~ #main-content #settings-screen .settings-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+#settings-screen .settings-header {
+  border-bottom: 1px dashed rgba(146, 177, 234, 0.35);
+  margin-bottom: 1rem;
+  padding-bottom: 0.85rem;
+}
+
+#settings-screen .settings-header h2 {
+  color: #f0f5ff;
+  font-family: "Trebuchet MS", "Avenir Next", "Segoe UI", sans-serif;
+  font-size: 1.25rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+#settings-screen .settings-header p {
+  color: rgba(214, 229, 255, 0.8);
+  font-size: 0.82rem;
+}
+
+#settings-screen .settings-grid {
+  gap: 14px;
+  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+}
+
+#settings-screen .settings-block {
+  background:
+    linear-gradient(180deg, rgba(21, 29, 44, 0.78), rgba(16, 23, 37, 0.75));
+  border: 1px solid rgba(123, 162, 231, 0.22);
+  border-radius: 14px;
+  padding: 0.95rem 1rem;
+}
+
+#settings-screen .settings-block h3 {
+  color: rgba(214, 229, 255, 0.87);
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+}
+
+#settings-screen .settings-field {
+  gap: 6px;
+}
+
+#settings-screen .settings-field label {
+  color: rgba(212, 227, 252, 0.82);
+  font-size: 0.76rem;
+}
+
+#settings-screen .settings-field input,
+#settings-screen .settings-field select {
+  background: rgba(8, 13, 23, 0.74);
+  border: 1px solid rgba(118, 155, 221, 0.38);
+  border-radius: 10px;
+  color: #e7f0ff;
+  min-height: 34px;
+  padding: 0 10px;
+}
+
+#settings-screen .settings-field input:focus,
+#settings-screen .settings-field select:focus {
+  border-color: rgba(142, 188, 255, 0.66);
+  box-shadow: 0 0 0 3px rgba(102, 170, 255, 0.2);
+}
+
+#settings-screen .settings-field-checkbox label {
+  align-items: center;
+  display: flex;
+  gap: 8px;
+}
+
+#settings-screen .settings-field-checkbox input[type="checkbox"] {
+  accent-color: #7fb2ff;
+  height: 15px;
+  width: 15px;
+}
+
+#settings-screen .settings-inline-actions {
+  align-items: center;
+  display: flex;
+  gap: 8px;
+}
+
+#settings-screen .settings-help-text {
+  color: rgba(176, 202, 242, 0.88);
+  display: block;
+  font-size: 0.72rem;
+}
+
+#settings-screen .settings-chk-list {
+  max-height: 190px;
+  overflow: auto;
+  padding-right: 4px;
+}
+
+#settings-screen .settings-chk-list label {
+  align-items: center;
+  background: rgba(14, 21, 34, 0.54);
+  border: 1px solid rgba(121, 156, 227, 0.24);
+  border-radius: 9px;
+  color: #deebff;
+  display: flex;
+  font-size: 0.78rem;
+  gap: 8px;
+  padding: 7px 8px;
+}
+
+#settings-screen .settings-actions {
+  border-top-color: rgba(138, 171, 237, 0.3);
+  margin-top: 1rem;
+  padding-top: 1rem;
+}
+
+#settings-screen .settings-btn {
+  border: 1px solid rgba(129, 167, 234, 0.45);
+  border-radius: 11px;
+  color: #e4efff;
+  min-height: 34px;
+  padding: 0 14px;
+}
+
+#settings-screen .settings-btn:hover {
+  background: rgba(116, 157, 233, 0.2);
+}
+
+#settings-screen .settings-btn--primary {
+  background: linear-gradient(135deg, #6bc5ff, #6e8fff);
+  border-color: transparent;
+  color: #081122;
+}
+
+#settings-screen .settings-btn--primary:hover {
+  opacity: 0.95;
+}

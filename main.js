@@ -1428,6 +1428,9 @@ async function loadSharpModule() {
 async function resolvePreviewSrcForImage(imagePath, mediaTypeHint = "image", options = {}) {
   const normalizedPath = String(imagePath || "").trim();
   const mediaType = String(mediaTypeHint || getMediaTypeFromPath(normalizedPath, "image")).toLowerCase();
+  const cacheTranscodedMovPreview = options?.cacheTranscodedMovPreview === true;
+  const cacheTranscodedHeicPreview = options?.cacheTranscodedHeicPreview === true;
+  const cacheTranscodedHeifPreview = options?.cacheTranscodedHeifPreview === true;
   const clipStartSeconds = Number(options?.clipStartSeconds);
   const clipEndSeconds = Number(options?.clipEndSeconds);
   const hasClipRange = Number.isFinite(clipStartSeconds)
@@ -1522,9 +1525,7 @@ async function resolvePreviewSrcForImage(imagePath, mediaTypeHint = "image", opt
       };
     }
 
-    // macOS (and non-Windows targets) should render MOV directly in Electron.
-    // Keep Windows-only transcoding as a compatibility fallback.
-    if (process.platform !== "win32") {
+    if (!cacheTranscodedMovPreview) {
       return {
         ok: true,
         previewSrc: toPreviewSrc(normalizedPath),
@@ -1593,6 +1594,19 @@ async function resolvePreviewSrcForImage(imagePath, mediaTypeHint = "image", opt
   }
 
   if (!PREVIEW_CONVERTIBLE_EXTENSIONS.has(ext)) {
+    return {
+      ok: true,
+      previewSrc: toPreviewSrc(normalizedPath),
+      converted: false,
+      imagePath: normalizedPath,
+    };
+  }
+
+  const shouldCacheConvertedPreviewForExt =
+    (ext === ".heic" && cacheTranscodedHeicPreview)
+    || (ext === ".heif" && cacheTranscodedHeifPreview);
+
+  if (!shouldCacheConvertedPreviewForExt) {
     return {
       ok: true,
       previewSrc: toPreviewSrc(normalizedPath),
@@ -2056,6 +2070,9 @@ async function readUserSettings() {
     auto_expand_filters: false,
     auto_close_sidebar_on_settings_nav: true,
     gallery_video_autoplay: false,
+    cache_transcoded_mov_preview: false,
+    cache_transcoded_heic_preview: false,
+    cache_transcoded_heif_preview: false,
     video_search_result_mode: "full_video",
     enable_face_indexing: true,
     face_model_version: "face-api-ssd-v1",
@@ -2111,6 +2128,18 @@ async function readUserSettings() {
         payload?.gallery_video_autoplay === undefined
           ? defaults.gallery_video_autoplay
           : Boolean(payload?.gallery_video_autoplay),
+      cache_transcoded_mov_preview:
+        payload?.cache_transcoded_mov_preview === undefined
+          ? Boolean(payload?.cache_transcoded_preview_media)
+          : Boolean(payload?.cache_transcoded_mov_preview),
+      cache_transcoded_heic_preview:
+        payload?.cache_transcoded_heic_preview === undefined
+          ? Boolean(payload?.cache_transcoded_preview_media)
+          : Boolean(payload?.cache_transcoded_heic_preview),
+      cache_transcoded_heif_preview:
+        payload?.cache_transcoded_heif_preview === undefined
+          ? Boolean(payload?.cache_transcoded_preview_media)
+          : Boolean(payload?.cache_transcoded_heif_preview),
       video_search_result_mode: normalizeVideoSearchResultMode(
         payload?.video_search_result_mode ?? defaults.video_search_result_mode,
       ),
@@ -2295,6 +2324,9 @@ async function writeUserSettings(settings) {
       settings?.gallery_video_autoplay === undefined
         ? false
         : Boolean(settings?.gallery_video_autoplay),
+    cache_transcoded_mov_preview: Boolean(settings?.cache_transcoded_mov_preview),
+    cache_transcoded_heic_preview: Boolean(settings?.cache_transcoded_heic_preview),
+    cache_transcoded_heif_preview: Boolean(settings?.cache_transcoded_heif_preview),
     video_search_result_mode: normalizeVideoSearchResultMode(settings?.video_search_result_mode),
     enable_face_indexing:
       settings?.enable_face_indexing === undefined
@@ -3873,6 +3905,11 @@ ipcMain.handle("export-media-file", async (_event, payload) => {
   try {
     const imagePath = String(payload?.imagePath || "").trim();
     const sourcePathRaw = String(payload?.sourcePath || "").trim();
+    const clipStartSeconds = Number(payload?.clipStartSeconds);
+    const clipEndSeconds = Number(payload?.clipEndSeconds);
+    const shouldExportTrimmedClip = Number.isFinite(clipStartSeconds)
+      && Number.isFinite(clipEndSeconds)
+      && clipEndSeconds > clipStartSeconds;
     if (!imagePath && !sourcePathRaw) {
       return { ok: false, message: "imagePath or sourcePath is required." };
     }
@@ -3897,8 +3934,31 @@ ipcMain.handle("export-media-file", async (_event, payload) => {
     await fs.mkdir(targetDir, { recursive: true });
 
     const sourceName = path.basename(sourcePath);
-    const targetPath = await getUniquePathInDirectory(targetDir, sourceName);
-    await fs.copyFile(sourcePath, targetPath);
+    let targetPath = "";
+
+    if (shouldExportTrimmedClip) {
+      const parsed = path.parse(sourceName);
+      const clipStartLabel = Number(clipStartSeconds.toFixed(3)).toString().replace(".", "-");
+      const clipEndLabel = Number(clipEndSeconds.toFixed(3)).toString().replace(".", "-");
+      const trimmedFileName = `${parsed.name}_clip_${clipStartLabel}s-${clipEndLabel}s.mp4`;
+      targetPath = await getUniquePathInDirectory(targetDir, trimmedFileName);
+      try {
+        await transcodeVideoTimeframePreviewToMp4(sourcePath, targetPath, clipStartSeconds, clipEndSeconds);
+      } catch (error) {
+        const code = String(error?.code || "").toUpperCase();
+        if (code === "ENOENT") {
+          return {
+            ok: false,
+            message: "ffmpeg was not found. Install FFmpeg and/or set FFMPEG_PATH to the ffmpeg binary path.",
+          };
+        }
+        throw error;
+      }
+    } else {
+      targetPath = await getUniquePathInDirectory(targetDir, sourceName);
+      await fs.copyFile(sourcePath, targetPath);
+    }
+
     return { ok: true, path: targetPath, directory: targetDir };
   } catch (error) {
     return { ok: false, message: String(error?.message || error) };
@@ -3936,7 +3996,7 @@ ipcMain.handle("copy-text", async (_event, text) => {
 ipcMain.handle("get-ui-partial", async (_event, payload) => {
   try {
     const name = String(payload?.name || "").trim();
-    const allowed = new Set(["settings-ui.html", "faces-ui.html"]);
+    const allowed = new Set(["sidebar.html", "user-settings.html", "faces-ui.html"]);
     if (!allowed.has(name)) {
       return { ok: false, message: "Requested UI partial is not allowed." };
     }
@@ -3957,9 +4017,13 @@ ipcMain.handle("get-image-preview-src", async (_event, payload) => {
   try {
     const imagePath = String(payload?.imagePath || "").trim();
     const mediaType = String(payload?.mediaType || getMediaTypeFromPath(imagePath, "image"));
+    const settings = await readUserSettings();
     return await resolvePreviewSrcForImage(imagePath, mediaType, {
       clipStartSeconds: payload?.clipStartSeconds,
       clipEndSeconds: payload?.clipEndSeconds,
+      cacheTranscodedMovPreview: Boolean(settings?.cache_transcoded_mov_preview),
+      cacheTranscodedHeicPreview: Boolean(settings?.cache_transcoded_heic_preview),
+      cacheTranscodedHeifPreview: Boolean(settings?.cache_transcoded_heif_preview),
     });
   } catch (error) {
     return { ok: false, message: String(error?.message || error) };
@@ -3970,6 +4034,10 @@ ipcMain.handle("get-master-directory", async (_event, options) => {
   try {
     const payload = await loadMasterDirectory();
     const albumData = await loadAlbumsData();
+    const settings = await readUserSettings();
+    const cacheTranscodedMovPreview = Boolean(settings?.cache_transcoded_mov_preview);
+    const cacheTranscodedHeicPreview = Boolean(settings?.cache_transcoded_heic_preview);
+    const cacheTranscodedHeifPreview = Boolean(settings?.cache_transcoded_heif_preview);
     const items = Array.isArray(payload?.items) ? payload.items : [];
     const stageLookup = await loadIndexingStageLookup();
     const localFilterLookup = await loadLocalFilterLookup();
@@ -3991,7 +4059,11 @@ ipcMain.handle("get-master-directory", async (_event, options) => {
       pageItems.map(async (item) => {
         const itemPath = String(item?.path || "");
         const itemMediaType = String(item?.media_type || getMediaTypeFromPath(itemPath, "image"));
-        const resolvedPreview = await resolvePreviewSrcForImage(itemPath, itemMediaType);
+        const resolvedPreview = await resolvePreviewSrcForImage(itemPath, itemMediaType, {
+          cacheTranscodedMovPreview,
+          cacheTranscodedHeicPreview,
+          cacheTranscodedHeifPreview,
+        });
         return {
           ...item,
           media_type: itemMediaType,
@@ -4322,6 +4394,10 @@ ipcMain.handle("get-album-images", async (_event, payload) => {
 
     const payloadMaster = await loadMasterDirectory();
     const allItems = Array.isArray(payloadMaster?.items) ? payloadMaster.items : [];
+    const settings = await readUserSettings();
+    const cacheTranscodedMovPreview = Boolean(settings?.cache_transcoded_mov_preview);
+    const cacheTranscodedHeicPreview = Boolean(settings?.cache_transcoded_heic_preview);
+    const cacheTranscodedHeifPreview = Boolean(settings?.cache_transcoded_heif_preview);
     const stageLookup = await loadIndexingStageLookup();
     const localFilterLookup = await loadLocalFilterLookup();
 
@@ -4341,7 +4417,11 @@ ipcMain.handle("get-album-images", async (_event, payload) => {
       pageItems.map(async (item) => {
         const itemPath = String(item?.path || "");
         const itemMediaType = String(item?.media_type || getMediaTypeFromPath(itemPath, "image"));
-        const resolvedPreview = await resolvePreviewSrcForImage(itemPath, itemMediaType);
+        const resolvedPreview = await resolvePreviewSrcForImage(itemPath, itemMediaType, {
+          cacheTranscodedMovPreview,
+          cacheTranscodedHeicPreview,
+          cacheTranscodedHeifPreview,
+        });
         return {
           ...item,
           media_type: itemMediaType,

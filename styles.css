@@ -87,6 +87,94 @@ select[multiple] option:checked {
   position: relative;
 }
 
+.toast-root {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  pointer-events: none;
+  position: fixed;
+  right: 16px;
+  top: 16px;
+  width: min(360px, calc(100vw - 24px));
+  z-index: 120;
+}
+
+.toast {
+  align-items: flex-start;
+  backdrop-filter: blur(10px);
+  background: linear-gradient(140deg, rgba(17, 25, 40, 0.9), rgba(12, 18, 30, 0.86));
+  border: 1px solid rgba(148, 172, 220, 0.38);
+  border-left-width: 4px;
+  border-radius: 12px;
+  box-shadow: 0 14px 34px rgba(0, 0, 0, 0.35);
+  color: #e8f0ff;
+  display: flex;
+  font-size: 0.82rem;
+  gap: 10px;
+  line-height: 1.35;
+  opacity: 0;
+  padding: 10px 12px;
+  pointer-events: auto;
+  transform: translateY(-8px) scale(0.985);
+}
+
+.toast.visible {
+  animation: toastIn 210ms ease forwards;
+}
+
+.toast.exiting {
+  animation: toastOut 170ms ease forwards;
+}
+
+.toast--success {
+  border-left-color: #50d8a0;
+}
+
+.toast--error {
+  border-left-color: #ff6f7f;
+}
+
+.toast--warning {
+  border-left-color: #ffcf70;
+}
+
+.toast--info {
+  border-left-color: #7ec5ff;
+}
+
+.toast__icon {
+  flex: 0 0 auto;
+  font-size: 0.92rem;
+  line-height: 1;
+  margin-top: 2px;
+}
+
+.toast__message {
+  word-break: break-word;
+}
+
+@keyframes toastIn {
+  0% {
+    opacity: 0;
+    transform: translateY(-8px) scale(0.985);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes toastOut {
+  0% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-6px) scale(0.985);
+  }
+}
+
 #layout {
   display: flex;
   min-height: 100vh;
@@ -1033,6 +1121,31 @@ select[multiple] option:checked {
   font-size: 0.72em;
   text-align: center;
   min-height: 1em;
+}
+
+#downloadTopResultsBtn {
+  background-color: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 999px;
+  color: rgba(255, 255, 255, 0.9);
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  line-height: 1;
+  margin-top: 4px;
+  padding: 6px 10px;
+  transition: background-color 180ms, border-color 180ms, opacity 180ms;
+}
+
+#downloadTopResultsBtn:hover,
+#downloadTopResultsBtn:focus-visible {
+  background-color: rgba(255, 255, 255, 0.16);
+  border-color: rgba(255, 255, 255, 0.28);
+}
+
+#downloadTopResultsBtn:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
 }
 
 /* ── Results Grid (masonry) ──────────────────── */

@@ -31,6 +31,9 @@ const settingsResultsDensitySelect = document.getElementById("settingsResultsDen
 const settingsAutoExpandFiltersInput = document.getElementById("settingsAutoExpandFilters");
 const settingsAutoCloseSidebarOnSettingsNavInput = document.getElementById("settingsAutoCloseSidebarOnSettingsNav");
 const settingsGalleryVideoAutoplayInput = document.getElementById("settingsGalleryVideoAutoplay");
+const settingsCacheTranscodedMovPreviewInput = document.getElementById("settingsCacheTranscodedMovPreview");
+const settingsCacheTranscodedHeicPreviewInput = document.getElementById("settingsCacheTranscodedHeicPreview");
+const settingsCacheTranscodedHeifPreviewInput = document.getElementById("settingsCacheTranscodedHeifPreview");
 const settingsVideoSearchResultModeSelect = document.getElementById("settingsVideoSearchResultMode");
 const settingsEnableFaceIndexingInput = document.getElementById("settingsEnableFaceIndexing");
 const settingsFaceModelVersionInput = document.getElementById("settingsFaceModelVersion");
@@ -57,6 +60,8 @@ const deleteAlbumBtn = document.getElementById("deleteAlbumBtn");
 
 const statusEl = document.getElementById("status");
 const countsEl = document.getElementById("counts");
+const downloadTopResultsBtn = document.getElementById("downloadTopResultsBtn");
+const toastRoot = document.getElementById("toastRoot");
 const resultsEl = document.getElementById("results");
 const cardTemplate = document.getElementById("resultCardTemplate");
 const searchAligner = document.getElementById("search-bar-aligner");
@@ -127,6 +132,8 @@ const scanUiState = {
 let latestSearchRunId = 0;
 
 const WELCOME_GALLERY_PAGE_SIZE = 120;
+const MAX_BULK_DOWNLOAD_RESULTS = 30;
+const TOAST_DEFAULT_DURATION_MS = 3400;
 
 const welcomeGalleryState = {
   offset: 0,
@@ -189,6 +196,9 @@ const userSettingsState = {
   autoExpandFilters: false,
   autoCloseSidebarOnSettingsNav: true,
   galleryVideoAutoplay: false,
+  cacheTranscodedMovPreview: false,
+  cacheTranscodedHeicPreview: false,
+  cacheTranscodedHeifPreview: false,
   videoSearchResultMode: "full_video",
   enableFaceIndexing: true,
   faceModelVersion: "face-api-ssd-v1",
@@ -217,6 +227,7 @@ const CARD_MEDIA_SWEEP_DEBOUNCE_MS = 120;
 let previewRows = [];
 let activePreviewPath = "";
 let pendingSingleCloudIndexPath = "";
+let bulkDownloadInProgress = false;
 const cardMediaState = new WeakMap();
 let cardMediaObserver = null;
 let cardMediaSweepTimer = null;
@@ -849,8 +860,141 @@ function bindScanAndIndexEvents() {
   });
 }
 
+function shouldToastStatusMessage(message) {
+  const text = String(message || "").trim();
+  if (!text) {
+    return false;
+  }
+
+  const lower = text.toLowerCase();
+  if (
+    lower.startsWith("searching")
+    || lower.startsWith("loading")
+    || lower.startsWith("validating")
+    || /^downloading\s+\d+\s*\/\s*\d+/i.test(lower)
+    || /^scanned\s+\d+\s*\/\s*\d+/i.test(lower)
+  ) {
+    return false;
+  }
+
+  return (
+    lower.includes("failed")
+    || lower.includes("could not")
+    || lower.includes("error")
+    || lower.includes("unavailable")
+    || lower.includes("cancelled")
+    || lower.includes("complete")
+    || lower.includes("saved")
+    || lower.includes("reloaded")
+    || lower.includes("deleted")
+    || lower.includes("added")
+    || lower.includes("created")
+    || lower.includes("renamed")
+    || lower.includes("loaded")
+    || lower.includes("downloaded")
+    || lower.includes("started")
+    || lower.includes("rebuilt")
+    || lower.includes("removed")
+  );
+}
+
+function inferToastType(message) {
+  const lower = String(message || "").toLowerCase();
+  if (
+    lower.includes("failed")
+    || lower.includes("could not")
+    || lower.includes("error")
+    || lower.includes("unavailable")
+  ) {
+    return "error";
+  }
+  if (lower.includes("cancelled")) {
+    return "warning";
+  }
+  if (
+    lower.includes("complete")
+    || lower.includes("saved")
+    || lower.includes("created")
+    || lower.includes("renamed")
+    || lower.includes("deleted")
+    || lower.includes("added")
+    || lower.includes("downloaded")
+    || lower.includes("loaded")
+    || lower.includes("rebuilt")
+    || lower.includes("removed")
+  ) {
+    return "success";
+  }
+  return "info";
+}
+
+function showToast(message, options = {}) {
+  if (!toastRoot) {
+    return;
+  }
+
+  const text = String(message || "").trim();
+  if (!text) {
+    return;
+  }
+
+  const type = ["success", "error", "warning", "info"].includes(String(options.type || ""))
+    ? String(options.type)
+    : "info";
+  const durationMs = Number.isFinite(Number(options.durationMs))
+    ? Math.max(1200, Number(options.durationMs))
+    : TOAST_DEFAULT_DURATION_MS;
+
+  const toast = document.createElement("div");
+  toast.className = `toast toast--${type}`;
+
+  const icon = document.createElement("span");
+  icon.className = "toast__icon";
+  icon.textContent = type === "success"
+    ? "OK"
+    : type === "error"
+      ? "!"
+      : type === "warning"
+        ? "!"
+        : "i";
+
+  const messageEl = document.createElement("div");
+  messageEl.className = "toast__message";
+  messageEl.textContent = text;
+
+  toast.appendChild(icon);
+  toast.appendChild(messageEl);
+  toastRoot.prepend(toast);
+
+  while (toastRoot.children.length > 5) {
+    toastRoot.removeChild(toastRoot.lastChild);
+  }
+
+  requestAnimationFrame(() => {
+    toast.classList.add("visible");
+  });
+
+  const closeToast = () => {
+    toast.classList.remove("visible");
+    toast.classList.add("exiting");
+    setTimeout(() => {
+      toast.remove();
+    }, 180);
+  };
+
+  const timer = setTimeout(closeToast, durationMs);
+  toast.addEventListener("click", () => {
+    clearTimeout(timer);
+    closeToast();
+  });
+}
+
 function setStatus(message) {
-  statusEl.textContent = message;
+  const text = String(message || "");
+  statusEl.textContent = text;
+  if (shouldToastStatusMessage(text)) {
+    showToast(text, { type: inferToastType(text) });
+  }
 }
 
 function setFiltersExpanded(expanded) {
@@ -870,6 +1014,30 @@ function clearResults() {
   selectedImagePaths.clear();
   updateAlbumActionButtons();
   searchAligner.classList.remove("searching");
+  updateDownloadTopResultsButtonState();
+}
+
+function getSearchDownloadRows() {
+  if (!scanUiState.hasSearchRun) {
+    return [];
+  }
+  return previewRows.filter((row) => String(row?.path || row?.image_path || "").trim());
+}
+
+function updateDownloadTopResultsButtonState() {
+  if (!downloadTopResultsBtn) {
+    return;
+  }
+
+  const downloadableRows = getSearchDownloadRows();
+  const visible = downloadableRows.length > 0;
+  downloadTopResultsBtn.classList.toggle("hidden", !visible);
+
+  const cappedCount = Math.min(MAX_BULK_DOWNLOAD_RESULTS, downloadableRows.length);
+  downloadTopResultsBtn.disabled = bulkDownloadInProgress || cappedCount === 0;
+  downloadTopResultsBtn.textContent = bulkDownloadInProgress
+    ? "Downloading..."
+    : `Download Top ${cappedCount}`;
 }
 
 function ensureCardMediaObserver() {
@@ -1155,14 +1323,22 @@ function setFaceClusterStatus(message) {
   if (!settingsFaceClusterStatus) {
     return;
   }
-  settingsFaceClusterStatus.textContent = String(message || "");
+  const text = String(message || "");
+  settingsFaceClusterStatus.textContent = text;
+  if (shouldToastStatusMessage(text)) {
+    showToast(text, { type: inferToastType(text) });
+  }
 }
 
 function setFacesWorkspaceStatus(message) {
   if (!facesStatusEl) {
     return;
   }
-  facesStatusEl.textContent = String(message || "");
+  const text = String(message || "");
+  facesStatusEl.textContent = text;
+  if (shouldToastStatusMessage(text)) {
+    showToast(text, { type: inferToastType(text) });
+  }
 }
 
 function getFaceClusterOptionLabel(cluster) {
@@ -1738,6 +1914,9 @@ async function loadSettingsUiState() {
         settings.gallery_video_autoplay === undefined
           ? false
           : Boolean(settings.gallery_video_autoplay);
+      userSettingsState.cacheTranscodedMovPreview = Boolean(settings.cache_transcoded_mov_preview);
+      userSettingsState.cacheTranscodedHeicPreview = Boolean(settings.cache_transcoded_heic_preview);
+      userSettingsState.cacheTranscodedHeifPreview = Boolean(settings.cache_transcoded_heif_preview);
       userSettingsState.videoSearchResultMode = normalizeVideoSearchResultMode(
         settings.video_search_result_mode,
       );
@@ -1769,6 +1948,15 @@ async function loadSettingsUiState() {
       }
       if (settingsGalleryVideoAutoplayInput) {
         settingsGalleryVideoAutoplayInput.checked = userSettingsState.galleryVideoAutoplay;
+      }
+      if (settingsCacheTranscodedMovPreviewInput) {
+        settingsCacheTranscodedMovPreviewInput.checked = userSettingsState.cacheTranscodedMovPreview;
+      }
+      if (settingsCacheTranscodedHeicPreviewInput) {
+        settingsCacheTranscodedHeicPreviewInput.checked = userSettingsState.cacheTranscodedHeicPreview;
+      }
+      if (settingsCacheTranscodedHeifPreviewInput) {
+        settingsCacheTranscodedHeifPreviewInput.checked = userSettingsState.cacheTranscodedHeifPreview;
       }
       if (settingsVideoSearchResultModeSelect) {
         settingsVideoSearchResultModeSelect.value = userSettingsState.videoSearchResultMode;
@@ -2124,31 +2312,19 @@ async function downloadMediaFromSearchResult(row) {
 
   const clipStartSeconds = Number(row?.clip_start_seconds);
   const clipEndSeconds = Number(row?.clip_end_seconds);
-  const previewApi = window.desktopAPI?.getMediaPreviewSrc || window.desktopAPI?.getImagePreviewSrc;
-
-  let sourcePath = String(row?.preview_src || "").trim();
-  if (previewApi && Number.isFinite(clipStartSeconds) && Number.isFinite(clipEndSeconds)) {
-    try {
-      const preview = await previewApi({
-        imagePath,
-        mediaType: "video",
-        clipStartSeconds,
-        clipEndSeconds,
-      });
-      const previewSrc = String(preview?.previewSrc || "").trim();
-      if (preview?.ok && previewSrc) {
-        sourcePath = previewSrc;
-      }
-    } catch {
-      // Fall through to any existing preview source.
-    }
+  if (!Number.isFinite(clipStartSeconds) || !Number.isFinite(clipEndSeconds) || clipEndSeconds <= clipStartSeconds) {
+    return downloadMediaToDesktop(row);
   }
 
   if (!window.desktopAPI?.exportMediaFile) {
     return { ok: false, message: "Desktop API unavailable." };
   }
 
-  const result = await window.desktopAPI.exportMediaFile({ imagePath, sourcePath });
+  const result = await window.desktopAPI.exportMediaFile({
+    imagePath,
+    clipStartSeconds,
+    clipEndSeconds,
+  });
   if (result?.ok) {
     const savedPath = String(result?.path || "").trim();
     setStatus(savedPath ? `Downloaded trimmed clip to ${savedPath}` : "Downloaded trimmed clip.");
@@ -2549,6 +2725,8 @@ function renderResults(results, options = {}) {
     previewRows.push(row);
     resultsEl.appendChild(node);
   }
+
+  updateDownloadTopResultsButtonState();
 }
 
 async function loadMoreWelcomeGallery() {
@@ -2780,6 +2958,49 @@ async function doSearch() {
   renderResults(result.results);
 }
 
+if (downloadTopResultsBtn) {
+  downloadTopResultsBtn.addEventListener("click", async () => {
+    if (bulkDownloadInProgress) {
+      return;
+    }
+
+    const rows = getSearchDownloadRows();
+    if (rows.length === 0) {
+      setStatus("No search results available to download.");
+      updateDownloadTopResultsButtonState();
+      return;
+    }
+
+    const cappedRows = rows.slice(0, MAX_BULK_DOWNLOAD_RESULTS);
+    bulkDownloadInProgress = true;
+    updateDownloadTopResultsButtonState();
+
+    let successCount = 0;
+    let failedCount = 0;
+
+    try {
+      for (let i = 0; i < cappedRows.length; i += 1) {
+        setStatus(`Downloading ${i + 1}/${cappedRows.length}...`);
+        const result = await downloadMediaFromSearchResult(cappedRows[i]);
+        if (result?.ok) {
+          successCount += 1;
+        } else {
+          failedCount += 1;
+        }
+      }
+
+      if (failedCount > 0) {
+        setStatus(`Bulk download complete. Success: ${successCount}, Failed: ${failedCount}.`);
+      } else {
+        setStatus(`Bulk download complete. Downloaded ${successCount} item(s).`);
+      }
+    } finally {
+      bulkDownloadInProgress = false;
+      updateDownloadTopResultsButtonState();
+    }
+  });
+}
+
 async function refreshResultsForCurrentControls() {
   const filtersPayload = buildFiltersPayload();
   const albumFromQuery = extractAlbumIdsFromQuery(queryInput.value.trim());
@@ -2876,6 +3097,9 @@ if (saveUserSettingsBtn) {
         settingsAutoCloseSidebarOnSettingsNavInput?.checked,
       );
       userSettingsState.galleryVideoAutoplay = Boolean(settingsGalleryVideoAutoplayInput?.checked);
+      userSettingsState.cacheTranscodedMovPreview = Boolean(settingsCacheTranscodedMovPreviewInput?.checked);
+      userSettingsState.cacheTranscodedHeicPreview = Boolean(settingsCacheTranscodedHeicPreviewInput?.checked);
+      userSettingsState.cacheTranscodedHeifPreview = Boolean(settingsCacheTranscodedHeifPreviewInput?.checked);
       userSettingsState.videoSearchResultMode = normalizeVideoSearchResultMode(
         settingsVideoSearchResultModeSelect?.value,
       );
@@ -2908,6 +3132,9 @@ if (saveUserSettingsBtn) {
         auto_expand_filters: userSettingsState.autoExpandFilters,
         auto_close_sidebar_on_settings_nav: userSettingsState.autoCloseSidebarOnSettingsNav,
         gallery_video_autoplay: userSettingsState.galleryVideoAutoplay,
+        cache_transcoded_mov_preview: userSettingsState.cacheTranscodedMovPreview,
+        cache_transcoded_heic_preview: userSettingsState.cacheTranscodedHeicPreview,
+        cache_transcoded_heif_preview: userSettingsState.cacheTranscodedHeifPreview,
         video_search_result_mode: userSettingsState.videoSearchResultMode,
         enable_face_indexing: userSettingsState.enableFaceIndexing,
         face_model_version: userSettingsState.faceModelVersion,
