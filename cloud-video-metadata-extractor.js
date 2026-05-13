@@ -11,6 +11,7 @@ const execFileAsync = promisify(execFile);
 
 const VIDEO_EXTENSIONS = new Set([
   ".mp4",
+  ".mpv",
   ".m4v",
   ".mov",
   ".mkv",
@@ -127,6 +128,34 @@ async function resolveWingetBinary(binaryName) {
   return "";
 }
 
+function resolveCommonBinaryPath(binaryName) {
+  const candidates = [];
+
+  if (process.platform === "darwin") {
+    candidates.push(
+      `/opt/homebrew/bin/${binaryName}`,
+      `/usr/local/bin/${binaryName}`,
+      `/opt/local/bin/${binaryName}`,
+    );
+  }
+
+  if (process.platform === "linux") {
+    candidates.push(
+      `/usr/bin/${binaryName}`,
+      `/usr/local/bin/${binaryName}`,
+      `/snap/bin/${binaryName}`,
+    );
+  }
+
+  for (const candidate of candidates) {
+    if (existsSync(candidate)) {
+      return candidate;
+    }
+  }
+
+  return "";
+}
+
 async function resolveMediaBinary(binaryName) {
   if (binaryName === "ffmpeg" && cachedFfmpegBinary) {
     return cachedFfmpegBinary;
@@ -154,6 +183,16 @@ async function resolveMediaBinary(binaryName) {
       cachedFfprobeBinary = fromWinget;
     }
     return fromWinget;
+  }
+
+  const fromCommonPath = resolveCommonBinaryPath(binaryName);
+  if (fromCommonPath) {
+    if (binaryName === "ffmpeg") {
+      cachedFfmpegBinary = fromCommonPath;
+    } else {
+      cachedFfprobeBinary = fromCommonPath;
+    }
+    return fromCommonPath;
   }
 
   if (binaryName === "ffmpeg") {
@@ -187,7 +226,7 @@ async function probeVideoDurationSeconds(videoPath) {
     const code = String(error?.code || "").toUpperCase();
     if (code === "ENOENT") {
       throw new Error(
-        "ffprobe was not found. Install FFmpeg and/or set FFPROBE_PATH to ffprobe.exe.",
+        "ffprobe was not found. Install FFmpeg and/or set FFPROBE_PATH to the ffprobe binary path.",
       );
     }
     throw error;
@@ -252,7 +291,7 @@ async function extractFramesByInterval(videoPath, outputDir, frameIntervalSecond
     const code = String(error?.code || "").toUpperCase();
     if (code === "ENOENT") {
       throw new Error(
-        "ffmpeg was not found. Install FFmpeg and/or set FFMPEG_PATH to ffmpeg.exe.",
+        "ffmpeg was not found. Install FFmpeg and/or set FFMPEG_PATH to the ffmpeg binary path.",
       );
     }
     throw error;
@@ -321,7 +360,7 @@ async function normalizeMovToMp4(sourcePath, targetPath) {
     const code = String(error?.code || "").toUpperCase();
     if (code === "ENOENT") {
       throw new Error(
-        "ffmpeg was not found. Install FFmpeg and/or set FFMPEG_PATH to ffmpeg.exe.",
+        "ffmpeg was not found. Install FFmpeg and/or set FFMPEG_PATH to the ffmpeg binary path.",
       );
     }
     throw error;

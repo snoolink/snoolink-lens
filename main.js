@@ -107,6 +107,7 @@ const IMAGE_FILE_TYPES = [
 ];
 const VIDEO_FILE_TYPES = [
   ".mp4",
+  ".mpv",
   ".m4v",
   ".mov",
   ".mkv",
