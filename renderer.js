@@ -25,6 +25,7 @@ const settingsAwsRegionInput = document.getElementById("settingsAwsRegion");
 const settingsAwsKeyInput = document.getElementById("settingsAwsKey");
 const settingsAwsSecretInput = document.getElementById("settingsAwsSecret");
 const settingsBedrockModelInput = document.getElementById("settingsBedrockModel");
+const settingsTwelveLabsApiKeyInput = document.getElementById("settingsTwelveLabsApiKey");
 const settingsMinMatchScoreInput = document.getElementById("settingsMinMatchScore");
 const settingsUiThemeSelect = document.getElementById("settingsUiTheme");
 const settingsResultsDensitySelect = document.getElementById("settingsResultsDensity");
@@ -73,12 +74,15 @@ const sidebarMidToggleBtn = document.getElementById("sidebarMidToggleBtn");
 const openAppSettingsLink = document.getElementById("openAppSettingsLink");
 const openWizardWorkspaceBtn = document.getElementById("openWizardWorkspaceBtn");
 const openFacesWorkspaceBtn = document.getElementById("openFacesWorkspaceBtn");
+const openReelAnalyzerBtn = document.getElementById("openReelAnalyzerBtn");
 const backToHomeBtn = document.getElementById("backToHomeBtn");
 const homeScreen = document.getElementById("home-screen");
 const settingsScreen = document.getElementById("settings-screen");
 const facesScreen = document.getElementById("faces-screen");
 const wizardScreen = document.getElementById("wizard-screen");
 const wizardSearchFrame = document.getElementById("wizardSearchFrame");
+const reelAnalyzerScreen = document.getElementById("reel-analyzer-screen");
+const reelAnalyzerFrame = document.getElementById("reelAnalyzerFrame");
 const facesRefreshBtn = document.getElementById("facesRefreshBtn");
 const facesRebuildBtn = document.getElementById("facesRebuildBtn");
 const facesStatusEl = document.getElementById("facesStatus");
@@ -289,6 +293,9 @@ function showSettingsScreen() {
   if (wizardScreen) {
     wizardScreen.classList.add("hidden");
   }
+  if (reelAnalyzerScreen) {
+    reelAnalyzerScreen.classList.add("hidden");
+  }
   if (settingsScreen) {
     settingsScreen.classList.remove("hidden");
   }
@@ -306,6 +313,9 @@ function showFacesScreen() {
   }
   if (wizardScreen) {
     wizardScreen.classList.add("hidden");
+  }
+  if (reelAnalyzerScreen) {
+    reelAnalyzerScreen.classList.add("hidden");
   }
   if (facesScreen) {
     facesScreen.classList.remove("hidden");
@@ -325,6 +335,9 @@ function showHomeScreen() {
   if (wizardScreen) {
     wizardScreen.classList.add("hidden");
   }
+  if (reelAnalyzerScreen) {
+    reelAnalyzerScreen.classList.add("hidden");
+  }
   if (homeScreen) {
     homeScreen.classList.remove("hidden");
   }
@@ -343,6 +356,9 @@ function showWizardScreen() {
   if (facesScreen) {
     facesScreen.classList.add("hidden");
   }
+  if (reelAnalyzerScreen) {
+    reelAnalyzerScreen.classList.add("hidden");
+  }
   if (wizardScreen) {
     wizardScreen.classList.remove("hidden");
   }
@@ -351,6 +367,30 @@ function showWizardScreen() {
   }
   if (wizardSearchFrame && !wizardSearchFrame.getAttribute("src")) {
     wizardSearchFrame.setAttribute("src", "./wizard-search.html");
+  }
+}
+
+function showReelAnalyzerScreen() {
+  if (homeScreen) {
+    homeScreen.classList.add("hidden");
+  }
+  if (settingsScreen) {
+    settingsScreen.classList.add("hidden");
+  }
+  if (facesScreen) {
+    facesScreen.classList.add("hidden");
+  }
+  if (wizardScreen) {
+    wizardScreen.classList.add("hidden");
+  }
+  if (reelAnalyzerScreen) {
+    reelAnalyzerScreen.classList.remove("hidden");
+  }
+  if (backToHomeBtn) {
+    backToHomeBtn.classList.remove("hidden");
+  }
+  if (reelAnalyzerFrame && !reelAnalyzerFrame.getAttribute("src")) {
+    reelAnalyzerFrame.setAttribute("src", "./instagram-reel-analyzer.html");
   }
 }
 
@@ -1899,7 +1939,10 @@ async function loadSettingsUiState() {
       if (settingsBedrockModelInput) {
         settingsBedrockModelInput.value = String(settings.model || "qwen.qwen3-vl-235b-a22b");
       }
-      const minMatchScoreValue = Number(settings.min_match_score);
+      if (settingsTwelveLabsApiKeyInput) {
+        settingsTwelveLabsApiKeyInput.value = String(settings.twelvelabs_api_key || "");
+      }
+      const minMatchScoreValue = Number(settingsMinMatchScoreInput?.value);
       userSettingsState.minMatchScore = Number.isFinite(minMatchScoreValue)
         ? Math.max(0, minMatchScoreValue)
         : 0.001;
@@ -1921,15 +1964,18 @@ async function loadSettingsUiState() {
         settings.video_search_result_mode,
       );
       userSettingsState.enableFaceIndexing = Boolean(settings.enable_face_indexing);
-      userSettingsState.faceModelVersion = String(settings.face_model_version || "face-api-ssd-v1");
-      userSettingsState.faceMinDetectionConfidence = Number.isFinite(Number(settings.face_min_detection_confidence))
-        ? Math.max(0, Math.min(1, Number(settings.face_min_detection_confidence)))
+      userSettingsState.faceModelVersion = String(settings.face_model_version || "face-api-ssd-v1").trim() || "face-api-ssd-v1";
+      const faceMinConfidenceInputValue = Number(settingsFaceMinConfidenceInput?.value);
+      userSettingsState.faceMinDetectionConfidence = Number.isFinite(faceMinConfidenceInputValue)
+        ? Math.max(0, Math.min(1, faceMinConfidenceInputValue))
         : 0.6;
-      userSettingsState.faceMinQualityScore = Number.isFinite(Number(settings.face_min_quality_score))
-        ? Math.max(0, Math.min(1, Number(settings.face_min_quality_score)))
+      const faceMinQualityInputValue = Number(settingsFaceMinQualityInput?.value);
+      userSettingsState.faceMinQualityScore = Number.isFinite(faceMinQualityInputValue)
+        ? Math.max(0, Math.min(1, faceMinQualityInputValue))
         : 0.45;
-      userSettingsState.faceClusterDistanceThreshold = Number.isFinite(Number(settings.face_cluster_distance_threshold))
-        ? Math.max(0.05, Math.min(1, Number(settings.face_cluster_distance_threshold)))
+      const faceClusterThresholdInputValue = Number(settingsFaceClusterDistanceThresholdInput?.value);
+      userSettingsState.faceClusterDistanceThreshold = Number.isFinite(faceClusterThresholdInputValue)
+        ? Math.max(0.05, Math.min(1, faceClusterThresholdInputValue))
         : 0.35;
       if (settingsMinMatchScoreInput) {
         settingsMinMatchScoreInput.value = String(userSettingsState.minMatchScore);
@@ -3126,6 +3172,7 @@ if (saveUserSettingsBtn) {
         aws_key: settingsAwsKeyInput?.value || "",
         secret_key: settingsAwsSecretInput?.value || "",
         model: settingsBedrockModelInput?.value || "qwen.qwen3-vl-235b-a22b",
+        twelvelabs_api_key: settingsTwelveLabsApiKeyInput?.value || "",
         min_match_score: userSettingsState.minMatchScore,
         ui_theme: userSettingsState.uiTheme,
         results_density: userSettingsState.resultsDensity,
@@ -3249,6 +3296,15 @@ if (openFacesWorkspaceBtn) {
 if (openWizardWorkspaceBtn) {
   openWizardWorkspaceBtn.addEventListener("click", () => {
     showWizardScreen();
+    if (userSettingsState.autoCloseSidebarOnSettingsNav) {
+      closeSidebar();
+    }
+  });
+}
+
+if (openReelAnalyzerBtn) {
+  openReelAnalyzerBtn.addEventListener("click", () => {
+    showReelAnalyzerScreen();
     if (userSettingsState.autoCloseSidebarOnSettingsNav) {
       closeSidebar();
     }

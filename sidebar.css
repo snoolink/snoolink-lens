@@ -143,6 +143,17 @@
   border-color: rgba(194, 172, 250, 0.5);
 }
 
+.settings-section.section-reels .settings-section-header {
+  background: rgba(230, 102, 78, 0.2);
+  border: 1px solid rgba(245, 141, 118, 0.34);
+}
+
+.settings-section.section-reels .section-icon,
+.sidebar-icon-dock-btn.section-reels {
+  background: rgba(255, 128, 102, 0.26);
+  border-color: rgba(255, 176, 154, 0.5);
+}
+
 .sidebar-icon-dock-img {
   height: 16px;
   object-fit: contain;

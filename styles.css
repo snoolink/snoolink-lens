@@ -738,7 +738,20 @@ select[multiple] option:checked {
   width: 100%;
 }
 
+#reel-analyzer-screen {
+  height: calc(100vh - 70px);
+  width: 100%;
+}
+
 #wizardSearchFrame {
+  background: rgba(10, 12, 18, 0.75);
+  border: 1px solid rgba(148, 182, 255, 0.16);
+  border-radius: 12px;
+  height: 100%;
+  width: 100%;
+}
+
+#reelAnalyzerFrame {
   background: rgba(10, 12, 18, 0.75);
   border: 1px solid rgba(148, 182, 255, 0.16);
   border-radius: 12px;

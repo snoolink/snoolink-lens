@@ -8,6 +8,7 @@ import {
   BedrockRuntimeClient,
   ConverseCommand,
 } from "@aws-sdk/client-bedrock-runtime";
+import { TwelveLabs } from "twelvelabs-js";
 import { NodeHttpHandler } from "@smithy/node-http-handler";
 import { execFile } from "node:child_process";
 import { createHash } from "node:crypto";
@@ -75,7 +76,9 @@ const DEFAULT_ENV_TEMPLATE = [
   "AWS_ACCESS_KEY_ID=",
   "AWS_SECRET_ACCESS_KEY=",
   "BEDROCK_VISION_MODEL=qwen.qwen3-vl-235b-a22b",
+  "TWELVELABS_API_KEY=",
 ].join("\n");
+const INSTAGRAM_REEL_ANALYZER_INDEX_ID = "694237c9fa043d83a491de49";
 const LOCAL_EXTRACTOR_MODULE_CANDIDATES = [
   path.join(__dirname, "local-image-metadata-extractor.js"),
   path.join(__dirname, "image-metadata-extractor.js"),
@@ -144,6 +147,8 @@ const indexState = {
   cancelled: false,
   lastResult: null,
 };
+
+let reelAnalyzerWindow = null;
 
 function sendToRenderer(channel, payload) {
   const win = BrowserWindow.getAllWindows()[0];
@@ -2101,6 +2106,7 @@ async function readUserSettings() {
     aws_region: "us-east-1",
     aws_key: "",
     secret_key: "",
+    twelvelabs_api_key: "",
     model: "qwen.qwen3-vl-235b-a22b",
     min_match_score: 0.03,
     ui_theme: "aurora",
@@ -2153,6 +2159,7 @@ async function readUserSettings() {
       aws_region: String(payload?.aws_region || defaults.aws_region),
       aws_key: String(payload?.aws_key || ""),
       secret_key: String(payload?.secret_key || ""),
+      twelvelabs_api_key: String(payload?.twelvelabs_api_key || ""),
       model: String(payload?.model || defaults.model),
       min_match_score: minMatchScore,
       ui_theme: String(payload?.ui_theme || defaults.ui_theme),
@@ -2230,6 +2237,7 @@ async function readEnvSettings() {
     aws_region: "us-east-1",
     aws_key: "",
     secret_key: "",
+    twelvelabs_api_key: "",
     model: "qwen.qwen3-vl-235b-a22b",
   };
 
@@ -2244,6 +2252,7 @@ async function readEnvSettings() {
       aws_region: String(parsed.AWS_REGION || defaults.aws_region),
       aws_key: String(parsed.AWS_ACCESS_KEY_ID || ""),
       secret_key: String(parsed.AWS_SECRET_ACCESS_KEY || ""),
+      twelvelabs_api_key: String(parsed.TWELVELABS_API_KEY || ""),
       model: String(parsed.BEDROCK_VISION_MODEL || defaults.model),
     };
   } catch {
@@ -2280,6 +2289,7 @@ async function writeEnvSettings(settings) {
   const existing = await readEnvSettings();
   const incomingAwsKey = String(settings?.aws_key || "").trim();
   const incomingSecretKey = String(settings?.secret_key || "").trim();
+  const incomingTwelveLabsApiKey = String(settings?.twelvelabs_api_key || "").trim();
 
   const nextValues = {
     AWS_REGION: String(settings?.aws_region || "us-east-1"),
@@ -2289,6 +2299,9 @@ async function writeEnvSettings(settings) {
     AWS_SECRET_ACCESS_KEY: isMaskedSecretValue(incomingSecretKey)
       ? String(existing?.secret_key || "")
       : incomingSecretKey,
+    TWELVELABS_API_KEY: isMaskedSecretValue(incomingTwelveLabsApiKey)
+      ? String(existing?.twelvelabs_api_key || "")
+      : incomingTwelveLabsApiKey,
     BEDROCK_VISION_MODEL: String(settings?.model || "qwen.qwen3-vl-235b-a22b"),
   };
 
@@ -2322,6 +2335,7 @@ async function writeEnvSettings(settings) {
   process.env.AWS_REGION = nextValues.AWS_REGION;
   process.env.AWS_ACCESS_KEY_ID = nextValues.AWS_ACCESS_KEY_ID;
   process.env.AWS_SECRET_ACCESS_KEY = nextValues.AWS_SECRET_ACCESS_KEY;
+  process.env.TWELVELABS_API_KEY = nextValues.TWELVELABS_API_KEY;
   process.env.BEDROCK_VISION_MODEL = nextValues.BEDROCK_VISION_MODEL;
 }
 
@@ -2347,6 +2361,7 @@ async function writeUserSettings(settings) {
     aws_region: String(settings?.aws_region || "us-east-1"),
     aws_key: maskSecretValue(settings?.aws_key),
     secret_key: maskSecretValue(settings?.secret_key),
+    twelvelabs_api_key: maskSecretValue(settings?.twelvelabs_api_key),
     model: String(settings?.model || "qwen.qwen3-vl-235b-a22b"),
     min_match_score: Number.isFinite(Number(settings?.min_match_score))
       ? Math.max(0, Number(settings.min_match_score))
@@ -3208,7 +3223,7 @@ function mergeFilterData(currentValue, nextValue) {
     ])),
     socialMediaBand: String(next.socialMediaBand || current.socialMediaBand || ""),
     instagramBand: String(next.instagramBand || current.instagramBand || ""),
-    aspectRatioSuitabilityValues: Array.from(new Set([
+    aspectRatioSuitability: Array.from(new Set([
       ...(Array.isArray(current.aspectRatioSuitabilityValues) ? current.aspectRatioSuitabilityValues : []),
       ...(Array.isArray(next.aspectRatioSuitabilityValues) ? next.aspectRatioSuitabilityValues : []),
     ])),
@@ -3217,14 +3232,8 @@ function mergeFilterData(currentValue, nextValue) {
     visualComplexity: String(next.visualComplexity || current.visualComplexity || ""),
     heroElement: String(next.heroElement || current.heroElement || ""),
     depthOfField: String(next.depthOfField || current.depthOfField || ""),
-    personLabels: Array.from(new Set([
-      ...(Array.isArray(current.personLabels) ? current.personLabels : []),
-      ...(Array.isArray(next.personLabels) ? next.personLabels : []),
-    ])),
-    faceClusterIds: Array.from(new Set([
-      ...(Array.isArray(current.faceClusterIds) ? current.faceClusterIds : []),
-      ...(Array.isArray(next.faceClusterIds) ? next.faceClusterIds : []),
-    ])),
+    personLabel: String(next.personLabel || current.personLabel || ""),
+    faceClusterId: String(next.faceClusterId || current.faceClusterId || ""),
   };
 }
 
@@ -3690,6 +3699,190 @@ function createWindow() {
   win.loadFile(path.join(__dirname, "index.html"));
 }
 
+function createInstagramReelAnalyzerWindow() {
+  const win = BrowserWindow.getAllWindows()[0];
+  if (!win || win.isDestroyed()) {
+    console.error("No active window to load the analyzer.");
+    return;
+  }
+
+  win.loadFile(path.join(__dirname, "instagram-reel-analyzer.html"));
+  win.setTitle("Instagram Reel Analyzer");
+}
+
+function stripMarkdownCodeFence(text) {
+  return String(text || "")
+    .replace(/^```(?:json)?\s*/i, "")
+    .replace(/\s*```$/i, "")
+    .trim();
+}
+
+function toSafeNumberOrNull(value) {
+  const numeric = Number(value);
+  return Number.isFinite(numeric) ? numeric : null;
+}
+
+function normalizeStructuredReelPayload(raw, fallbackText) {
+  const payload = raw && typeof raw === "object" ? raw : {};
+  const clipTypesRaw = Array.isArray(payload.clip_types)
+    ? payload.clip_types
+    : Array.isArray(payload.clipTypes)
+      ? payload.clipTypes
+      : [];
+  const textsRaw = Array.isArray(payload.texts)
+    ? payload.texts
+    : Array.isArray(payload.texts_present)
+      ? payload.texts_present
+      : [];
+
+  const texts = textsRaw
+    .map((row) => ({
+      text: String(row?.text || row?.quote || "").trim(),
+      start: toSafeNumberOrNull(row?.start ?? row?.start_sec ?? row?.startSeconds),
+      end: toSafeNumberOrNull(row?.end ?? row?.end_sec ?? row?.endSeconds),
+      timeframe: String(row?.timeframe || "").trim(),
+    }))
+    .filter((row) => row.text);
+
+  const clipTypes = clipTypesRaw
+    .map((value) => String(value || "").trim())
+    .filter(Boolean);
+
+  const clipCount = toSafeNumberOrNull(payload.clip_count ?? payload.clipCount);
+  const mainQuote = String(payload.main_quote ?? payload.mainQuote ?? "").trim();
+
+  return {
+    clip_count: clipCount,
+    clip_types: clipTypes,
+    main_quote: mainQuote,
+    texts,
+    narrative: String(fallbackText || "").trim(),
+  };
+}
+
+function parseStructuredReelPayloadFromText(rawText, fallbackText) {
+  const cleaned = stripMarkdownCodeFence(rawText);
+  if (!cleaned) {
+    return normalizeStructuredReelPayload(null, fallbackText);
+  }
+
+  try {
+    return normalizeStructuredReelPayload(JSON.parse(cleaned), fallbackText);
+  } catch {
+    const firstBrace = cleaned.indexOf("{");
+    const lastBrace = cleaned.lastIndexOf("}");
+    if (firstBrace >= 0 && lastBrace > firstBrace) {
+      const sliced = cleaned.slice(firstBrace, lastBrace + 1);
+      try {
+        return normalizeStructuredReelPayload(JSON.parse(sliced), fallbackText);
+      } catch {
+        // Fall back below.
+      }
+    }
+  }
+
+  return normalizeStructuredReelPayload(null, fallbackText || cleaned);
+}
+
+async function runInstagramReelAnalysisWithTwelveLabs(payload) {
+  const request = payload && typeof payload === "object" ? payload : {};
+  const videoPath = String(request.videoPath || "").trim();
+  const videoUrl = String(request.videoUrl || "").trim();
+  const indexId = String(request.indexId || INSTAGRAM_REEL_ANALYZER_INDEX_ID).trim();
+  const prompt = String(request.prompt || "").trim() || [
+    "Analyze this Instagram reel and return the most practical breakdown for production recreation.",
+    "Include the likely clip sequence, clip purposes, and a concise core quote.",
+    "Also include any on-screen text with rough timeframe references.",
+  ].join(" ");
+
+  if (!videoPath && !videoUrl) {
+    return { ok: false, message: "Provide a local video file or a direct video URL." };
+  }
+
+  const settings = await readUserSettings();
+  const envSettings = await readEnvSettings();
+  const apiKey = String(envSettings.twelvelabs_api_key || settings.twelvelabs_api_key || "").trim();
+  if (!apiKey) {
+    return {
+      ok: false,
+      message: "TwelveLabs API key is missing. Add it in App Settings first.",
+    };
+  }
+
+  if (videoPath) {
+    const exists = await pathExists(videoPath);
+    if (!exists) {
+      return { ok: false, message: "Selected video file was not found." };
+    }
+  }
+
+  const client = new TwelveLabs({ apiKey });
+
+  try {
+    const task = await client.task.create({
+      indexId,
+      ...(videoPath ? { file: videoPath } : { url: videoUrl }),
+    });
+
+    if (!task?.id) {
+      return { ok: false, message: "TwelveLabs did not return a task id." };
+    }
+
+    const completedTask = await task.waitForDone(5000);
+    const finalStatus = String(completedTask?.status || "").toLowerCase();
+    if (finalStatus !== "ready") {
+      return {
+        ok: false,
+        message: `TwelveLabs indexing task did not complete successfully (status: ${completedTask?.status || "unknown"}).`,
+      };
+    }
+
+    const videoId = String(completedTask?.videoId || "").trim();
+    if (!videoId) {
+      return { ok: false, message: "TwelveLabs did not return a video id after indexing." };
+    }
+
+    const narrative = await client.analyze(videoId, prompt);
+
+    const narrativeText = String(narrative?.data || "").trim();
+
+    const structuringPrompt = [
+      "Return ONLY valid JSON.",
+      "Extract a production-focused Instagram reel breakdown using this exact schema:",
+      '{"clip_count": number|null, "clip_types": string[], "main_quote": string, "texts": [{"text": string, "timeframe": string, "start": number|null, "end": number|null}] }',
+      "Rules:",
+      "- clip_count is the number of sequential clips you can infer.",
+      "- clip_types should be reusable categories (hook shot, talking head, b-roll, cta, etc).",
+      "- main_quote should be the strongest line spoken or shown.",
+      "- texts should include on-screen text or quote text with rough timeframe when possible.",
+      "- If unknown, use null or empty arrays.",
+    ].join("\n");
+
+    const structured = await client.analyze(videoId, structuringPrompt);
+
+    const structuredText = String(structured?.data || "").trim();
+    const normalizedStructured = parseStructuredReelPayloadFromText(structuredText, narrativeText);
+
+    return {
+      ok: true,
+      indexId,
+      assetId: String(task.id),
+      indexedAssetId: videoId,
+      prompt,
+      source: videoPath ? "local" : "url",
+      sourceValue: videoPath || videoUrl,
+      analysisText: narrativeText,
+      structured: normalizedStructured,
+      rawStructuredText: structuredText,
+    };
+  } catch (error) {
+    return {
+      ok: false,
+      message: String(error?.message || error),
+    };
+  }
+}
+
 ipcMain.handle("pick-metadata-file", async (event) => {
   try {
     const parentWindow = BrowserWindow.fromWebContents(event.sender) || undefined;
@@ -3707,6 +3900,38 @@ ipcMain.handle("pick-metadata-file", async (event) => {
   } catch (error) {
     return { ok: false, message: String(error?.message || error) };
   }
+});
+
+ipcMain.handle("open-instagram-reel-analyzer-window", async () => {
+  try {
+    createInstagramReelAnalyzerWindow();
+    return { ok: true };
+  } catch (error) {
+    return { ok: false, message: String(error?.message || error) };
+  }
+});
+
+ipcMain.handle("pick-instagram-reel-video", async (event) => {
+  try {
+    const parentWindow = BrowserWindow.fromWebContents(event.sender) || undefined;
+    const result = await dialog.showOpenDialog(parentWindow, {
+      title: "Choose a video for Instagram Reel analysis",
+      filters: [{ name: "Video", extensions: Array.from(VIDEO_FILE_TYPES).map((v) => v.replace(".", "")) }],
+      properties: ["openFile"],
+    });
+
+    if (result.canceled || result.filePaths.length === 0) {
+      return { ok: false, message: "No video selected." };
+    }
+
+    return { ok: true, filePath: result.filePaths[0] };
+  } catch (error) {
+    return { ok: false, message: String(error?.message || error) };
+  }
+});
+
+ipcMain.handle("analyze-instagram-reel", async (_event, payload) => {
+  return runInstagramReelAnalysisWithTwelveLabs(payload);
 });
 
 ipcMain.handle("validate-metadata-file", async (_event, filePath) => {
@@ -4160,6 +4385,7 @@ ipcMain.handle("get-user-settings", async () => {
       aws_region: envSettings.aws_region || storedSettings.aws_region,
       aws_key: envSettings.aws_key || storedSettings.aws_key,
       secret_key: envSettings.secret_key || storedSettings.secret_key,
+      twelvelabs_api_key: envSettings.twelvelabs_api_key || storedSettings.twelvelabs_api_key,
       model: envSettings.model || storedSettings.model,
     };
     return { ok: true, settings, envPath: ENV_FILE_PATH };
@@ -4857,7 +5083,7 @@ async function startIndexingInternal({ files, mode = "local" }) {
               video_analysis: isVideo ? cloudResult : null,
               status,
               error: "",
-              media_type: isVideo ? "video" : "image",
+              media_type: mediaType,
               similar_group_id: activeCloudGroup?.group_id || null,
               similar_group_representative_path: activeCloudGroup?.representative || imagePath,
               similar_group_member_count: groupMemberPaths.length,
@@ -5200,6 +5426,7 @@ app.whenReady().then(async () => {
   process.env.AWS_REGION = String(envSettings.aws_region || "us-east-1");
   process.env.AWS_ACCESS_KEY_ID = String(envSettings.aws_key || "");
   process.env.AWS_SECRET_ACCESS_KEY = String(envSettings.secret_key || "");
+  process.env.TWELVELABS_API_KEY = String(envSettings.twelvelabs_api_key || "");
   process.env.BEDROCK_VISION_MODEL = String(envSettings.model || "qwen.qwen3-vl-235b-a22b");
 
   await ensureUserSettingsFileExists();
@@ -5217,4 +5444,4 @@ app.on("window-all-closed", () => {
   if (process.platform !== "darwin") { 
     app.quit(); 
   } 
-});  
+});

@@ -1,0 +1,122 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Instagram Reel Analyzer</title>
+    <link rel="icon" type="image/x-icon" href="./assets/app-icon.ico" />
+    <link rel="stylesheet" href="./instagram-reel-analyzer.css" />
+  </head>
+  <body>
+    <div class="page-bg" aria-hidden="true">
+      <div class="orb orb-a"></div>
+      <div class="orb orb-b"></div>
+      <div class="grid-overlay"></div>
+    </div>
+
+    <main class="app-shell">
+      <header class="hero">
+        <h1>Instagram Reel Analyzer</h1>
+        <p class="hero-copy">
+          Upload a local reel and generate a production-focused breakdown: clip count, reusable clip types,
+          strongest quote, and on-screen texts with timeframes.
+        </p>
+      </header>
+
+      <section class="panel input-panel">
+        <div class="section-head">
+          <h2>Video Input</h2>
+          <span class="chip">Index ID: 694237c9fa043d83a491de49</span>
+        </div>
+
+        <div id="dropZone" class="drop-zone" role="button" tabindex="0" aria-label="Drop a video file or click to browse">
+          <p class="drop-title">Drag and drop your reel here</p>
+          <p class="drop-subtitle">or use browse to select a local video</p>
+          <div class="drop-actions">
+            <button id="browseVideoBtn" type="button" class="btn btn-primary">Browse Video</button>
+            <button id="clearVideoBtn" type="button" class="btn btn-ghost">Clear</button>
+          </div>
+          <input id="videoFileInput" type="file" accept="video/*" hidden />
+        </div>
+
+        <div id="videoPreviewContainer" class="video-preview-container" style="display: none;">
+          <h3>Video Preview</h3>
+          <video id="videoPreview" controls style="max-width: 100%;"></video>
+        </div>
+
+        <div id="galleryPreviewContainer" class="gallery-preview-container" style="display: none;">
+          <h3>Gallery Preview</h3>
+          <div id="galleryPreview" class="gallery-preview"></div>
+        </div>
+
+        <div class="input-grid">
+          <label class="field">
+            <span>Video URL (to be launched)</span>
+            <input id="videoUrlInput" type="url" placeholder="https://example.com/video.mp4" disabled />
+          </label>
+        </div>
+
+        <label class="field prompt-field">
+          <span>Analysis prompt</span>
+          <textarea id="analysisPrompt" rows="5" placeholder="Describe what you want extracted from this reel"></textarea>
+        </label>
+
+        <div class="run-row">
+          <button id="analyzeBtn" type="button" class="btn btn-primary btn-large">Analyze Reel</button>
+          <p id="statusText" class="status">Ready.</p>
+        </div>
+      </section>
+
+      <section class="panel results-panel">
+        <div class="section-head">
+          <h2>Main Results</h2>
+          <div class="meta-row">
+            <span id="sourceMeta" class="chip muted">No run yet</span>
+            <span id="idsMeta" class="chip muted">Asset IDs pending</span>
+          </div>
+        </div>
+
+        <div class="cards">
+          <article class="result-card">
+            <p class="label">Number of clips</p>
+            <p id="clipCountValue" class="value">-</p>
+          </article>
+          <article class="result-card">
+            <p class="label">Main quote</p>
+            <p id="mainQuoteValue" class="value quote">-</p>
+          </article>
+          <article class="result-card">
+            <p class="label">Type of clips</p>
+            <ul id="clipTypesList" class="pill-list"></ul>
+          </article>
+        </div>
+
+        <div class="table-wrap">
+          <h3>Texts present with timeframe</h3>
+          <table class="texts-table">
+            <thead>
+              <tr>
+                <th>Text</th>
+                <th>Timeframe</th>
+                <th>Start (s)</th>
+                <th>End (s)</th>
+              </tr>
+            </thead>
+            <tbody id="textsTableBody">
+              <tr>
+                <td colspan="4" class="empty">No analysis yet.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <details class="raw-output">
+          <summary>Full narrative output</summary>
+          <pre id="rawAnalysisText">No analysis yet.</pre>
+        </details>
+      </section>
+    </main>
+
+    <script type="module" src="./instagram-reel-analyzer.js"></script>
+  </body>
+</html>
