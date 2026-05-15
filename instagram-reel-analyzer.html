@@ -115,6 +115,48 @@
           <pre id="rawAnalysisText">No analysis yet.</pre>
         </details>
       </section>
+      <section class="panel clip-sequence-panel" id="clipSequencePanel" style="display:none;">
+  <div class="section-head">
+    <h2>Clip Sequence Breakdown</h2>
+    <span class="chip" id="clipSequenceCount">0 clips</span>
+  </div>
+ 
+  <div class="csb-toolbar">
+    <div class="csb-search-wrap">
+      <svg class="csb-search-icon" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+        <circle cx="8.5" cy="8.5" r="5.5" stroke="currentColor" stroke-width="1.6"/>
+        <path d="M13 13L17 17" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+      </svg>
+      <input id="csbSearch" class="csb-search" type="text" placeholder="Filter clips by description…" />
+    </div>
+    <button id="csbExportCsv" class="btn btn-ghost btn-sm" type="button">Export CSV</button>
+  </div>
+ 
+  <div class="csb-table-wrap">
+    <table class="csb-table" aria-label="Clip sequence breakdown">
+      <thead>
+        <tr>
+          <th class="col-num">#</th>
+          <th class="col-tc" data-sort="start">Timecode <span class="sort-icon">↕</span></th>
+          <th class="col-start" data-sort="startSec">Start (s) <span class="sort-icon">↕</span></th>
+          <th class="col-end" data-sort="endSec">End (s) <span class="sort-icon">↕</span></th>
+          <th class="col-dur" data-sort="dur">Duration <span class="sort-icon">↕</span></th>
+          <th class="col-desc">Description</th>
+          <th class="col-tag">Clip Type Tag</th>
+        </tr>
+      </thead>
+      <tbody id="csbTableBody">
+        <tr><td colspan="7" class="empty">Run an analysis to populate this table.</td></tr>
+      </tbody>
+    </table>
+  </div>
+ 
+  <!-- Timeline scrubber bar -->
+  <div class="csb-timeline" id="csbTimeline" aria-label="Clip timeline">
+    <div class="csb-tl-track" id="csbTlTrack"></div>
+    <div class="csb-tl-labels" id="csbTlLabels"></div>
+  </div>
+</section>
     </main>
 
     <script type="module" src="./instagram-reel-analyzer.js"></script>
