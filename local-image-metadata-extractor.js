@@ -543,9 +543,10 @@ async function extractImageInfo(filePath) {
     const image = sharp(filePath);
     const metadata = await image.metadata();
     const stats = await image.stats();
-  
-    const width = metadata.width;
-    const height = metadata.height;
+
+    // Use auto-oriented dimensions when available so EXIF rotation is respected cross-platform.
+    const width = Number(metadata?.autoOrient?.width || metadata.width || 0) || null;
+    const height = Number(metadata?.autoOrient?.height || metadata.height || 0) || null;
     const aspectRatio = width / height;
     const totalPixels = width * height;
     const orientation = classifyOrientationFromAspectRatio(aspectRatio);

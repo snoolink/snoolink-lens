@@ -1,18 +1,22 @@
 # Snoolink Lens
 
-Snoolink Lens is an Electron desktop app to scan media folders, index image/video metadata, and search with semantic ranking plus practical filters.
+Snoolink Lens is an Electron desktop app to scan media folders, index image/video metadata, and search with semantic ranking plus practical filters. 
 
-It is designed for fast local workflows first, with optional cloud enrichment.
+It is designed for fast local workflows first, with optional cloud enrichment. 
 
-## Features Overview
+## Features Overview 
 
 - Scan local drives and custom folders for images and videos.
 - Build a persistent master catalog with stable item IDs.
 - Run local indexing for rich technical and content metadata.
 - Run optional cloud indexing for description + OCR metadata.
+- Process indexing in parallel workers (configurable concurrency).
+- Cloud batching keeps image and video jobs separate; videos are grouped by similar duration.
 - Use semantic search with query expansion and intent-aware matching.
 - Filter with dynamic metadata controls (including multi-select tag filters).
 - Review people groups in the Faces workspace and assign names.
+- Manual app-data backup from Settings (including cloud/local metadata outputs).
+- Welcome gallery randomizes per load and cards show loading state while previews are prepared.
 
 ## Install and Run Desktop App
 
@@ -282,6 +286,41 @@ What happens:
 - Incremental processing skips already indexed rows when valid.
 - Local index extracts orientation, format, quality hints, and more.
 - Cloud index adds description/OCR (optional).
+- Indexing runs in parallel workers to reduce total processing time.
+
+Cloud-mode batching strategy:
+
+- Image representatives are processed in image-only batches.
+- Video representatives are processed in video-only batches.
+- Video batches are grouped by similar duration buckets to reduce long-tail wait time.
+
+Worker defaults and tuning:
+
+- Cloud default worker count: `5`
+- Local default worker count: `2`
+- Override for either mode: set `SNOOLINK_INDEX_CONCURRENCY`
+- Runtime safety cap is enforced internally to prevent runaway worker counts.
+
+Example (PowerShell):
+
+```powershell
+$env:SNOOLINK_INDEX_CONCURRENCY = "6"
+npm start
+```
+
+Example (macOS Terminal):
+
+```bash
+export SNOOLINK_INDEX_CONCURRENCY=6
+npm start
+```
+
+Cross-platform metadata reliability (local indexing):
+
+- Video duration parsing now supports ffprobe field/tag variants and timestamp-style values.
+- FPS parsing now uses multiple ffprobe candidates for better Windows/macOS consistency.
+- Video orientation uses effective display dimensions after rotation metadata.
+- Image orientation uses auto-oriented dimensions (EXIF-aware) for consistent filtering.
 
 Example local indexing output snippet:
 
@@ -430,6 +469,17 @@ Examples:
 - face_min_detection_confidence
 - face_cluster_distance_threshold
 
+Settings include manual backup support:
+
+- App Settings now exposes a **Back up data** action.
+- Backup writes a timestamped folder and a `backup-manifest.json`.
+- Backup includes key outputs such as:
+  - `cloud-image_metadata_results.json`
+  - `local-image_metadata_results.json`
+  - `master_image_directory.json`
+  - `albums_data.json`
+  - `app_settings.json`
+
 ### Cloud environment variables
 
 - AWS_REGION
@@ -487,6 +537,12 @@ Examples:
 - Broaden query terms and reduce strict filters
 - Use OR-capable multi-select tags for better recall
 
+### Indexing feels slow or memory-heavy
+
+- Reduce worker count with `SNOOLINK_INDEX_CONCURRENCY` (for example `3` or `2`).
+- Increase worker count only if CPU/RAM headroom is available.
+- For cloud mode, duration-grouped video batches are expected to finish after image batches.
+
 ## Notes
 
 - Utility script available: scripts/rerun-local-index.mjs
@@ -541,3 +597,60 @@ Cloud indexing in Snoolink Lens uses a cloud AI vision model (such as AWS Bedroc
 **Privacy & Cost:**
 - Only optimized images/frames are sent to the cloud, not originals.
 - Requires cloud credentials (AWS) and may incur API costs depending on usage.
+
+## Wizard Functionality
+
+The wizard is a user-friendly interface designed to simplify the process of generating search queries and analyzing results. It provides the following features:
+
+### Key Features
+
+1. **Long Captions as Default**:
+   - The wizard automatically sets long captions as the default option for query generation, ensuring detailed and context-rich searches.
+
+2. **Direct Search Integration**:
+   - A "Search" button allows users to directly execute the best matching video search from the wizard interface.
+   - Supports clip-by-clip searches with optimized query generation for each segment.
+
+3. **Customizable Sections**:
+   - The wizard UI is organized into sections that can be reordered based on user preferences.
+   - AI video generation prompts have been removed for a cleaner and more focused interface.
+
+4. **Dynamic Query Expansion**:
+   - The wizard leverages query expansion techniques to enhance search results by including semantically related terms.
+
+### Workflow
+
+1. Select the desired media or input text for the search.
+2. Customize the query parameters using the wizard interface.
+3. Execute the search directly or refine the results using the provided filters.
+
+---
+
+## Analyzer Functionality
+
+The analyzer is a powerful tool for in-depth media analysis, offering the following capabilities:
+
+### Key Features
+
+1. **Metadata Extraction**:
+   - Extracts both local and cloud metadata for images and videos.
+   - Supports technical metadata (e.g., resolution, format) and content metadata (e.g., detected objects, descriptions).
+
+2. **Batch Processing**:
+   - Processes media in batches, separating images and videos for optimized performance.
+   - Groups videos by similar durations to reduce processing time.
+
+3. **Semantic Ranking**:
+   - Ranks media based on semantic relevance to the search query.
+   - Combines lexical, fuzzy, and semantic signals for accurate results.
+
+4. **Preview Panel**:
+   - Displays a comprehensive view of local and cloud metadata for selected media.
+   - Includes dynamic previews for videos and images.
+
+### Workflow
+
+1. Import media into the analyzer.
+2. Run metadata extraction (local and/or cloud).
+3. Use the semantic ranking feature to sort results.
+4. Preview and analyze the selected media in detail.

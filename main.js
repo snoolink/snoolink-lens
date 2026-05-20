@@ -63,6 +63,8 @@ const ALBUMS_DATA_PATH = path.join(DATA_DIR_PATH, "albums_data.json");
 const USER_SETTINGS_PATH = path.join(DATA_DIR_PATH, "app_settings.json");
 const LEGACY_USER_SETTINGS_PATH = path.join(DATA_DIR_PATH, "user_settings.json");
 const LEGACY_USER_SETTINGS_SJON_PATH = path.join(DATA_DIR_PATH, "user_setting.sjon");
+const LOCAL_IMAGE_METADATA_PATH = path.join(DATA_DIR_PATH, "local-image_metadata_results.json");
+const CLOUD_IMAGE_METADATA_PATH = path.join(DATA_DIR_PATH, "cloud-image_metadata_results.json");
 const ENV_FILE_PATH = app.isPackaged
   ? path.join(app.getPath("userData"), ".env")
   : DEV_MODE
@@ -171,6 +173,32 @@ async function pathExists(targetPath) {
   } catch {
     return false;
   }
+}
+
+function buildBackupTimestampSlug(date = new Date()) {
+  const pad = (value) => String(value).padStart(2, "0");
+  const year = String(date.getFullYear());
+  const month = pad(date.getMonth() + 1);
+  const day = pad(date.getDate());
+  const hour = pad(date.getHours());
+  const minute = pad(date.getMinutes());
+  const second = pad(date.getSeconds());
+  return `${year}${month}${day}-${hour}${minute}${second}`;
+}
+
+function getBackupFileSpecs() {
+  return [
+    { key: "cloudMetadata", sourcePath: CLOUD_IMAGE_METADATA_PATH, fileName: "cloud-image_metadata_results.json", required: true },
+    { key: "localMetadata", sourcePath: LOCAL_IMAGE_METADATA_PATH, fileName: "local-image_metadata_results.json", required: true },
+    { key: "masterDirectory", sourcePath: MASTER_DIRECTORY_PATH, fileName: "master_image_directory.json", required: false },
+    { key: "albums", sourcePath: ALBUMS_DATA_PATH, fileName: "albums_data.json", required: false },
+    { key: "settings", sourcePath: USER_SETTINGS_PATH, fileName: "app_settings.json", required: false },
+    { key: "cloudGroups", sourcePath: CLOUD_GROUPS_OUTPUT_PATH, fileName: "cloud_index_groups.json", required: false },
+    { key: "localGroups", sourcePath: LOCAL_GROUPS_OUTPUT_PATH, fileName: "local_index_groups.json", required: false },
+    { key: "faceClusters", sourcePath: LOCAL_FACE_CLUSTERS_OUTPUT_PATH, fileName: "local_face_clusters.json", required: false },
+    { key: "searchHistory", sourcePath: SEARCH_HISTORY_PATH, fileName: "search_history.json", required: false },
+    { key: "env", sourcePath: ENV_FILE_PATH, fileName: "env.backup", required: false },
+  ];
 }
 
 async function getUniquePathInDirectory(directoryPath, fileName) {
@@ -352,19 +380,30 @@ function normalizeVideoSearchResultMode(value) {
 }
 
 async function loadMasterDirectory() {
+  const fingerprint = await getPathFingerprint(MASTER_DIRECTORY_PATH);
+  if (masterDirectoryCache.payload && masterDirectoryCache.fingerprint === fingerprint) {
+    return masterDirectoryCache.payload;
+  }
+
+  let payload = { items: [] };
   try {
     const text = await fs.readFile(MASTER_DIRECTORY_PATH, "utf-8");
-    const payload = JSON.parse(text);
-    if (Array.isArray(payload)) {
-      return { items: payload };
+    const parsed = JSON.parse(text);
+    if (Array.isArray(parsed)) {
+      payload = { items: parsed };
+    } else if (Array.isArray(parsed?.items)) {
+      payload = parsed;
     }
-    if (Array.isArray(payload?.items)) {
-      return payload;
-    }
-    return { items: [] };
   } catch {
-    return { items: [] };
+    payload = { items: [] };
   }
+
+  masterDirectoryCache = {
+    fingerprint,
+    payload,
+  };
+
+  return payload;
 }
 
 async function loadAlbumsData() {
@@ -374,20 +413,33 @@ async function loadAlbumsData() {
     image_album_map: {},
   };
 
+  const fingerprint = await getPathFingerprint(ALBUMS_DATA_PATH);
+  if (albumsDataCache.payload && albumsDataCache.fingerprint === fingerprint) {
+    return albumsDataCache.payload;
+  }
+
+  let payload = defaults;
   try {
     const text = await fs.readFile(ALBUMS_DATA_PATH, "utf-8");
-    const payload = JSON.parse(text);
-    return {
-      generated_at: String(payload?.generated_at || defaults.generated_at),
-      albums: Array.isArray(payload?.albums) ? payload.albums : [],
+    const parsed = JSON.parse(text);
+    payload = {
+      generated_at: String(parsed?.generated_at || defaults.generated_at),
+      albums: Array.isArray(parsed?.albums) ? parsed.albums : [],
       image_album_map:
-        payload?.image_album_map && typeof payload.image_album_map === "object"
-          ? payload.image_album_map
+        parsed?.image_album_map && typeof parsed.image_album_map === "object"
+          ? parsed.image_album_map
           : {},
     };
   } catch {
-    return defaults;
+    payload = defaults;
   }
+
+  albumsDataCache = {
+    fingerprint,
+    payload,
+  };
+
+  return payload;
 }
 
 async function saveAlbumsData(payload) {
@@ -428,6 +480,12 @@ async function saveAlbumsData(payload) {
 
   await fs.mkdir(DATA_DIR_PATH, { recursive: true });
   await fs.writeFile(ALBUMS_DATA_PATH, JSON.stringify(nextPayload, null, 2), "utf-8");
+
+  albumsDataCache = {
+    fingerprint: await getPathFingerprint(ALBUMS_DATA_PATH),
+    payload: nextPayload,
+  };
+
   return nextPayload;
 }
 
@@ -640,6 +698,10 @@ async function updateMasterDirectoryFromScan(files) {
   };
 
   await fs.writeFile(MASTER_DIRECTORY_PATH, JSON.stringify(payload, null, 2), "utf-8");
+  masterDirectoryCache = {
+    fingerprint: await getPathFingerprint(MASTER_DIRECTORY_PATH),
+    payload,
+  };
 
   return {
     path: MASTER_DIRECTORY_PATH,
@@ -1134,6 +1196,31 @@ let loggedSsdFallbackWarning = false;
 let cachedFfmpegBinary = "";
 const imagePreviewSrcCache = new Map();
 const PREVIEW_SRC_CACHE_MAX_ENTRIES = 240;
+let masterDirectoryCache = {
+  fingerprint: "",
+  payload: null,
+};
+let albumsDataCache = {
+  fingerprint: "",
+  payload: null,
+};
+let indexingStageLookupCache = {
+  fingerprint: "",
+  payload: null,
+};
+let localFilterLookupCache = {
+  fingerprint: "",
+  payload: null,
+};
+
+async function getPathFingerprint(targetPath) {
+  try {
+    const stats = await fs.stat(targetPath);
+    return `${stats.size}:${Math.round(stats.mtimeMs)}`;
+  } catch {
+    return "missing";
+  }
+}
 
 function normalizeBinaryFromEnv(pathOrDir, binaryName) {
   const value = String(pathOrDir || "").trim();
@@ -1433,7 +1520,6 @@ async function loadSharpModule() {
 async function renderImagePreviewPng(sourcePath) {
   const sharp = await loadSharpModule();
   let sharpError = null;
-
   if (sharp) {
     try {
       const buffer = await sharp(sourcePath)
@@ -2058,6 +2144,18 @@ function buildSuccessfulIndexSets(payload) {
 async function loadIndexingStageLookup() {
   const localFilePath = path.join(DATA_DIR_PATH, "local-image_metadata_results.json");
   const cloudFilePath = path.join(DATA_DIR_PATH, "cloud-image_metadata_results.json");
+  const [localFingerprint, cloudFingerprint] = await Promise.all([
+    getPathFingerprint(localFilePath),
+    getPathFingerprint(cloudFilePath),
+  ]);
+  const combinedFingerprint = `${localFingerprint}|${cloudFingerprint}`;
+
+  if (
+    indexingStageLookupCache.payload
+    && indexingStageLookupCache.fingerprint === combinedFingerprint
+  ) {
+    return indexingStageLookupCache.payload;
+  }
 
   let localPayload = null;
   let cloudPayload = null;
@@ -2081,12 +2179,19 @@ async function loadIndexingStageLookup() {
   const localSets = buildSuccessfulIndexSets(localPayload);
   const cloudSets = buildSuccessfulIndexSets(cloudPayload);
 
-  return {
+  const payload = {
     localByPath: localSets.byPath,
     localById: localSets.byId,
     cloudByPath: cloudSets.byPath,
     cloudById: cloudSets.byId,
   };
+
+  indexingStageLookupCache = {
+    fingerprint: combinedFingerprint,
+    payload,
+  };
+
+  return payload;
 }
 
 async function readUserSettings() {
@@ -3240,6 +3345,19 @@ function mergeFilterData(currentValue, nextValue) {
 async function loadLocalFilterLookup() {
   const localFilePath = path.join(DATA_DIR_PATH, "local-image_metadata_results.json");
   const cloudFilePath = path.join(DATA_DIR_PATH, "cloud-image_metadata_results.json");
+  const [localFingerprint, cloudFingerprint] = await Promise.all([
+    getPathFingerprint(localFilePath),
+    getPathFingerprint(cloudFilePath),
+  ]);
+  const combinedFingerprint = `${localFingerprint}|${cloudFingerprint}`;
+
+  if (
+    localFilterLookupCache.payload
+    && localFilterLookupCache.fingerprint === combinedFingerprint
+  ) {
+    return localFilterLookupCache.payload;
+  }
+
   const lookup = new Map();
 
   const sourcePaths = [localFilePath, cloudFilePath];
@@ -3265,6 +3383,11 @@ async function loadLocalFilterLookup() {
       // Continue with available sources.
     }
   }
+
+  localFilterLookupCache = {
+    fingerprint: combinedFingerprint,
+    payload: lookup,
+  };
 
   return lookup;
 }
@@ -3621,6 +3744,9 @@ async function generateWizardPlanWithBedrock(payload) {
     ? Math.max(256, Math.min(4000, Number(request.maxTokens)))
     : 2200;
 
+  // Ensure the userPrompt is passed as-is without modifications
+  const finalUserPrompt = userPrompt;
+
   if (!systemPrompt || !userPrompt) {
     return { ok: false, message: "Wizard request is missing required prompts." };
   }
@@ -3629,7 +3755,7 @@ async function generateWizardPlanWithBedrock(payload) {
   const envSettings = await readEnvSettings();
   const region = String(envSettings.aws_region || process.env.AWS_REGION || "us-east-1").trim();
   const modelId = String(
-    process.env.BEDROCK_QUERY_MODEL || envSettings.model || process.env.BEDROCK_VISION_MODEL || "qwen.qwen3-vl-235b-a22b",
+    process.env.BEDROCK_QUERY_MODEL || envSettings.model || process.env.BEDROCK_VISION_MODEL || "qwen.qwen3-vl-235b-a22b"
   ).trim();
   const accessKeyId = String(envSettings.aws_key || process.env.AWS_ACCESS_KEY_ID || "").trim();
   const secretAccessKey = String(envSettings.secret_key || process.env.AWS_SECRET_ACCESS_KEY || "").trim();
@@ -4293,6 +4419,49 @@ ipcMain.handle("get-image-preview-src", async (_event, payload) => {
   }
 });
 
+function normalizeRandomSeed(value) {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) {
+    return 0;
+  }
+  return Math.abs(Math.floor(numeric)) >>> 0;
+}
+
+function fnv1a32(input) {
+  const text = String(input || "");
+  let hash = 0x811c9dc5;
+  for (let i = 0; i < text.length; i += 1) {
+    hash ^= text.charCodeAt(i);
+    hash = Math.imul(hash, 0x01000193);
+  }
+  return hash >>> 0;
+}
+
+function sortItemsBySeed(items, seed) {
+  const normalizedSeed = normalizeRandomSeed(seed);
+  if (!Array.isArray(items) || items.length <= 1) {
+    return Array.isArray(items) ? items.slice() : [];
+  }
+
+  return items
+    .map((item, index) => {
+      const itemPath = String(item?.path || "");
+      const stableId = itemPath || `item-${index}`;
+      return {
+        item,
+        index,
+        key: fnv1a32(`${normalizedSeed}:${stableId}`),
+      };
+    })
+    .sort((a, b) => {
+      if (a.key !== b.key) {
+        return a.key - b.key;
+      }
+      return a.index - b.index;
+    })
+    .map((entry) => entry.item);
+}
+
 ipcMain.handle("get-master-directory", async (_event, options) => {
   try {
     const payload = await loadMasterDirectory();
@@ -4306,6 +4475,7 @@ ipcMain.handle("get-master-directory", async (_event, options) => {
     const localFilterLookup = await loadLocalFilterLookup();
     const requestedOffset = Number(options?.offset);
     const requestedLimit = Number(options?.limit);
+    const deferPreviewResolution = options?.deferPreviewResolution !== false;
     const offset = Number.isFinite(requestedOffset)
       ? Math.max(0, Math.floor(requestedOffset))
       : 0;
@@ -4314,7 +4484,12 @@ ipcMain.handle("get-master-directory", async (_event, options) => {
       : 120;
 
     const filteredByAlbums = filterItemsByAlbumIds(items, albumData, options?.filters?.albumIds);
-    const filteredItems = applyGalleryFilters(filteredByAlbums, localFilterLookup, options?.filters);
+    const randomize = options?.randomize === true;
+    const randomSeed = normalizeRandomSeed(options?.randomSeed);
+    let filteredItems = applyGalleryFilters(filteredByAlbums, localFilterLookup, options?.filters);
+    if (randomize && filteredItems.length > 1) {
+      filteredItems = sortItemsBySeed(filteredItems, randomSeed);
+    }
 
     // Returning the full directory for very large libraries can OOM the renderer.
     const pageItems = filteredItems.slice(offset, offset + limit);
@@ -4322,11 +4497,13 @@ ipcMain.handle("get-master-directory", async (_event, options) => {
       pageItems.map(async (item) => {
         const itemPath = String(item?.path || "");
         const itemMediaType = String(item?.media_type || getMediaTypeFromPath(itemPath, "image"));
-        const resolvedPreview = await resolvePreviewSrcForImage(itemPath, itemMediaType, {
-          cacheTranscodedMovPreview,
-          cacheTranscodedHeicPreview,
-          cacheTranscodedHeifPreview,
-        });
+        const resolvedPreview = deferPreviewResolution
+          ? null
+          : await resolvePreviewSrcForImage(itemPath, itemMediaType, {
+            cacheTranscodedMovPreview,
+            cacheTranscodedHeicPreview,
+            cacheTranscodedHeifPreview,
+          });
         return {
           ...item,
           media_type: itemMediaType,
@@ -4344,6 +4521,7 @@ ipcMain.handle("get-master-directory", async (_event, options) => {
       path: MASTER_DIRECTORY_PATH,
       total: filteredItems.length,
       offset,
+      randomSeed,
       hasMore: offset + limitedItems.length < filteredItems.length,
       shown: limitedItems.length,
       generatedAt: payload?.generated_at || null,
@@ -4411,6 +4589,96 @@ ipcMain.handle("save-user-settings", async (_event, settings) => {
       path: USER_SETTINGS_PATH,
       envPath: ENV_FILE_PATH,
       warning: envWarning,
+    };
+  } catch (error) {
+    return { ok: false, message: String(error?.message || error) };
+  }
+});
+
+ipcMain.handle("backup-app-data", async (event) => {
+  try {
+    const parentWindow = BrowserWindow.fromWebContents(event.sender) || undefined;
+    const folderResult = await dialog.showOpenDialog(parentWindow, {
+      title: "Choose backup destination folder",
+      properties: ["openDirectory", "createDirectory"],
+    });
+
+    if (folderResult.canceled || !Array.isArray(folderResult.filePaths) || folderResult.filePaths.length === 0) {
+      return { ok: false, cancelled: true, message: "Backup cancelled." };
+    }
+
+    await ensureEnvFileExists();
+    await ensureUserSettingsFileExists();
+    await ensureAlbumsDataFileExists();
+
+    const targetRoot = folderResult.filePaths[0];
+    const timestampSlug = buildBackupTimestampSlug();
+    const backupDirName = `snoolink-lens-backup-${timestampSlug}`;
+    const backupDirPath = path.join(targetRoot, backupDirName);
+    await fs.mkdir(backupDirPath, { recursive: true });
+
+    const specs = getBackupFileSpecs();
+    const backedUpFiles = [];
+    const missingFiles = [];
+    const skippedRequiredFiles = [];
+
+    for (const spec of specs) {
+      if (!(await pathExists(spec.sourcePath))) {
+        missingFiles.push({
+          key: spec.key,
+          required: Boolean(spec.required),
+          sourcePath: spec.sourcePath,
+        });
+        if (spec.required) {
+          skippedRequiredFiles.push(spec.key);
+        }
+        continue;
+      }
+
+      const destinationPath = path.join(backupDirPath, spec.fileName);
+      await fs.copyFile(spec.sourcePath, destinationPath);
+      backedUpFiles.push({
+        key: spec.key,
+        sourcePath: spec.sourcePath,
+        destinationPath,
+      });
+    }
+
+    const manifest = {
+      generated_at: new Date().toISOString(),
+      backup_directory: backupDirPath,
+      source_data_directory: DATA_DIR_PATH,
+      files_backed_up: backedUpFiles,
+      files_missing: missingFiles,
+      required_files_missing: skippedRequiredFiles,
+    };
+    await fs.writeFile(
+      path.join(backupDirPath, "backup-manifest.json"),
+      JSON.stringify(manifest, null, 2),
+      "utf-8",
+    );
+
+    if (backedUpFiles.length === 0) {
+      return {
+        ok: false,
+        message: "No data files were available to back up yet.",
+        backupDir: backupDirPath,
+        filesBackedUp: 0,
+        missingFiles,
+      };
+    }
+
+    const message = skippedRequiredFiles.length > 0
+      ? `Backup completed with missing required file(s): ${skippedRequiredFiles.join(", ")}.`
+      : "Backup completed.";
+
+    return {
+      ok: true,
+      message,
+      backupDir: backupDirPath,
+      filesBackedUp: backedUpFiles.length,
+      missingFiles,
+      requiredFilesMissing: skippedRequiredFiles,
     };
   } catch (error) {
     return { ok: false, message: String(error?.message || error) };
@@ -4872,9 +5140,10 @@ async function startIndexingInternal({ files, mode = "local" }) {
     let localFaceClustersPath = "";
     let cloudGroups = [];
     let cloudGroupByRepresentative = new Map();
+    let localRowsForCloud = [];
     if (useCloud && targets.length > 0) {
-      const localRows = await loadLocalIndexRows();
-      const grouping = buildCloudGroupsFromLocalTargets(targets, localRows);
+      localRowsForCloud = await loadLocalIndexRows();
+      const grouping = buildCloudGroupsFromLocalTargets(targets, localRowsForCloud);
       const groupedOutCount = targets.length - grouping.representativeTargets.length;
 
       targets = grouping.representativeTargets;
@@ -4974,25 +5243,131 @@ async function startIndexingInternal({ files, mode = "local" }) {
       failed,
     });
 
-    for (let i = 0; i < targets.length; i += 1) {
-      if (indexState.cancelled) {
-        outputPath = useCloud
-          ? await writeCloudIndexFile(results, cloudModelId)
-          : await writeLocalIndexFile(results);
-        sendToRenderer("index-complete", {
-          ok: false,
-          cancelled: true,
-          success,
-          failed,
-          total: totalWorkItems,
-          failures,
-          outputPath,
-        });
-        return { ok: false, cancelled: true, outputPath };
+    const requestedParallelism = Number(
+      process.env.SNOOLINK_INDEX_CONCURRENCY
+      || (useCloud ? 5 : 2),
+    );
+    const indexingConcurrency = Math.max(1, Math.min(8, Math.floor(requestedParallelism || 1)));
+    sendToRenderer("index-log", {
+      message: `Index parallelism: ${indexingConcurrency} worker${indexingConcurrency === 1 ? "" : "s"}.`,
+    });
+
+    function chunkArray(items, size) {
+      const rows = Array.isArray(items) ? items : [];
+      const chunkSize = Math.max(1, Number(size || 1));
+      const out = [];
+      for (let i = 0; i < rows.length; i += chunkSize) {
+        out.push(rows.slice(i, i + chunkSize));
+      }
+      return out;
+    }
+
+    function getVideoDurationBatchKey(seconds) {
+      const value = Number(seconds);
+      if (!Number.isFinite(value) || value <= 0) {
+        return "unknown";
+      }
+      if (value < 30) {
+        return "v-00-under-30s";
+      }
+      if (value < 90) {
+        return "v-01-30s-90s";
+      }
+      if (value < 240) {
+        return "v-02-90s-4m";
+      }
+      if (value < 600) {
+        return "v-03-4m-10m";
+      }
+      return "v-04-10m-plus";
+    }
+
+    function resolveRepresentativeVideoDurationSeconds(imagePath, localDurationByPath) {
+      const direct = Number(localDurationByPath.get(imagePath));
+      if (Number.isFinite(direct) && direct > 0) {
+        return direct;
       }
 
-      await waitWhilePaused(indexState);
-      const imagePath = targets[i];
+      const group = cloudGroupByRepresentative.get(imagePath);
+      const members = Array.isArray(group?.members) ? group.members : [];
+      for (const memberPath of members) {
+        const candidate = Number(localDurationByPath.get(memberPath));
+        if (Number.isFinite(candidate) && candidate > 0) {
+          return candidate;
+        }
+      }
+
+      return null;
+    }
+
+    let executionBatches = chunkArray(targets, indexingConcurrency);
+    if (useCloud) {
+      const localDurationByPath = new Map();
+      for (const row of localRowsForCloud) {
+        const rowPath = String(row?.path || row?.image_path || "").trim();
+        if (!rowPath) {
+          continue;
+        }
+
+        const seconds = Number(
+          row?.local_metadata?.video_info?.duration_seconds
+          ?? row?.local_metadata?.content_hints?.duration_seconds
+          ?? row?.filtering?.duration_seconds,
+        );
+        if (Number.isFinite(seconds) && seconds > 0) {
+          localDurationByPath.set(rowPath, seconds);
+        }
+      }
+
+      const imageTargets = [];
+      const videoTargets = [];
+      for (const imagePath of targets) {
+        const mediaType = getMediaTypeFromPath(imagePath, "image");
+        if (mediaType === "video") {
+          videoTargets.push({
+            path: imagePath,
+            durationSeconds: resolveRepresentativeVideoDurationSeconds(imagePath, localDurationByPath),
+          });
+        } else {
+          imageTargets.push(imagePath);
+        }
+      }
+
+      const imageBatches = chunkArray(imageTargets, indexingConcurrency);
+
+      const videoBuckets = new Map();
+      for (const row of videoTargets) {
+        const bucketKey = getVideoDurationBatchKey(row.durationSeconds);
+        if (!videoBuckets.has(bucketKey)) {
+          videoBuckets.set(bucketKey, []);
+        }
+        videoBuckets.get(bucketKey).push(row);
+      }
+
+      const orderedVideoBucketKeys = Array.from(videoBuckets.keys()).sort();
+      const videoBatches = [];
+      for (const bucketKey of orderedVideoBucketKeys) {
+        const bucketRows = videoBuckets.get(bucketKey) || [];
+        bucketRows.sort((a, b) => {
+          const aDuration = Number(a?.durationSeconds);
+          const bDuration = Number(b?.durationSeconds);
+          const safeA = Number.isFinite(aDuration) ? aDuration : Number.POSITIVE_INFINITY;
+          const safeB = Number.isFinite(bDuration) ? bDuration : Number.POSITIVE_INFINITY;
+          return safeA - safeB;
+        });
+        const chunked = chunkArray(bucketRows.map((row) => row.path), indexingConcurrency);
+        videoBatches.push(...chunked);
+      }
+
+      executionBatches = [...imageBatches, ...videoBatches];
+      sendToRenderer("index-log", {
+        message: `Cloud batching strategy: ${imageTargets.length} image representative(s) in image-only batches and ${videoTargets.length} video representative(s) in duration-grouped video-only batches.`,
+      });
+    }
+
+    const targetIndexByPath = new Map(targets.map((row, idx) => [row, idx]));
+
+    async function processSingleTarget(imagePath, targetIndex) {
       const activeCloudGroup = useCloud
         ? (cloudGroupByRepresentative.get(imagePath) || {
           group_id: null,
@@ -5006,18 +5381,14 @@ async function startIndexingInternal({ files, mode = "local" }) {
           : [imagePath])
         : [imagePath];
 
-      sendToRenderer("index-log", {
-        message: useCloud
-          ? `Processing representative ${i + 1}/${targets.length}: ${path.basename(imagePath)} (${groupMemberPaths.length} group item${groupMemberPaths.length === 1 ? "" : "s"})`
-          : `Processing ${i + 1}/${targets.length}: ${path.basename(imagePath)}`,
-      });
       const mediaType = getMediaTypeFromPath(imagePath, "image");
       let metadata = makeMetadataForMedia(imagePath, mediaType);
       let embedding = [];
       let status = "ok";
       let errorMessage = "";
       let localMetadata = null;
-      const imageId = idByPath.get(imagePath) ?? i + 1;
+      const imageId = idByPath.get(imagePath) ?? targetIndex + 1;
+      const producedRows = [];
 
       try {
         if (useCloud) {
@@ -5062,7 +5433,7 @@ async function startIndexingInternal({ files, mode = "local" }) {
 
           for (const memberPath of groupMemberPaths) {
             const memberId = idByPath.get(memberPath) ?? imageId;
-            results.push({
+            producedRows.push({
               id: memberId,
               image_path: memberPath,
               model_id: cloudResult?.model_id || cloudModelId,
@@ -5192,7 +5563,7 @@ async function startIndexingInternal({ files, mode = "local" }) {
           }
 
           metadata.media_type = mediaType;
-          results.push({
+          producedRows.push({
             id: imageId,
             path: imagePath,
             status,
@@ -5211,7 +5582,7 @@ async function startIndexingInternal({ files, mode = "local" }) {
           status = "failed";
           for (const memberPath of groupMemberPaths) {
             const memberId = idByPath.get(memberPath) ?? imageId;
-            results.push({
+            producedRows.push({
               id: memberId,
               image_path: memberPath,
               model_id: cloudModelId,
@@ -5245,7 +5616,7 @@ async function startIndexingInternal({ files, mode = "local" }) {
             status = "failed";
           }
 
-          results.push({
+          producedRows.push({
             id: imageId,
             path: imagePath,
             status,
@@ -5259,32 +5630,115 @@ async function startIndexingInternal({ files, mode = "local" }) {
         }
       }
 
-      if (status === "ok") {
-        success += groupMemberPaths.length;
-      } else {
-        failed += groupMemberPaths.length;
-        for (const memberPath of groupMemberPaths) {
-          failures.push({ path: memberPath, message: errorMessage });
-        }
+      return {
+        imagePath,
+        status,
+        errorMessage,
+        groupMemberPaths,
+        producedRows,
+        processedCount: useCloud ? groupMemberPaths.length : 1,
+      };
+    }
+
+    let cancelledDuringLoop = false;
+    let announcedTargetCount = 0;
+    for (const batch of executionBatches) {
+      if (indexState.cancelled) {
+        cancelledDuringLoop = true;
+        break;
       }
 
-      processedWorkItems += useCloud ? groupMemberPaths.length : 1;
+      await waitWhilePaused(indexState);
+      if (indexState.cancelled) {
+        cancelledDuringLoop = true;
+        break;
+      }
 
+      for (let b = 0; b < batch.length; b += 1) {
+        const imagePath = batch[b];
+        announcedTargetCount += 1;
+        const batchIndex = announcedTargetCount - 1;
+        const activeCloudGroup = useCloud
+          ? (cloudGroupByRepresentative.get(imagePath) || {
+            members: [imagePath],
+          })
+          : null;
+        const groupSize = useCloud
+          ? ((Array.isArray(activeCloudGroup?.members) && activeCloudGroup.members.length > 0)
+            ? activeCloudGroup.members.length
+            : 1)
+          : 1;
+
+        sendToRenderer("index-log", {
+          message: useCloud
+            ? `Processing representative ${batchIndex + 1}/${targets.length}: ${path.basename(imagePath)} (${groupSize} group item${groupSize === 1 ? "" : "s"})`
+            : `Processing ${batchIndex + 1}/${targets.length}: ${path.basename(imagePath)}`,
+        });
+      }
+
+      const settled = await Promise.allSettled(
+        batch.map((imagePath) => processSingleTarget(imagePath, targetIndexByPath.get(imagePath) ?? 0)),
+      );
+
+      for (const item of settled) {
+        const task = item.status === "fulfilled"
+          ? item.value
+          : {
+            imagePath: "",
+            status: "failed",
+            errorMessage: String(item.reason?.message || item.reason || "Unknown error"),
+            groupMemberPaths: [],
+            producedRows: [],
+            processedCount: 0,
+          };
+
+        if (Array.isArray(task.producedRows) && task.producedRows.length > 0) {
+          results.push(...task.producedRows);
+        }
+
+        if (task.status === "ok") {
+          success += Number(task.processedCount || 0);
+        } else {
+          failed += Number(task.processedCount || 0);
+          for (const memberPath of task.groupMemberPaths) {
+            failures.push({ path: memberPath, message: task.errorMessage });
+          }
+        }
+
+        processedWorkItems += Number(task.processedCount || 0);
+
+        outputPath = useCloud
+          ? await writeCloudIndexFile(results, cloudModelId)
+          : await writeLocalIndexFile(results);
+
+        const processed = processedWorkItems;
+        const percent = Math.floor((processed / Math.max(1, totalWorkItems)) * 100);
+        sendToRenderer("index-progress", {
+          phase: "index",
+          percent,
+          processed,
+          total: totalWorkItems,
+          current: task.imagePath || "",
+          success,
+          failed,
+        });
+      }
+    }
+
+    if (cancelledDuringLoop) {
       outputPath = useCloud
         ? await writeCloudIndexFile(results, cloudModelId)
         : await writeLocalIndexFile(results);
-
-      const processed = processedWorkItems;
-      const percent = Math.floor((processed / Math.max(1, totalWorkItems)) * 100);
-      sendToRenderer("index-progress", {
-        phase: "index",
-        percent,
-        processed,
-        total: totalWorkItems,
-        current: imagePath,
+      sendToRenderer("index-complete", {
+        ok: false,
+        cancelled: true,
         success,
         failed,
+        total: totalWorkItems,
+        failures,
+        outputPath,
       });
+      return { ok: false, cancelled: true, outputPath };
     }
 
     if (!useCloud) {

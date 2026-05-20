@@ -88,6 +88,7 @@
   .clip-copy-btn { padding: 7px 12px; background: transparent; border: 1px solid var(--border); border-radius: 8px; font-family: inherit; font-size: 11px; color: var(--text-muted); cursor: pointer; display: flex; align-items: center; gap: 5px; white-space: nowrap; transition: border-color 0.2s, color 0.2s; }
   .clip-copy-btn:hover { border-color: var(--border-hover); color: var(--text); }
   .clip-copy-btn svg { width: 11px; height: 11px; stroke: currentColor; }
+  .clip-actions { display: flex; flex-direction: column; gap: 6px; align-items: stretch; }
   .gallery-copy-all { margin-top: 12px; }
 
   /* Caption tabs */
@@ -116,7 +117,7 @@
   <header>
     <div class="eyebrow">Travel Content · Personal Profile</div>
     <h1>Reel <em>Prompt</em><br>Generator</h1>
-    <p class="subtitle">Paste your quote — get gallery search keywords for your personal videos, background prompts, captions, and hashtags.</p>
+    <p class="subtitle">Paste your quote — get gallery search keywords for your personal videos, stock keywords, captions, and hashtags.</p>
   </header>
 
   <div class="input-section">
@@ -139,30 +140,11 @@
         <option value="golden hour">Golden hour</option>
       </select>
     </div>
-    <div class="opt-group">
-      <span class="opt-label">Clip duration</span>
-      <select id="clipDuration">
-        <option value="3">3 seconds</option>
-        <option value="4">4 seconds</option>
-        <option value="5">5 seconds</option>
-        <option value="6" selected>6 seconds (default)</option>
-        <option value="8">8 seconds</option>
-        <option value="10">10 seconds</option>
-      </select>
-    </div>
-    <div class="opt-group">
-      <span class="opt-label">Output format</span>
-      <select id="formatSelect">
-        <option value="stock">Gallery keywords only</option>
-        <option value="ai">AI video prompt only</option>
-        <option value="both" selected>Both</option>
-      </select>
-    </div>
   </div>
 
   <button class="gen-btn" id="genBtn" onclick="generate()">
     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 14c.2-1 .7-1.7 1.5-2.5 1-.9 1.5-2.2 1.5-3.5A6 6 0 0 0 6 8c0 1 .2 2.2 1.5 3.5.7.7 1.3 1.5 1.5 2.5"/><path d="M9 18h6"/><path d="M10 22h4"/></svg>
-    Generate prompts, captions &amp; hashtags
+    Generate gallery plan, captions &amp; hashtags
   </button>
 
   <div id="errorMsg"></div>
@@ -170,11 +152,11 @@
   <div id="results">
     <div class="divider"></div>
 
+    <div class="section-label">PERSONAL GALLERY SEARCH — CLIP BY CLIP</div>
+    <div class="gallery-section" id="gallerySection"></div>
+
     <div class="section-label">Quote analysis</div>
     <div class="analysis-grid" id="analysisGrid"></div>
-
-    <div class="section-label">Personal gallery search — clip by clip</div>
-    <div class="gallery-section" id="gallerySection"></div>
 
     <div class="section-label">Background video options</div>
     <div class="bg-cards" id="bgCards"></div>
@@ -228,8 +210,7 @@ async function generate() {
   if (!quote) { showError('Please enter a quote first.'); return; }
 
   const style        = document.getElementById('styleSelect').value;
-  const clipDuration = document.getElementById('clipDuration').value;   // seconds, default 6
-  const format       = document.getElementById('formatSelect').value;
+  const clipDuration = '6';
 
   genBtn.disabled = true;
   genBtn.innerHTML = '<span class="spinner"></span> Analyzing quote...';
@@ -260,8 +241,7 @@ Analyze the given quote and return ONLY a valid JSON object with this exact stru
       "icon": "single emoji",
       "title": "short title",
       "description": "1-2 sentences why this fits",
-      "stockTerms": "3-5 comma-separated stock footage keywords",
-      "aiPrompt": "60-80 word AI video generation prompt with camera, lighting, movement, atmosphere, color grading"
+      "stockTerms": "3-5 comma-separated stock footage keywords"
     }
   ],
   "directorNote": "1-2 sentence visual direction and text placement tip",
@@ -282,7 +262,6 @@ galleryClips rules:
 - Vary sceneType across clips for visual rhythm.
 - All hashtags start with #. Return exactly 10 broad and 10 niche hashtags.`;
 
-  // Calculate number of clips needed for a ~30s reel at chosen clip duration
   const reelDuration = 30;
   const clipSec = parseInt(clipDuration, 10);
   const numClips = Math.ceil(reelDuration / clipSec);
@@ -290,15 +269,13 @@ galleryClips rules:
   const userMsg = `Quote: "${quote}"
 Reel style: ${style}
 Clip duration: ${clipDuration} seconds each
-Number of clips needed: ${numClips} (for a ~${reelDuration}s reel)
-Output format: ${format}`;
+Number of clips needed: ${numClips} (for a ~${reelDuration}s reel)`;
 
   try {
     const desktopApi = getDesktopApi();
     if (!desktopApi || typeof desktopApi.wizardGeneratePlan !== 'function') {
       throw new Error('Wizard backend bridge unavailable. Please restart the app.');
     }
-
     const response = await desktopApi.wizardGeneratePlan({
       systemPrompt,
       userPrompt: userMsg,
@@ -310,16 +287,16 @@ Output format: ${format}`;
 
     const raw = String(response.text || '');
     const clean = raw.replace(/```json|```/g, '').trim();
-    renderResults(JSON.parse(clean), format, clipSec);
+    renderResults(JSON.parse(clean), clipSec);
   } catch(e) {
     showError('Error: ' + (e.message || 'Something went wrong. Check AWS settings and Bedrock model access, then try again.'));
   } finally {
     genBtn.disabled = false;
-    genBtn.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 14c.2-1 .7-1.7 1.5-2.5 1-.9 1.5-2.2 1.5-3.5A6 6 0 0 0 6 8c0 1 .2 2.2 1.5 3.5.7.7 1.3 1.5 1.5 2.5"/><path d="M9 18h6"/><path d="M10 22h4"/></svg> Generate prompts, captions &amp; hashtags';
+    genBtn.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 14c.2-1 .7-1.7 1.5-2.5 1-.9 1.5-2.2 1.5-3.5A6 6 0 0 0 6 8c0 1 .2 2.2 1.5 3.5.7.7 1.3 1.5 1.5 2.5"/><path d="M9 18h6"/><path d="M10 22h4"/></svg> Generate gallery plan, captions &amp; hashtags';
   }
 }
 
-function renderResults(d, format, clipSec) {
+function renderResults(d, clipSec) {
   // Analysis pills
   const fields = [
     { label: 'Mood', val: d.mood }, { label: 'Emotion', val: d.emotion },
@@ -332,12 +309,12 @@ function renderResults(d, format, clipSec) {
 
   // Gallery clips
   if (d.galleryClips && d.galleryClips.length) {
+    window._galleryClips = d.galleryClips;
     renderGalleryClips(d.galleryClips, clipSec);
   }
 
   // Background video cards
   window._bgData = d.backgroundOptions;
-  window._format = format;
   document.getElementById('bgCards').innerHTML = d.backgroundOptions.map((opt, i) =>
     `<div class="bg-card${i===0?' selected':''}" id="card-${i}" onclick="selectCard(${i})">
       <div class="card-icon">${opt.icon}</div>
@@ -346,11 +323,11 @@ function renderResults(d, format, clipSec) {
       <div class="card-desc">${opt.description}</div>
     </div>`
   ).join('');
-  showPrompts(d.backgroundOptions[0], format);
+  showPrompts(d.backgroundOptions[0]);
 
   document.getElementById('directorNote').textContent = d.directorNote;
 
-  if (d.captions) { window._captions = d.captions; renderCaptions('short'); }
+  if (d.captions) { window._captions = d.captions; renderCaptions('long'); }
   if (d.hashtags)  { renderHashtags(d.hashtags); }
 
   results.style.display = 'block';
@@ -360,7 +337,8 @@ function renderResults(d, format, clipSec) {
 function renderGalleryClips(clips, clipSec) {
   const ci = `<svg viewBox="0 0 24 24" fill="none" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>`;
 
-  const allKeywords = clips.map(c => c.searchKeywords).join(' | ');
+  const quote = quoteInput.value.trim();
+  const si = `<svg viewBox="0 0 24 24" fill="none" stroke-width="2"><path d="M5 12h14"/><path d="m13 5 7 7-7 7"/></svg>`;
 
   const rows = clips.map((clip, i) => `
     <div class="clip-row">
@@ -373,7 +351,10 @@ function renderGalleryClips(clips, clipSec) {
           <span class="clip-tag">${clip.tip || ''}</span>
         </div>
       </div>
-      <button class="clip-copy-btn" onclick="copyRaw('${clip.searchKeywords.replace(/'/g,"\\'")}', this)">${ci} Copy</button>
+      <div class="clip-actions">
+        <button class="clip-copy-btn" onclick="copyRaw('${clip.searchKeywords.replace(/'/g,"\\'")}', this)">${ci} Copy</button>
+        <button class="clip-copy-btn" onclick="searchClipFromWizard(${i}, this)">${si} Search</button>
+      </div>
     </div>`
   ).join('');
 
@@ -382,28 +363,63 @@ function renderGalleryClips(clips, clipSec) {
     <div class="clip-list">${rows}</div>
     <div class="copy-row gallery-copy-all">
       <button class="copy-btn" id="copyAllClipsBtn">${ci} Copy all search terms</button>
+      <button class="copy-btn" id="searchFirstClipBtn">${si} Search clip 1 now</button>
     </div>`;
 
+  const allKeywords = clips.map(c => c.searchKeywords).join(' | ');
   document.getElementById('copyAllClipsBtn').onclick = function() { copyRaw(allKeywords, this); };
+  document.getElementById('searchFirstClipBtn').onclick = function() {
+    searchClipFromWizard(0, this);
+  };
+}
+
+function optimizeClipSearchPhrase(clip) {
+  // Only use the original searchKeywords, do not add sceneType or extra phrases
+  return String(clip?.searchKeywords || '').trim();
+}
+
+function searchClipFromWizard(clipIndex, btn) {
+  const clips = Array.isArray(window._galleryClips) ? window._galleryClips : [];
+  const clip = clips[Number(clipIndex)] || null;
+  if (!clip) {
+    showError('No clip phrase found for this row.');
+    return;
+  }
+
+  const query = optimizeClipSearchPhrase(clip);
+  const clipLabel = `Clip ${clip.clipNumber || Number(clipIndex) + 1}`;
+  runGallerySearchFromWizard(query, clipLabel, btn);
+}
+
+function runGallerySearchFromWizard(query, clipLabel, btn) {
+  const payload = {
+    type: 'wizard-search-clip',
+    query: String(query || '').trim(),
+    clipLabel: String(clipLabel || '').trim(),
+  };
+
+  if (window.parent && window.parent !== window) {
+    window.parent.postMessage(payload, '*');
+    const orig = btn.innerHTML;
+    btn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg> Running search...';
+    setTimeout(() => { btn.innerHTML = orig; }, 1800);
+    return;
+  }
+
+  showError('Unable to trigger app search from this window.');
 }
 
 function selectCard(i) {
   document.querySelectorAll('.bg-card').forEach((c, idx) => c.classList.toggle('selected', idx === i));
-  showPrompts(window._bgData[i], window._format);
+  showPrompts(window._bgData[i]);
 }
 
-function showPrompts(opt, format) {
+function showPrompts(opt) {
   let html = '';
-  if (format === 'stock' || format === 'both') {
-    html += `<div class="prompt-block"><div class="prompt-block-label">Stock footage keywords</div><p class="prompt-text" id="stock-text">${opt.stockTerms}</p></div>`;
-  }
-  if (format === 'ai' || format === 'both') {
-    html += `<div class="prompt-block"><div class="prompt-block-label">AI video generation prompt</div><p class="prompt-text" id="ai-text">${opt.aiPrompt}</p></div>`;
-  }
+  html += `<div class="prompt-block"><div class="prompt-block-label">Stock footage keywords</div><p class="prompt-text" id="stock-text">${opt.stockTerms}</p></div>`;
   const ci = `<svg viewBox="0 0 24 24" fill="none" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>`;
   html += `<div class="copy-row">
-    ${(format==='stock'||format==='both') ? `<button class="copy-btn" onclick="copyEl('stock-text',this)">${ci} Copy keywords</button>` : ''}
-    ${(format==='ai'||format==='both')    ? `<button class="copy-btn" onclick="copyEl('ai-text',this)">${ci} Copy AI prompt</button>` : ''}
+    <button class="copy-btn" onclick="copyEl('stock-text',this)">${ci} Copy keywords</button>
   </div>`;
   document.getElementById('promptArea').innerHTML = html;
 }

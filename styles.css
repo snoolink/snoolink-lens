@@ -1195,6 +1195,48 @@ select[multiple] option:checked {
   cursor: pointer;
 }
 
+.search-result.loading::before {
+  background: linear-gradient(
+    110deg,
+    rgba(10, 16, 26, 0.78) 8%,
+    rgba(39, 61, 92, 0.52) 42%,
+    rgba(10, 16, 26, 0.78) 78%
+  );
+  background-size: 220% 100%;
+  content: "";
+  inset: 0;
+  position: absolute;
+  z-index: 3;
+  animation: resultCardLoadingSweep 1.35s linear infinite;
+}
+
+.search-result.loading::after {
+  content: "Loading preview...";
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  background: rgba(8, 14, 24, 0.82);
+  border: 1px solid rgba(168, 206, 255, 0.55);
+  border-radius: 999px;
+  color: #eaf3ff;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  padding: 6px 10px;
+  z-index: 4;
+  white-space: nowrap;
+}
+
+@keyframes resultCardLoadingSweep {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -50% 0;
+  }
+}
+
 .search-result.selected {
   outline: 2px solid rgba(160, 208, 255, 0.9);
   outline-offset: 1px;

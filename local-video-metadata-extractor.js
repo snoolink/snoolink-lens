@@ -102,8 +102,10 @@ function parseFraction(value) {
     return null;
   }
 
-  if (raw.includes("/")) {
-    const [a, b] = raw.split("/");
+  const normalizedRaw = raw.replace(/\s+/g, "");
+
+  if (normalizedRaw.includes("/")) {
+    const [a, b] = normalizedRaw.split("/");
     const n = Number(a);
     const d = Number(b);
     if (Number.isFinite(n) && Number.isFinite(d) && d !== 0) {
@@ -112,8 +114,146 @@ function parseFraction(value) {
     return null;
   }
 
-  const parsed = Number(raw);
+  const numericMatch = normalizedRaw.match(/-?\d+(?:\.\d+)?/);
+  const parsed = numericMatch ? Number(numericMatch[0]) : Number(normalizedRaw);
   return Number.isFinite(parsed) ? parsed : null;
+}
+
+/**
+ * Parse duration variants from ffprobe values/tags.
+ * Supports seconds, numeric strings, and HH:MM:SS(.sss) formats.
+ * @param {unknown} value - Raw duration candidate.
+ * @returns {number|null} Duration in seconds or null.
+ */
+function parseDurationSeconds(value) {
+  if (value === null || value === undefined) {
+    return null;
+  }
+
+  if (typeof value === "number") {
+    return Number.isFinite(value) && value > 0 ? value : null;
+  }
+
+  const raw = String(value).trim();
+  if (!raw) {
+    return null;
+  }
+
+  const directNumber = Number(raw);
+  if (Number.isFinite(directNumber) && directNumber > 0) {
+    return directNumber;
+  }
+
+  const hhmmssMatch = raw.match(/^(\d+):(\d{1,2}):(\d{1,2}(?:\.\d+)?)$/);
+  if (hhmmssMatch) {
+    const hours = Number(hhmmssMatch[1]);
+    const minutes = Number(hhmmssMatch[2]);
+    const seconds = Number(hhmmssMatch[3]);
+    if (Number.isFinite(hours) && Number.isFinite(minutes) && Number.isFinite(seconds)) {
+      return (hours * 3600) + (minutes * 60) + seconds;
+    }
+  }
+
+  const secondsTokenMatch = raw.match(/(\d+(?:\.\d+)?)\s*s(?:ec(?:ond)?s?)?$/i);
+  if (secondsTokenMatch) {
+    const seconds = Number(secondsTokenMatch[1]);
+    return Number.isFinite(seconds) && seconds > 0 ? seconds : null;
+  }
+
+  return null;
+}
+
+/**
+ * Extract best-known duration from ffprobe stream row.
+ * @param {object} stream - ffprobe stream object.
+ * @returns {number|null} Duration in seconds or null.
+ */
+function parseStreamDurationSeconds(stream) {
+  const streamRow = stream && typeof stream === "object" ? stream : {};
+  const tagMap = streamRow.tags && typeof streamRow.tags === "object" ? streamRow.tags : {};
+
+  const directCandidates = [
+    streamRow.duration,
+    tagMap.DURATION,
+    tagMap.duration,
+    tagMap["com.apple.quicktime.duration"],
+  ];
+
+  for (const candidate of directCandidates) {
+    const parsed = parseDurationSeconds(candidate);
+    if (parsed != null) {
+      return parsed;
+    }
+  }
+
+  const durationTs = toNumberOrNull(streamRow.duration_ts);
+  const timeBase = parseFraction(streamRow.time_base);
+  if (
+    Number.isFinite(durationTs)
+    && durationTs > 0
+    && Number.isFinite(timeBase)
+    && timeBase > 0
+  ) {
+    return durationTs * timeBase;
+  }
+
+  return null;
+}
+
+/**
+ * Extract best-known FPS from ffprobe stream row.
+ * @param {object} stream - ffprobe stream object.
+ * @returns {{fps:number|null,raw:string|null}} Parsed FPS and source token.
+ */
+function parseStreamFrameRate(stream) {
+  const streamRow = stream && typeof stream === "object" ? stream : {};
+  const tagMap = streamRow.tags && typeof streamRow.tags === "object" ? streamRow.tags : {};
+  const candidates = [
+    streamRow.avg_frame_rate,
+    streamRow.r_frame_rate,
+    streamRow.frame_rate,
+    tagMap["com.apple.quicktime.nominal-frame-rate"],
+    tagMap.framerate,
+    tagMap.frame_rate,
+    tagMap.FRAMERATE,
+  ];
+
+  for (const candidate of candidates) {
+    const parsed = parseFraction(candidate);
+    if (Number.isFinite(parsed) && parsed > 0) {
+      return {
+        fps: Number(parsed.toFixed(4)),
+        raw: String(candidate || "") || null,
+      };
+    }
+  }
+
+  return { fps: null, raw: null };
+}
+
+/**
+ * Extract best-known duration from ffprobe format payload.
+ * @param {object} formatData - ffprobe format object.
+ * @returns {number|null} Duration in seconds or null.
+ */
+function parseFormatDurationSeconds(formatData) {
+  const formatRow = formatData && typeof formatData === "object" ? formatData : {};
+  const tagMap = formatRow.tags && typeof formatRow.tags === "object" ? formatRow.tags : {};
+  const candidates = [
+    formatRow.duration,
+    tagMap.DURATION,
+    tagMap.duration,
+    tagMap["com.apple.quicktime.duration"],
+  ];
+
+  for (const candidate of candidates) {
+    const parsed = parseDurationSeconds(candidate);
+    if (parsed != null) {
+      return parsed;
+    }
+  }
+
+  return null;
 }
 
 /**
@@ -463,12 +603,12 @@ function parseVideoStreams(streams) {
     const height = toIntOrNull(stream.height);
     const rotation = parseRotationDegrees(stream);
     const display = getEffectiveDisplayDimensions(width, height, rotation);
-    const avgFrameRate = parseFraction(stream.avg_frame_rate);
-    const rFrameRate = parseFraction(stream.r_frame_rate);
-    const frameRate = Number.isFinite(avgFrameRate) && avgFrameRate > 0 ? avgFrameRate : rFrameRate;
+    const frameRateInfo = parseStreamFrameRate(stream);
+    const frameRate = frameRateInfo.fps;
     const displayAspectRatio = String(stream.display_aspect_ratio || "").trim();
     const sampleAspectRatio = String(stream.sample_aspect_ratio || "").trim();
     const calculatedAspect = display.width && display.height ? display.width / display.height : null;
+    const durationSeconds = parseStreamDurationSeconds(stream);
 
     return {
       index: Number(stream.index ?? idx),
@@ -490,12 +630,12 @@ function parseVideoStreams(streams) {
       color_space: String(stream.color_space || "") || null,
       color_transfer: String(stream.color_transfer || "") || null,
       color_primaries: String(stream.color_primaries || "") || null,
-      frame_rate: Number.isFinite(frameRate) ? Number(frameRate.toFixed(4)) : null,
-      frame_rate_raw: String(stream.avg_frame_rate || stream.r_frame_rate || "") || null,
+      frame_rate: Number.isFinite(frameRate) ? frameRate : null,
+      frame_rate_raw: frameRateInfo.raw,
       frame_rate_category: deriveFrameRateCategory(frameRate),
       bitrate: toNumberOrNull(stream.bit_rate),
       bitrate_category: deriveBitrateCategory(stream.bit_rate),
-      duration_seconds: toNumberOrNull(stream.duration),
+      duration_seconds: durationSeconds,
       frame_count: toIntOrNull(stream.nb_frames),
       field_order: String(stream.field_order || "") || null,
       is_avc: stream.is_avc === "true" || stream.is_avc === true,
@@ -574,8 +714,8 @@ function parseChapters(chapters) {
   const rows = Array.isArray(chapters) ? chapters : [];
   return rows.map((chapter, idx) => ({
     index: Number(chapter.id ?? idx),
-    start_seconds: toNumberOrNull(chapter.start_time),
-    end_seconds: toNumberOrNull(chapter.end_time),
+    start_seconds: parseDurationSeconds(chapter.start_time),
+    end_seconds: parseDurationSeconds(chapter.end_time),
     title: String(chapter.tags?.title || "") || null,
     tags: parseTags(chapter.tags),
   }));
@@ -959,8 +1099,8 @@ async function extractVideoMetadata(filePath, basicInfo = {}) {
 
   const primaryVideo = videoStreams.primary || {};
   const durationSeconds =
-    toNumberOrNull(formatData.duration) ??
-    toNumberOrNull(primaryVideo.duration_seconds) ??
+    parseFormatDurationSeconds(formatData) ??
+    parseDurationSeconds(primaryVideo.duration_seconds) ??
     null;
 
   const formatInfo = ffprobe.ok

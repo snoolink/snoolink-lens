@@ -17,6 +17,7 @@ contextBridge.exposeInMainWorld("desktopAPI", {
   pickCustomFolders: () => ipcRenderer.invoke("pick-custom-folders"),
   getUserSettings: () => ipcRenderer.invoke("get-user-settings"),
   saveUserSettings: (settings) => ipcRenderer.invoke("save-user-settings", settings),
+  backupAppData: () => ipcRenderer.invoke("backup-app-data"),
   openInstagramReelAnalyzerWindow: () => ipcRenderer.invoke("open-instagram-reel-analyzer-window"),
   pickInstagramReelVideo: () => ipcRenderer.invoke("pick-instagram-reel-video"),
   analyzeInstagramReel: (payload) => ipcRenderer.invoke("analyze-instagram-reel", payload),
