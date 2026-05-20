@@ -240,17 +240,161 @@ function resetResultsUi() {
 // Prompt default
 // ─────────────────────────────────────────────────────────
 
+// function setPromptDefault() {
+//   if (!analysisPromptInput || analysisPromptInput.value.trim()) {
+//     return;
+//   }
+//   analysisPromptInput.value = [
+//     "Break down this Instagram reel for recreation:",
+//     "1) Estimate number of clips.",
+//     "2) Identify clip types in sequence.",
+//     "3) Extract the strongest quote.",
+//     "4) List on-screen text with rough timeframe.",
+//     "5) For each clip, provide 2-4 concise related search phrases (keywords) that could be used to find similar content in a personal content database. List these as: Related Search Phrases: ..."
+//   ].join("\n");
+// }
+
 function setPromptDefault() {
   if (!analysisPromptInput || analysisPromptInput.value.trim()) {
     return;
   }
-  analysisPromptInput.value = [
-    "Break down this Instagram reel for recreation:",
-    "1) estimate number of clips,",
-    "2) identify clip types in sequence,",
-    "3) extract the strongest quote,",
-    "4) list on-screen text with rough timeframe.",
-  ].join("\n");
+
+  analysisPromptInput.value = `
+Analyze this Instagram reel and return ONLY valid JSON.
+
+Your primary goal is to detect EVERY distinct video clip/shot change in the reel as accurately as possible.
+
+Important clip detection rules:
+- Treat every camera cut, scene switch, angle change, zoom jump, transition, overlay sequence, or major visual composition change as a NEW clip.
+- Detect even very short clips (including clips under 1 second).
+- Preserve exact chronological order of clips.
+- Do NOT merge multiple scenes into one clip.
+- If a transition contains a visibly different intermediate frame/scene, create a separate clip entry.
+- Each clip must represent a visually continuous segment only.
+- Include ALL clips from beginning to end of the reel.
+
+Timestamp rules:
+- Use millisecond precision timestamps.
+- Format timestamps exactly as: "MM:SS.mmm"
+- Ensure timestamps are sequential and non-overlapping.
+- Ensure:
+  previous_clip.end_time == next_clip.start_time
+- Final clip end_time must match the reel ending.
+- Never skip time ranges.
+
+Scene analysis requirements:
+- Describe:
+  - subject
+  - actions
+  - environment
+  - lighting
+  - framing
+  - camera angle
+  - camera movement
+  - mood/aesthetic
+  - visible objects
+  - color tones
+  - composition style
+- Be highly visual and specific.
+
+Editing analysis requirements:
+- Identify:
+  - transition type
+  - pacing
+  - playback speed
+  - stabilization style
+  - motion effects
+  - blur
+  - glow
+  - grain
+  - color grading
+  - overlays
+  - zoom behavior
+  - tracking shots
+  - cuts synced to beats
+- Mention if clip appears drone-shot, handheld, cinematic, vlog-style, AI-generated, action-cam, tripod, etc.
+
+Search phrase requirements:
+- Generate highly searchable stock-video/search-engine style phrases.
+- Include:
+  - subject
+  - environment
+  - camera style
+  - aesthetic
+  - action
+  - mood
+- Minimum 5 phrases per clip.
+
+Return EXACTLY this JSON structure:
+
+{
+  "video_summary": "short overall description",
+
+  "video_style": {
+    "genre": "",
+    "aesthetic": "",
+    "pace": "",
+    "primary_colors": [],
+    "overall_camera_style": "",
+    "overall_editing_style": ""
+  },
+
+  "clips": [
+    {
+      "clip_index": 1,
+
+      "start_time": "00:00.000",
+      "end_time": "00:01.250",
+      "duration_seconds": 1.25,
+
+      "scene_description": {
+        "summary": "",
+        "subjects": [],
+        "actions": [],
+        "environment": "",
+        "lighting": "",
+        "camera_angle": "",
+        "camera_distance": "",
+        "camera_motion": "",
+        "composition": "",
+        "mood": "",
+        "dominant_colors": [],
+        "visible_objects": []
+      },
+
+      "related_search_phrases": [
+        "",
+        "",
+        "",
+        "",
+        ""
+      ],
+
+      "editing_notes": {
+        "transition_in": "",
+        "transition_out": "",
+        "cut_type": "",
+        "speed": "",
+        "stabilization": "",
+        "effects": [],
+        "color_grading": "",
+        "sync_to_visual_beats": "",
+        "visual_style_tags": []
+      }
+    }
+  ]
+}
+
+Strict output rules:
+- Return ONLY raw JSON.
+- No markdown.
+- No explanations.
+- No comments.
+- No trailing commas.
+- Use empty arrays instead of null.
+- Use empty strings instead of null.
+- Maintain valid parsable JSON at all times.
+`.trim();
 }
 
 // ─────────────────────────────────────────────────────────
@@ -351,7 +495,7 @@ async function runAnalysis() {
   const prompt = String(analysisPromptInput?.value || "").trim();
 
   setRunning(true);
-  setStatus("Uploading and processing with TwelveLabs...", "running");
+  setStatus("Uploading and processing ...", "running");
 
   const result = await desktopApi.analyzeInstagramReel({
     indexId: INSTAGRAM_REEL_ANALYZER_INDEX_ID,
@@ -483,13 +627,21 @@ function inferTag(desc) {
 function parseClipSequence(text) {
   const lineRe = /[-•]\s*\[(\d{1,2}:\d{2})[–\-—](\d{1,2}:\d{2})\]:?\s*(.+)/g;
   const clips = [];
-  let match;
+  let match, lastIndex = 0;
 
   while ((match = lineRe.exec(text)) !== null) {
     const [, startTC, endTC, desc] = match;
     const startSec = tcToSec(startTC);
     const endSec   = tcToSec(endTC);
     const dur      = +(endSec - startSec).toFixed(2);
+    let searchPhrases = [];
+
+    // Look for search phrases after this match, before the next clip
+    const nextClipIdx = lineRe.lastIndex;
+    const searchPhraseMatch = /(?:Search Phrases|Related Search Phrases)\s*:\s*([\s\S]*?)(?=\n[-•]|$)/i.exec(text.substring(nextClipIdx - match[0].length));
+    if (searchPhraseMatch && searchPhraseMatch[1]) {
+      searchPhrases = searchPhraseMatch[1].split(',').map(s => s.trim()).filter(Boolean);
+    }
 
     clips.push({
       startTC,
@@ -499,7 +651,9 @@ function parseClipSequence(text) {
       dur,
       desc: desc.trim(),
       tag: inferTag(desc),
+      searchPhrases,
     });
+    lastIndex = lineRe.lastIndex;
   }
 
   return clips;
@@ -603,7 +757,7 @@ function initExport(clips) {
   if (!btn) return;
 
   btn.addEventListener("click", () => {
-    const header = ["#", "Timecode", "Start (s)", "End (s)", "Duration (s)", "Description", "Clip Type"];
+    const header = ["#", "Timecode", "Start (s)", "End (s)", "Duration (s)", "Description", "Clip Type", "Related Search Phrases"];
     const rows   = clips.map((c, i) => [
       i + 1,
       `${c.startTC}-${c.endTC}`,
@@ -612,6 +766,7 @@ function initExport(clips) {
       c.dur,
       `"${c.desc.replace(/"/g, '""')}"`,
       c.tag.label,
+      Array.isArray(c.searchPhrases) && c.searchPhrases.length ? `"${c.searchPhrases.map(p => p.replace(/\"/g, '""')).join(', ')}"` : "-"
     ]);
 
     const csv = [header, ...rows].map((r) => r.join(",")).join("\n");
@@ -660,6 +815,7 @@ function populateClipSequence(rawText) {
       <td class="col-dur"><span class="dur-pill">${c.dur}s</span></td>
       <td class="col-desc">${escHtml(c.desc)}</td>
       <td class="col-tag"><span class="clip-tag" data-kind="${c.tag.kind}">${c.tag.label}</span></td>
+      <td class="col-phrases">${Array.isArray(c.searchPhrases) && c.searchPhrases.length ? c.searchPhrases.map(escHtml).join(", ") : "-"}</td>
     </tr>
   `).join("");
 

@@ -5,71 +5,116 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Instagram Reel Analyzer</title>
     <link rel="icon" type="image/x-icon" href="./assets/app-icon.ico" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Sans:ital,wght@0,300;0,400;0,500;0,600;1,400&display=swap" rel="stylesheet" />
     <link rel="stylesheet" href="./instagram-reel-analyzer.css" />
   </head>
   <body>
+    <!-- Ambient background -->
     <div class="page-bg" aria-hidden="true">
       <div class="orb orb-a"></div>
       <div class="orb orb-b"></div>
+      <div class="orb orb-c"></div>
       <div class="grid-overlay"></div>
+      <div class="noise-overlay"></div>
     </div>
 
+    <!-- Toast notification -->
+    <div id="toastContainer" class="toast-container" aria-live="polite"></div>
+
     <main class="app-shell">
+      <!-- Hero -->
       <header class="hero">
-        <h1>Instagram Reel Analyzer</h1>
+        <div class="hero-eyebrow">
+          <span class="eyebrow-dot"></span>
+          <span>TwelveLabs · Index 694237c9</span>
+        </div>
+        <h1>Reel <em>Analyzer</em></h1>
         <p class="hero-copy">
           Upload a local reel and generate a production-focused breakdown: clip count, reusable clip types,
-          strongest quote, and on-screen texts with timeframes.
+          strongest quote, on-screen texts with timeframes, and content database search phrases.
         </p>
       </header>
 
+      <!-- Input panel -->
       <section class="panel input-panel">
         <div class="section-head">
           <h2>Video Input</h2>
-          <span class="chip">Index ID: 694237c9fa043d83a491de49</span>
+          <div class="section-head-right">
+            <span class="chip chip-index">Index <strong>694237c9fa043d83a491de49</strong></span>
+          </div>
         </div>
 
         <div id="dropZone" class="drop-zone" role="button" tabindex="0" aria-label="Drop a video file or click to browse">
-          <p class="drop-title">Drag and drop your reel here</p>
-          <p class="drop-subtitle">or use browse to select a local video</p>
+          <div class="drop-icon" aria-hidden="true">
+            <svg viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <rect x="4" y="8" width="40" height="32" rx="5" stroke="currentColor" stroke-width="2"/>
+              <polygon points="19,16 19,32 34,24" fill="currentColor" opacity="0.7"/>
+            </svg>
+          </div>
+          <p class="drop-title">Drag &amp; drop your reel here</p>
+          <p class="drop-subtitle">MP4, MOV, WebM — any local video file</p>
           <div class="drop-actions">
-            <button id="browseVideoBtn" type="button" class="btn btn-primary">Browse Video</button>
+            <button id="browseVideoBtn" type="button" class="btn btn-primary">
+              <svg viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M2 11V13H14V11M8 2V10M8 2L5 5M8 2L11 5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              Browse Video
+            </button>
             <button id="clearVideoBtn" type="button" class="btn btn-ghost">Clear</button>
           </div>
           <input id="videoFileInput" type="file" accept="video/*" hidden />
         </div>
 
+        <!-- Video preview -->
         <div id="videoPreviewContainer" class="video-preview-container" style="display: none;">
-          <h3>Video Preview</h3>
-          <video id="videoPreview" controls style="max-width: 100%;"></video>
+          <div class="preview-label">
+            <svg viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="7" cy="7" r="6" stroke="currentColor" stroke-width="1.4"/><polygon points="5.5,4.5 5.5,9.5 10,7" fill="currentColor"/></svg>
+            Video Preview
+          </div>
+          <video id="videoPreview" controls></video>
         </div>
 
         <div id="galleryPreviewContainer" class="gallery-preview-container" style="display: none;">
-          <h3>Gallery Preview</h3>
+          <div class="preview-label">
+            <svg viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="7" cy="7" r="6" stroke="currentColor" stroke-width="1.4"/><polygon points="5.5,4.5 5.5,9.5 10,7" fill="currentColor"/></svg>
+            Selected File
+          </div>
           <div id="galleryPreview" class="gallery-preview"></div>
         </div>
 
         <div class="input-grid">
           <label class="field">
-            <span>Video URL (to be launched)</span>
+            <span class="field-label">Video URL <span class="field-badge">coming soon</span></span>
             <input id="videoUrlInput" type="url" placeholder="https://example.com/video.mp4" disabled />
           </label>
         </div>
 
         <label class="field prompt-field">
-          <span>Analysis prompt</span>
-          <textarea id="analysisPrompt" rows="5" placeholder="Describe what you want extracted from this reel"></textarea>
+          <span class="field-label">Analysis prompt</span>
+          <textarea id="analysisPrompt" rows="6" placeholder="Describe what you want extracted from this reel"></textarea>
         </label>
 
         <div class="run-row">
-          <button id="analyzeBtn" type="button" class="btn btn-primary btn-large">Analyze Reel</button>
-          <p id="statusText" class="status">Ready.</p>
+          <button id="analyzeBtn" type="button" class="btn btn-primary btn-large">
+            <span class="btn-icon">
+              <svg viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M3 8H13M13 8L9 4M13 8L9 12" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </span>
+            <span class="btn-label">Analyze Reel</span>
+            <span class="btn-spinner" hidden>
+              <svg viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="8" cy="8" r="6" stroke="currentColor" stroke-width="2" stroke-dasharray="20 18" stroke-linecap="round"/></svg>
+            </span>
+          </button>
+          <div class="status-wrap">
+            <span class="status-dot" id="statusDot"></span>
+            <p id="statusText" class="status">Ready.</p>
+          </div>
         </div>
       </section>
 
+      <!-- Results panel -->
       <section class="panel results-panel">
         <div class="section-head">
-          <h2>Main Results</h2>
+          <h2>Analysis Results</h2>
           <div class="meta-row">
             <span id="sourceMeta" class="chip muted">No run yet</span>
             <span id="idsMeta" class="chip muted">Asset IDs pending</span>
@@ -77,86 +122,135 @@
         </div>
 
         <div class="cards">
-          <article class="result-card">
-            <p class="label">Number of clips</p>
-            <p id="clipCountValue" class="value">-</p>
+          <article class="result-card card-clips">
+            <p class="label">
+              <svg viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="1" y="2" width="10" height="8" rx="1.5" stroke="currentColor" stroke-width="1.3"/><path d="M4 2V10" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/><path d="M8 2V10" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
+              Number of clips
+            </p>
+            <p id="clipCountValue" class="value value-large">—</p>
           </article>
-          <article class="result-card">
-            <p class="label">Main quote</p>
-            <p id="mainQuoteValue" class="value quote">-</p>
+
+          <article class="result-card card-quote">
+            <p class="label">
+              <svg viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M2 4C2 4 2 7 5 7V9C2 9 1 7 1 4H2ZM7 4C7 4 7 7 10 7V9C7 9 6 7 6 4H7Z" fill="currentColor" opacity="0.7"/></svg>
+              Main quote
+            </p>
+            <div class="value-with-copy">
+              <p id="mainQuoteValue" class="value quote">—</p>
+              <button class="copy-btn" data-copy-target="mainQuoteValue" title="Copy quote" aria-label="Copy quote">
+                <svg viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="4.5" y="4.5" width="8" height="8" rx="1.5" stroke="currentColor" stroke-width="1.3"/><path d="M9 4.5V3C9 2.17 8.33 1.5 7.5 1.5H3C2.17 1.5 1.5 2.17 1.5 3V7.5C1.5 8.33 2.17 9 3 9H4.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
+              </button>
+            </div>
           </article>
-          <article class="result-card">
-            <p class="label">Type of clips</p>
+
+          <article class="result-card card-types">
+            <p class="label">
+              <svg viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="3" cy="6" r="1.5" fill="currentColor" opacity="0.7"/><circle cx="6" cy="6" r="1.5" fill="currentColor" opacity="0.7"/><circle cx="9" cy="6" r="1.5" fill="currentColor" opacity="0.7"/></svg>
+              Type of clips
+            </p>
             <ul id="clipTypesList" class="pill-list"></ul>
           </article>
         </div>
 
+        <!-- Texts table -->
         <div class="table-wrap">
-          <h3>Texts present with timeframe</h3>
-          <table class="texts-table">
+          <div class="table-header">
+            <h3>On-Screen Texts &amp; Timeframes</h3>
+          </div>
+          <div class="texts-table-wrap">
+            <table class="texts-table">
+              <thead>
+                <tr>
+                  <th>Text</th>
+                  <th>Timeframe</th>
+                  <th>Start (s)</th>
+                  <th>End (s)</th>
+                  <th>Copy</th>
+                </tr>
+              </thead>
+              <tbody id="textsTableBody">
+                <tr>
+                  <td colspan="5" class="empty">No analysis yet.</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Raw output -->
+        <details class="raw-output">
+          <summary>
+            <svg viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M2 3H10M2 6H7M2 9H8" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
+            Full narrative output
+          </summary>
+          <div class="raw-output-inner">
+            <button class="copy-btn copy-btn-raw" data-copy-target="rawAnalysisText" title="Copy full output">
+              <svg viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="4.5" y="4.5" width="8" height="8" rx="1.5" stroke="currentColor" stroke-width="1.3"/><path d="M9 4.5V3C9 2.17 8.33 1.5 7.5 1.5H3C2.17 1.5 1.5 2.17 1.5 3V7.5C1.5 8.33 2.17 9 3 9H4.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
+              Copy
+            </button>
+            <pre id="rawAnalysisText">No analysis yet.</pre>
+          </div>
+        </details>
+      </section>
+
+      <!-- Clip Sequence Breakdown panel -->
+      <section class="panel clip-sequence-panel" id="clipSequencePanel" style="display:none;">
+        <div class="section-head">
+          <h2>Clip Sequence Breakdown</h2>
+          <span class="chip chip-count" id="clipSequenceCount">0 clips</span>
+        </div>
+
+        <div class="csb-toolbar">
+          <div class="csb-search-wrap">
+            <svg class="csb-search-icon" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+              <circle cx="8.5" cy="8.5" r="5.5" stroke="currentColor" stroke-width="1.6"/>
+              <path d="M13 13L17 17" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+            </svg>
+            <input id="csbSearch" class="csb-search" type="text" placeholder="Filter clips by description or search phrase…" />
+          </div>
+          <div class="csb-toolbar-actions">
+            <button id="csbCopyAllPhrases" class="btn btn-ghost btn-sm" type="button">
+              <svg viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="4.5" y="4.5" width="8" height="8" rx="1.5" stroke="currentColor" stroke-width="1.3"/><path d="M9 4.5V3C9 2.17 8.33 1.5 7.5 1.5H3C2.17 1.5 1.5 2.17 1.5 3V7.5C1.5 8.33 2.17 9 3 9H4.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
+              Copy All Phrases
+            </button>
+            <button id="csbExportCsv" class="btn btn-ghost btn-sm" type="button">
+              <svg viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M7 1V9M7 9L4 6M7 9L10 6" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/><path d="M2 11H12" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
+              Export CSV
+            </button>
+          </div>
+        </div>
+
+        <div class="csb-table-wrap">
+          <table class="csb-table" aria-label="Clip sequence breakdown">
             <thead>
               <tr>
-                <th>Text</th>
-                <th>Timeframe</th>
-                <th>Start (s)</th>
-                <th>End (s)</th>
+                <th class="col-num">#</th>
+                <th class="col-tc" data-sort="start">Timecode <span class="sort-icon">↕</span></th>
+                <th class="col-start" data-sort="startSec">Start (s) <span class="sort-icon">↕</span></th>
+                <th class="col-end" data-sort="endSec">End (s) <span class="sort-icon">↕</span></th>
+                <th class="col-dur" data-sort="dur">Duration <span class="sort-icon">↕</span></th>
+                <th class="col-desc">Description</th>
+                <th class="col-tag">Clip Type</th>
+                <th class="col-phrases">Search Phrases
+                  <span class="col-phrases-hint">for content DB</span>
+                </th>
               </tr>
             </thead>
-            <tbody id="textsTableBody">
-              <tr>
-                <td colspan="4" class="empty">No analysis yet.</td>
-              </tr>
+            <tbody id="csbTableBody">
+              <tr><td colspan="8" class="empty">Run an analysis to populate this table.</td></tr>
             </tbody>
           </table>
         </div>
 
-        <details class="raw-output">
-          <summary>Full narrative output</summary>
-          <pre id="rawAnalysisText">No analysis yet.</pre>
-        </details>
+        <!-- Timeline scrubber -->
+        <div class="csb-timeline" id="csbTimeline" aria-label="Clip timeline">
+          <div class="csb-tl-header">
+            <span class="csb-tl-title">Timeline</span>
+          </div>
+          <div class="csb-tl-track" id="csbTlTrack"></div>
+          <div class="csb-tl-labels" id="csbTlLabels"></div>
+        </div>
       </section>
-      <section class="panel clip-sequence-panel" id="clipSequencePanel" style="display:none;">
-  <div class="section-head">
-    <h2>Clip Sequence Breakdown</h2>
-    <span class="chip" id="clipSequenceCount">0 clips</span>
-  </div>
- 
-  <div class="csb-toolbar">
-    <div class="csb-search-wrap">
-      <svg class="csb-search-icon" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-        <circle cx="8.5" cy="8.5" r="5.5" stroke="currentColor" stroke-width="1.6"/>
-        <path d="M13 13L17 17" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
-      </svg>
-      <input id="csbSearch" class="csb-search" type="text" placeholder="Filter clips by description…" />
-    </div>
-    <button id="csbExportCsv" class="btn btn-ghost btn-sm" type="button">Export CSV</button>
-  </div>
- 
-  <div class="csb-table-wrap">
-    <table class="csb-table" aria-label="Clip sequence breakdown">
-      <thead>
-        <tr>
-          <th class="col-num">#</th>
-          <th class="col-tc" data-sort="start">Timecode <span class="sort-icon">↕</span></th>
-          <th class="col-start" data-sort="startSec">Start (s) <span class="sort-icon">↕</span></th>
-          <th class="col-end" data-sort="endSec">End (s) <span class="sort-icon">↕</span></th>
-          <th class="col-dur" data-sort="dur">Duration <span class="sort-icon">↕</span></th>
-          <th class="col-desc">Description</th>
-          <th class="col-tag">Clip Type Tag</th>
-        </tr>
-      </thead>
-      <tbody id="csbTableBody">
-        <tr><td colspan="7" class="empty">Run an analysis to populate this table.</td></tr>
-      </tbody>
-    </table>
-  </div>
- 
-  <!-- Timeline scrubber bar -->
-  <div class="csb-timeline" id="csbTimeline" aria-label="Clip timeline">
-    <div class="csb-tl-track" id="csbTlTrack"></div>
-    <div class="csb-tl-labels" id="csbTlLabels"></div>
-  </div>
-</section>
     </main>
 
     <script type="module" src="./instagram-reel-analyzer.js"></script>
