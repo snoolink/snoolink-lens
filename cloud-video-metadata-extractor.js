@@ -38,7 +38,8 @@ const VIDEO_EXTENSIONS = new Set([
 ]);
 
 const DEFAULT_FRAME_INTERVAL_SECONDS = 1;
-const MAX_ANALYZED_FRAMES = 300;
+// Lowered default max frames for RAM efficiency
+const MAX_ANALYZED_FRAMES = 100;
 let cachedFfmpegBinary = "";
 let cachedFfprobeBinary = "";
 
@@ -478,6 +479,7 @@ export async function describeVideo(videoPath, options = {}) {
     prompt,
     maxTokens = 2048,
     maxFrames = MAX_ANALYZED_FRAMES,
+    batchSize = 10, // New: process frames in batches
   } = options;
 
   const tempDir = await mkdtemp(join(tmpdir(), "snoolink-cloud-video-"));
@@ -524,46 +526,52 @@ export async function describeVideo(videoPath, options = {}) {
       frameFiles = frameFiles.slice(0, maxFrames);
     }
 
+    // Batch processing for RAM efficiency
     const frames = [];
-    for (let i = 0; i < frameFiles.length; i += 1) {
-      const framePath = join(tempDir, frameFiles[i]);
-      const second = Number((i * frameIntervalSeconds).toFixed(3));
-
-      try {
-        const frameResult = await describeImage(framePath, {
-          modelId,
-          prompt,
-          maxTokens,
-        });
-
-        frames.push({
-          second,
-          frame_file: frameFiles[i],
-          description: String(frameResult?.description || ""),
-          sceneTags: Array.isArray(frameResult?.sceneTags) ? frameResult.sceneTags : [],
-          objectTags: Array.isArray(frameResult?.objectTags) ? frameResult.objectTags : [],
-          activityTags: Array.isArray(frameResult?.activityTags) ? frameResult.activityTags : [],
-          socialMediaScore: Number(frameResult?.socialMediaScore || 0),
-          instagramScore: Number(frameResult?.instagramScore || 0),
-          aspectRatioSuitability: Array.isArray(frameResult?.aspectRatioSuitability) ? frameResult.aspectRatioSuitability : [],
-          aestheticStyle: String(frameResult?.aestheticStyle || ""),
-          editingLevel: String(frameResult?.editingLevel || ""),
-          visualComplexity: String(frameResult?.visualComplexity || ""),
-          heroElement: String(frameResult?.heroElement || ""),
-          depthOfField: String(frameResult?.depthOfField || ""),
-          ocr: frameResult?.ocr || { all_text: "", entries: [] },
-          status: "ok",
-          error: "",
-        });
-      } catch (error) {
-        frames.push({
-          second,
-          frame_file: frameFiles[i],
-          description: "",
-          ocr: { all_text: "", entries: [] },
-          status: "failed",
-          error: String(error?.message || error),
-        });
+    for (let batchStart = 0; batchStart < frameFiles.length; batchStart += batchSize) {
+      const batchEnd = Math.min(batchStart + batchSize, frameFiles.length);
+      const batch = frameFiles.slice(batchStart, batchEnd);
+      for (let i = 0; i < batch.length; i += 1) {
+        const frameIdx = batchStart + i;
+        const framePath = join(tempDir, batch[i]);
+        const second = Number((frameIdx * frameIntervalSeconds).toFixed(3));
+        try {
+          const frameResult = await describeImage(framePath, {
+            modelId,
+            prompt,
+            maxTokens,
+          });
+          frames.push({
+            second,
+            frame_file: batch[i],
+            description: String(frameResult?.description || ""),
+            sceneTags: Array.isArray(frameResult?.sceneTags) ? frameResult.sceneTags : [],
+            objectTags: Array.isArray(frameResult?.objectTags) ? frameResult.objectTags : [],
+            activityTags: Array.isArray(frameResult?.activityTags) ? frameResult.activityTags : [],
+            socialMediaScore: Number(frameResult?.socialMediaScore || 0),
+            instagramScore: Number(frameResult?.instagramScore || 0),
+            aspectRatioSuitability: Array.isArray(frameResult?.aspectRatioSuitability) ? frameResult.aspectRatioSuitability : [],
+            aestheticStyle: String(frameResult?.aestheticStyle || ""),
+            editingLevel: String(frameResult?.editingLevel || ""),
+            visualComplexity: String(frameResult?.visualComplexity || ""),
+            heroElement: String(frameResult?.heroElement || ""),
+            depthOfField: String(frameResult?.depthOfField || ""),
+            ocr: frameResult?.ocr || { all_text: "", entries: [] },
+            status: "ok",
+            error: "",
+          });
+        } catch (error) {
+          frames.push({
+            second,
+            frame_file: batch[i],
+            description: "",
+            ocr: { all_text: "", entries: [] },
+            status: "failed",
+            error: String(error?.message || error),
+          });
+        }
+        // Explicit dereference and optional GC
+        if (global.gc) global.gc();
       }
     }
 

@@ -57,6 +57,36 @@ function configureChromiumCachePaths() {
 }
 
 configureChromiumCachePaths();
+// Periodically force V8 to trim memory if supported (Node 14+)
+setInterval(() => {
+  if (global.gc) {
+    try {
+      global.gc();
+    } catch {}
+  }
+  if (typeof process.memoryUsage === "function") {
+    const mem = process.memoryUsage();
+    const mb = (bytes) => (bytes / 1024 / 1024).toFixed(1);
+    console.log(`[snoolink-lens][periodic] Heap: ${mb(mem.heapUsed)} MB / ${mb(mem.heapTotal)} MB | RSS: ${mb(mem.rss)} MB | External: ${mb(mem.external)} MB`);
+  }
+}, 60000);
+
+// Runtime safety net for large metadata/video sessions.
+app.commandLine.appendSwitch("js-flags", "--max-old-space-size=4096");
+
+// Periodically force V8 to trim memory if supported (Node 14+)
+setInterval(() => {
+  if (global.gc) {
+    try {
+      global.gc();
+    } catch {}
+  }
+  if (typeof process.memoryUsage === "function") {
+    const mem = process.memoryUsage();
+    const mb = (bytes) => (bytes / 1024 / 1024).toFixed(1);
+    console.log(`[snoolink-lens][periodic] Heap: ${mb(mem.heapUsed)} MB / ${mb(mem.heapTotal)} MB | RSS: ${mb(mem.rss)} MB | External: ${mb(mem.external)} MB`);
+  }
+}, 60000);
 
 const MASTER_DIRECTORY_PATH = path.join(DATA_DIR_PATH, "master_image_directory.json");
 const ALBUMS_DATA_PATH = path.join(DATA_DIR_PATH, "albums_data.json");
@@ -96,6 +126,11 @@ const LOCAL_GROUPS_OUTPUT_PATH = path.join(DATA_DIR_PATH, "local_index_groups.js
 const LOCAL_FACE_CLUSTERS_OUTPUT_PATH = path.join(DATA_DIR_PATH, "local_face_clusters.json");
 const SEARCH_HISTORY_PATH = path.join(DATA_DIR_PATH, "search_history.json");
 const MAX_SEARCH_HISTORY_ENTRIES = 10000;
+const MAX_FILTER_LOOKUP_OCR_CORPUS_CHARS = 1200;
+const MAX_FILTER_LOOKUP_FRAME_ROWS = 8;
+const MAX_SEARCH_RESULT_TEXT_CHARS = 1200;
+const MAX_SEARCH_RESULT_TITLE_CHARS = 220;
+const MAX_SEARCH_RESULT_TAGS = 24;
 const execFileAsync = promisify(execFile);
 
 const IMAGE_FILE_TYPES = [
@@ -224,6 +259,53 @@ function cloneJsonSafe(value) {
   } catch {
     return null;
   }
+}
+
+function trimSearchResultText(value, maxChars = MAX_SEARCH_RESULT_TEXT_CHARS) {
+  const text = String(value || "").trim();
+  if (!text) {
+    return "";
+  }
+  if (text.length <= maxChars) {
+    return text;
+  }
+  return `${text.slice(0, Math.max(0, maxChars - 1))}…`;
+}
+
+function compactSearchResultRows(rows) {
+  const list = Array.isArray(rows) ? rows : [];
+  return list.map((row) => {
+    const safeRow = row && typeof row === "object" ? row : {};
+    const metadata = safeRow?.metadata && typeof safeRow.metadata === "object" ? safeRow.metadata : {};
+    const tags = Array.isArray(metadata?.tags)
+      ? metadata.tags.slice(0, MAX_SEARCH_RESULT_TAGS).map((value) => trimSearchResultText(value, 80))
+      : [];
+    const objects = Array.isArray(metadata?.objects)
+      ? metadata.objects.slice(0, MAX_SEARCH_RESULT_TAGS).map((value) => trimSearchResultText(value, 80))
+      : [];
+
+    return {
+      id: safeRow?.id,
+      score: Number(safeRow?.score || 0),
+      path: String(safeRow?.path || safeRow?.image_path || "").trim(),
+      image_path: String(safeRow?.image_path || safeRow?.path || "").trim(),
+      media_type: String(safeRow?.media_type || metadata?.media_type || "").trim(),
+      preview_src: String(safeRow?.preview_src || "").trim(),
+      status: String(safeRow?.status || "ok"),
+      clip_mode: safeRow?.clip_mode || null,
+      clip_start_seconds: safeRow?.clip_start_seconds,
+      clip_end_seconds: safeRow?.clip_end_seconds,
+      clip_match_second: safeRow?.clip_match_second,
+      clip_match_text: trimSearchResultText(safeRow?.clip_match_text, 420),
+      metadata: {
+        title: trimSearchResultText(metadata?.title, MAX_SEARCH_RESULT_TITLE_CHARS),
+        description: trimSearchResultText(metadata?.description, MAX_SEARCH_RESULT_TEXT_CHARS),
+        tags,
+        objects,
+        media_type: String(metadata?.media_type || safeRow?.media_type || "").trim(),
+      },
+    };
+  });
 }
 
 async function appendSearchHistoryEntry(entry) {
@@ -1295,8 +1377,7 @@ function resolveCommonFfmpegBinaryPath() {
   if (process.platform === "darwin") {
     candidates.push(
       "/opt/homebrew/bin/ffmpeg",
-      "/usr/local/bin/ffmpeg",
-      "/opt/local/bin/ffmpeg",
+      "/opt/local/bin/ffmpeg"
     );
   }
 
@@ -1304,7 +1385,7 @@ function resolveCommonFfmpegBinaryPath() {
     candidates.push(
       "/usr/bin/ffmpeg",
       "/usr/local/bin/ffmpeg",
-      "/snap/bin/ffmpeg",
+      "/snap/bin/ffmpeg"
     );
   }
 
@@ -2000,7 +2081,6 @@ async function writeLocalIndexFile(results) {
   await fs.writeFile(target, JSON.stringify(payload, null, 2), "utf-8");
   return target;
 }
-
 async function loadExistingIndexResults(useCloud) {
   const filePath = useCloud
     ? path.join(DATA_DIR_PATH, "cloud-image_metadata_results.json")
@@ -2011,7 +2091,7 @@ async function loadExistingIndexResults(useCloud) {
       rows: [],
       byPath: new Set(),
       byId: new Set(),
-      retryableFailedCount: 0,
+      retryableFailedCount: 0
     };
   }
 
@@ -2047,51 +2127,17 @@ async function loadExistingIndexResults(useCloud) {
       rows,
       byPath,
       byId,
-      retryableFailedCount,
+      retryableFailedCount
     };
   } catch {
     return {
       rows: [],
       byPath: new Set(),
       byId: new Set(),
-      retryableFailedCount: 0,
+      retryableFailedCount: 0
     };
   }
-}
-
-async function loadSuccessfulLocalIndexLookup() {
-  const localFilePath = path.join(DATA_DIR_PATH, "local-image_metadata_results.json");
-  const byPath = new Set();
-  const byId = new Set();
-
-  if (!(await pathExists(localFilePath))) {
-    return { byPath, byId };
-  }
-
-  try {
-    const payload = JSON.parse(await fs.readFile(localFilePath, "utf-8"));
-    const rows = Array.isArray(payload?.results) ? payload.results : [];
-
-    for (const row of rows) {
-      if (String(row?.status || "") !== "ok") {
-        continue;
-      }
-
-      const rowPath = String(row?.path || "").trim();
-      const rowId = Number(row?.id);
-      if (rowPath) {
-        byPath.add(rowPath);
-      }
-      if (Number.isFinite(rowId)) {
-        byId.add(rowId);
-      }
-    }
-  } catch {
-    return { byPath, byId };
-  }
-
-  return { byPath, byId };
-}
+} // ← this was missing
 
 async function getMasterDirectoryIdByPath() {
   const payload = await loadMasterDirectory();
@@ -2295,7 +2341,7 @@ async function readUserSettings() {
       ),
       enable_face_indexing:
         payload?.enable_face_indexing === undefined
-          ? defaults.enable_face_indexing
+          ? true
           : Boolean(payload?.enable_face_indexing),
       face_model_version: normalizeFaceModelVersion(payload?.face_model_version || defaults.face_model_version),
       face_min_detection_confidence: Number.isFinite(Number(payload?.face_min_detection_confidence))
@@ -3102,7 +3148,8 @@ function scoreToBand(value) {
   return "low";
 }
 
-function extractLocalFilterData(row) {
+function extractLocalFilterData(row, options = {}) {
+  const includeOcrCorpus = options?.includeOcrCorpus === true;
   const metadata = row?.metadata || {};
   const localMeta = row?.local_metadata || {};
   const cloudMeta = row?.cloud_metadata && typeof row.cloud_metadata === "object" ? row.cloud_metadata : {};
@@ -3160,7 +3207,7 @@ function extractLocalFilterData(row) {
   return {
     containsPeople: metadata?.contains_people === true ? "yes" : metadata?.contains_people === false ? "no" : "any",
     containsText: metadata?.contains_text === true ? "yes" : metadata?.contains_text === false ? "no" : "any",
-    ocrCorpus: extractOcrCorpusFromRow(row),
+    ocrCorpus: includeOcrCorpus ? extractOcrCorpusFromRow(row) : "",
     resolutionMegapixels: String(filtering?.resolutionMegapixels || buildResolutionMegapixelsLabel(localMeta) || "").toLowerCase(),
     aspectRatio: String(filtering?.aspectRatio || normalizeAspectRatioFromMeta(localMeta) || "").toLowerCase(),
     fileType: String(extractFileTypeValue(row) || "").toLowerCase(),
@@ -3239,10 +3286,24 @@ function hasExactOcrTermMatch(ocrCorpusText, terms) {
 
 function extractOcrCorpusFromRow(row) {
   const parts = [];
+  let totalChars = 0;
+
+  const canAcceptMoreText = () => totalChars < MAX_FILTER_LOOKUP_OCR_CORPUS_CHARS;
   const pushText = (value) => {
+    if (!canAcceptMoreText()) {
+      return;
+    }
     const text = String(value || "").trim();
     if (text) {
-      parts.push(text);
+      const remaining = Math.max(0, MAX_FILTER_LOOKUP_OCR_CORPUS_CHARS - totalChars);
+      if (remaining <= 0) {
+        return;
+      }
+      const nextText = text.length > remaining ? text.slice(0, remaining) : text;
+      if (nextText) {
+        parts.push(nextText);
+        totalChars += nextText.length;
+      }
     }
   };
 
@@ -3285,7 +3346,17 @@ function extractOcrCorpusFromRow(row) {
     ? metadata.video_analysis.frames
     : [];
 
-  for (const frame of [...frameAnalyses, ...sampledFrames, ...metadataFrameAnalyses, ...metadataSampledFrames]) {
+  const allFrames = [
+    ...frameAnalyses,
+    ...sampledFrames,
+    ...metadataFrameAnalyses,
+    ...metadataSampledFrames,
+  ];
+
+  for (const frame of allFrames.slice(0, MAX_FILTER_LOOKUP_FRAME_ROWS)) {
+    if (!canAcceptMoreText()) {
+      break;
+    }
     pushText(frame?.ocr?.all_text);
     pushText(frame?.ocr_all_text);
     pushText(frame?.ocr_text);
@@ -3342,14 +3413,25 @@ function mergeFilterData(currentValue, nextValue) {
   };
 }
 
-async function loadLocalFilterLookup() {
+function hasLookupDependentGalleryFilters(filters) {
+  const activeFilters = filters && typeof filters === "object" ? filters : {};
+  return String(activeFilters.ocrTextQuery || "").trim().length > 0;
+}
+
+function hasActiveOcrGalleryFilter(filters) {
+  const activeFilters = filters && typeof filters === "object" ? filters : {};
+  return String(activeFilters.ocrTextQuery || "").trim().length > 0;
+}
+
+async function loadLocalFilterLookup(options = {}) {
+  const includeOcrCorpus = options?.includeOcrCorpus === true;
   const localFilePath = path.join(DATA_DIR_PATH, "local-image_metadata_results.json");
   const cloudFilePath = path.join(DATA_DIR_PATH, "cloud-image_metadata_results.json");
   const [localFingerprint, cloudFingerprint] = await Promise.all([
     getPathFingerprint(localFilePath),
     getPathFingerprint(cloudFilePath),
   ]);
-  const combinedFingerprint = `${localFingerprint}|${cloudFingerprint}`;
+  const combinedFingerprint = `${localFingerprint}|${cloudFingerprint}|ocr=${includeOcrCorpus ? "1" : "0"}`;
 
   if (
     localFilterLookupCache.payload
@@ -3369,18 +3451,24 @@ async function loadLocalFilterLookup() {
       const payload = JSON.parse(await fs.readFile(sourcePath, "utf-8"));
       const rows = Array.isArray(payload?.results) ? payload.results : [];
       for (const row of rows) {
+        if (lookup.size >= MAX_FILTER_LOOKUP_ROWS) {
+          break;
+        }
         if (String(row?.status || "") !== "ok") {
           continue;
         }
-        const rowPath = String(row?.path || row?.image_path || "").trim();
+        const rowPath = String(row?.path || "").trim();
         if (!rowPath) {
           continue;
         }
         const existing = lookup.get(rowPath);
-        lookup.set(rowPath, mergeFilterData(existing, extractLocalFilterData(row)));
+        lookup.set(rowPath, mergeFilterData(existing, extractLocalFilterData(row, { includeOcrCorpus })));
       }
     } catch {
       // Continue with available sources.
+    }
+    if (lookup.size >= MAX_FILTER_LOOKUP_ROWS) {
+      break;
     }
   }
 
@@ -4065,6 +4153,12 @@ ipcMain.handle("validate-metadata-file", async (_event, filePath) => {
 });
 
 ipcMain.handle("semantic-search", async (_event, payload) => {
+    // Log memory usage at start of handler
+    try {
+      const mem = process.memoryUsage();
+      const mb = (bytes) => (bytes / 1024 / 1024).toFixed(1);
+      console.log(`[snoolink-lens][search] Heap: ${mb(mem.heapUsed)} MB / ${mb(mem.heapTotal)} MB | RSS: ${mb(mem.rss)} MB | External: ${mb(mem.external)} MB`);
+    } catch {}
   const filters = payload?.filters && typeof payload.filters === "object" ? payload.filters : {};
   const requestedAlbumIds = Array.isArray(filters.albumIds)
     ? filters.albumIds.map((id) => Number(id)).filter((id) => Number.isFinite(id))
@@ -4102,6 +4196,12 @@ ipcMain.handle("semantic-search", async (_event, payload) => {
   };
 
   const result = await runSemanticSearch(runPayload);
+  const compactResult = result?.ok === true
+    ? {
+      ...result,
+      results: compactSearchResultRows(result?.results),
+    }
+    : result;
 
   try {
     await appendSearchHistoryEntry({
@@ -4111,13 +4211,19 @@ ipcMain.handle("semantic-search", async (_event, payload) => {
       minScore: effectiveMinScore,
       filters,
       allowedImagePathsCount: Array.isArray(allowedImagePaths) ? allowedImagePaths.length : 0,
-      result,
+      result: {
+        ok: result?.ok === true,
+        filteredCount: Number(result?.filteredCount || 0),
+        results: Array.isArray(result?.results) ? new Array(result.results.length) : [],
+        message: String(result?.message || ""),
+        queryExpansion: cloneJsonSafe(result?.queryExpansion) || null,
+      },
     });
   } catch {
     // Logging must never break search.
   }
 
-  return result;
+  return compactResult;
 });
 
 ipcMain.handle("wizard-generate-plan", async (_event, payload) => {
@@ -4141,8 +4247,68 @@ ipcMain.handle("get-image-metadata-by-path", async (_event, payload) => {
   try {
     const metadataFilePath = String(payload?.filePath || "").trim();
     const imagePath = String(payload?.imagePath || "").trim();
-    if (!metadataFilePath || !imagePath) {
+    const pathOnly = payload?.pathOnly === true;
+    if (!imagePath) {
+      return { ok: false, message: "imagePath is required." };
+    }
+    if (!pathOnly && !metadataFilePath) {
       return { ok: false, message: "filePath and imagePath are required." };
+    }
+
+    if (pathOnly) {
+      const snapshot = payload?.rowSnapshot && typeof payload.rowSnapshot === "object"
+        ? payload.rowSnapshot
+        : {};
+      let sizeBytes = null;
+      let modifiedAt = null;
+      try {
+        const stats = await fs.stat(imagePath);
+        sizeBytes = Number(stats?.size || 0);
+        modifiedAt = stats?.mtime ? new Date(stats.mtime).toISOString() : null;
+      } catch {
+        // Keep metadata lightweight even when file stat fails.
+      }
+
+      const inferredMediaType = String(
+        snapshot?.media_type ||
+        snapshot?.metadata?.media_type ||
+        getMediaTypeFromPath(imagePath, "image"),
+      );
+
+      const metadata = snapshot?.metadata && typeof snapshot.metadata === "object"
+        ? snapshot.metadata
+        : {
+          title: path.basename(imagePath) || `Untitled ${inferredMediaType}`,
+          description: "",
+          tags: [],
+          objects: [],
+          media_type: inferredMediaType,
+        };
+
+      const pathOnlyResult = {
+        id: snapshot?.id ?? null,
+        path: imagePath,
+        image_path: imagePath,
+        media_type: inferredMediaType,
+        status: String(snapshot?.status || "ok"),
+        metadata,
+        local_metadata: {
+          ...(snapshot?.local_metadata && typeof snapshot.local_metadata === "object" ? snapshot.local_metadata : {}),
+          size_bytes: sizeBytes,
+          modified_at: modifiedAt,
+        },
+        cloud_metadata: snapshot?.cloud_metadata || null,
+        model_id: snapshot?.model_id || null,
+        analyzed_at: snapshot?.analyzed_at || null,
+        description: snapshot?.description || null,
+        ocr: snapshot?.ocr || null,
+        error: String(snapshot?.error || ""),
+      };
+
+      return {
+        ok: true,
+        result: pathOnlyResult,
+      };
     }
 
     const resolvedPath = path.isAbsolute(metadataFilePath)
@@ -4403,6 +4569,12 @@ ipcMain.handle("get-ui-partial", async (_event, payload) => {
 });
 
 ipcMain.handle("get-image-preview-src", async (_event, payload) => {
+  // Log memory usage at start of handler
+  try {
+    const mem = process.memoryUsage();
+    const mb = (bytes) => (bytes / 1024 / 1024).toFixed(1);
+    console.log(`[snoolink-lens][preview] Heap: ${mb(mem.heapUsed)} MB / ${mb(mem.heapTotal)} MB | RSS: ${mb(mem.rss)} MB | External: ${mb(mem.external)} MB`);
+  } catch {}
   try {
     const imagePath = String(payload?.imagePath || "").trim();
     const mediaType = String(payload?.mediaType || getMediaTypeFromPath(imagePath, "image"));
@@ -4462,17 +4634,49 @@ function sortItemsBySeed(items, seed) {
     .map((entry) => entry.item);
 }
 
+function buildLightweightGalleryItem(item, overrides = {}) {
+  const safeItem = item && typeof item === "object" ? item : {};
+  const itemPath = String(safeItem?.path || "").trim();
+  const itemMediaType = String(safeItem?.media_type || getMediaTypeFromPath(itemPath, "image"));
+  const name = String(safeItem?.name || path.basename(itemPath) || "Untitled media");
+  const directory = String(safeItem?.directory || path.dirname(itemPath) || "");
+
+  return {
+    id: safeItem?.id ?? null,
+    path: itemPath,
+    media_type: itemMediaType,
+    preview_src: String(overrides?.preview_src || safeItem?.preview_src || toPreviewSrc(itemPath)),
+    indexing_stage: String(overrides?.indexing_stage || "none"),
+    metadata: {
+      title: name,
+      description: directory,
+      tags: [],
+      objects: [],
+      media_type: itemMediaType,
+    },
+  };
+}
+
 ipcMain.handle("get-master-directory", async (_event, options) => {
+  // Log memory usage at start of handler
   try {
+    const mem = process.memoryUsage();
+    const mb = (bytes) => (bytes / 1024 / 1024).toFixed(1);
+    console.log(`[snoolink-lens][search] Heap: ${mb(mem.heapUsed)} MB / ${mb(mem.heapTotal)} MB | RSS: ${mb(mem.rss)} MB | External: ${mb(mem.external)} MB`);
     const payload = await loadMasterDirectory();
     const albumData = await loadAlbumsData();
+    const activeFilters = options?.filters && typeof options.filters === "object" ? options.filters : {};
+    const requiresLookupFilters = hasLookupDependentGalleryFilters(activeFilters) || hasActiveOcrGalleryFilter(activeFilters);
+    const includeOcrCorpus = hasActiveOcrGalleryFilter(activeFilters);
     const settings = await readUserSettings();
     const cacheTranscodedMovPreview = Boolean(settings?.cache_transcoded_mov_preview);
     const cacheTranscodedHeicPreview = Boolean(settings?.cache_transcoded_heic_preview);
     const cacheTranscodedHeifPreview = Boolean(settings?.cache_transcoded_heif_preview);
     const items = Array.isArray(payload?.items) ? payload.items : [];
     const stageLookup = await loadIndexingStageLookup();
-    const localFilterLookup = await loadLocalFilterLookup();
+    const localFilterLookup = requiresLookupFilters
+      ? await loadLocalFilterLookup({ includeOcrCorpus })
+      : new Map();
     const requestedOffset = Number(options?.offset);
     const requestedLimit = Number(options?.limit);
     const deferPreviewResolution = options?.deferPreviewResolution !== false;
@@ -4483,10 +4687,10 @@ ipcMain.handle("get-master-directory", async (_event, options) => {
       ? Math.max(1, Math.min(Math.floor(requestedLimit), 500))
       : 120;
 
-    const filteredByAlbums = filterItemsByAlbumIds(items, albumData, options?.filters?.albumIds);
+    const filteredByAlbums = filterItemsByAlbumIds(items, albumData, activeFilters?.albumIds);
     const randomize = options?.randomize === true;
     const randomSeed = normalizeRandomSeed(options?.randomSeed);
-    let filteredItems = applyGalleryFilters(filteredByAlbums, localFilterLookup, options?.filters);
+    let filteredItems = applyGalleryFilters(filteredByAlbums, localFilterLookup, activeFilters);
     if (randomize && filteredItems.length > 1) {
       filteredItems = sortItemsBySeed(filteredItems, randomSeed);
     }
@@ -4504,17 +4708,14 @@ ipcMain.handle("get-master-directory", async (_event, options) => {
             cacheTranscodedHeicPreview,
             cacheTranscodedHeifPreview,
           });
-        return {
-          ...item,
-          media_type: itemMediaType,
+        return buildLightweightGalleryItem(item, {
           preview_src:
             resolvedPreview?.ok && resolvedPreview?.previewSrc
               ? resolvedPreview.previewSrc
               : item?.preview_src || toPreviewSrc(itemPath),
           indexing_stage: getIndexingStageForItem(item, stageLookup),
-          local_filter_data: localFilterLookup.get(String(item?.path || "")) || null,
-        };
-      }),
+        });
+      })
     );
     return {
       ok: true,
@@ -4525,7 +4726,7 @@ ipcMain.handle("get-master-directory", async (_event, options) => {
       hasMore: offset + limitedItems.length < filteredItems.length,
       shown: limitedItems.length,
       generatedAt: payload?.generated_at || null,
-      items: limitedItems,
+      items: limitedItems
     };
   } catch (error) {
     return { ok: false, message: String(error?.message || error), items: [] };
@@ -4623,35 +4824,33 @@ ipcMain.handle("backup-app-data", async (event) => {
     const skippedRequiredFiles = [];
 
     for (const spec of specs) {
-      if (!(await pathExists(spec.sourcePath))) {
-        missingFiles.push({
-          key: spec.key,
-          required: Boolean(spec.required),
-          sourcePath: spec.sourcePath,
-        });
-        if (spec.required) {
-          skippedRequiredFiles.push(spec.key);
-        }
-        continue;
+      if (!(await pathExists(localFilePath))) {
+        return { byPath, byId };
       }
 
-      const destinationPath = path.join(backupDirPath, spec.fileName);
-      await fs.copyFile(spec.sourcePath, destinationPath);
-      backedUpFiles.push({
-        key: spec.key,
-        sourcePath: spec.sourcePath,
-        destinationPath,
-      });
-    }
+      try {
+        const payload = JSON.parse(await fs.readFile(localFilePath, "utf-8"));
+        const rows = Array.isArray(payload?.results) ? payload.results : [];
 
-    const manifest = {
-      generated_at: new Date().toISOString(),
-      backup_directory: backupDirPath,
-      source_data_directory: DATA_DIR_PATH,
-      files_backed_up: backedUpFiles,
-      files_missing: missingFiles,
-      required_files_missing: skippedRequiredFiles,
-    };
+        for (const row of rows) {
+          if (String(row?.status || "") !== "ok") {
+            continue;
+          }
+
+          const rowPath = String(row?.path || "").trim();
+          const rowId = Number(row?.id);
+          if (rowPath) {
+            byPath.add(rowPath);
+          }
+          if (Number.isFinite(rowId)) {
+            byId.add(rowId);
+          }
+        }
+        return { byPath, byId };
+      } catch {
+        return { byPath, byId };
+      }
+    }
     await fs.writeFile(
       path.join(backupDirPath, "backup-manifest.json"),
       JSON.stringify(manifest, null, 2),
@@ -4926,12 +5125,17 @@ ipcMain.handle("get-album-images", async (_event, payload) => {
 
     const payloadMaster = await loadMasterDirectory();
     const allItems = Array.isArray(payloadMaster?.items) ? payloadMaster.items : [];
+    const activeFilters = payload?.filters && typeof payload.filters === "object" ? payload.filters : {};
+    const requiresLookupFilters = hasLookupDependentGalleryFilters(activeFilters) || hasActiveOcrGalleryFilter(activeFilters);
+    const includeOcrCorpus = hasActiveOcrGalleryFilter(activeFilters);
     const settings = await readUserSettings();
     const cacheTranscodedMovPreview = Boolean(settings?.cache_transcoded_mov_preview);
     const cacheTranscodedHeicPreview = Boolean(settings?.cache_transcoded_heic_preview);
     const cacheTranscodedHeifPreview = Boolean(settings?.cache_transcoded_heif_preview);
     const stageLookup = await loadIndexingStageLookup();
-    const localFilterLookup = await loadLocalFilterLookup();
+    const localFilterLookup = requiresLookupFilters
+      ? await loadLocalFilterLookup({ includeOcrCorpus })
+      : new Map();
 
     const requestedOffset = Number(payload?.offset);
     const requestedLimit = Number(payload?.limit);
@@ -4943,27 +5147,26 @@ ipcMain.handle("get-album-images", async (_event, payload) => {
       : 120;
 
     const filteredByAlbum = filterItemsByAlbumIds(allItems, data, [albumId]);
-    const filtered = applyGalleryFilters(filteredByAlbum, localFilterLookup, payload?.filters);
+    const filtered = applyGalleryFilters(filteredByAlbum, localFilterLookup, activeFilters);
     const pageItems = filtered.slice(offset, offset + limit);
     const paged = await Promise.all(
       pageItems.map(async (item) => {
         const itemPath = String(item?.path || "");
         const itemMediaType = String(item?.media_type || getMediaTypeFromPath(itemPath, "image"));
-        const resolvedPreview = await resolvePreviewSrcForImage(itemPath, itemMediaType, {
-          cacheTranscodedMovPreview,
-          cacheTranscodedHeicPreview,
-          cacheTranscodedHeifPreview,
-        });
-        return {
-          ...item,
-          media_type: itemMediaType,
+        const resolvedPreview = payload?.deferPreviewResolution === false
+          ? await resolvePreviewSrcForImage(itemPath, itemMediaType, {
+            cacheTranscodedMovPreview,
+            cacheTranscodedHeicPreview,
+            cacheTranscodedHeifPreview,
+          })
+          : null;
+        return buildLightweightGalleryItem(item, {
           preview_src:
             resolvedPreview?.ok && resolvedPreview?.previewSrc
               ? resolvedPreview.previewSrc
               : item?.preview_src || toPreviewSrc(itemPath),
           indexing_stage: getIndexingStageForItem(item, stageLookup),
-          local_filter_data: localFilterLookup.get(String(item?.path || "")) || null,
-        };
+        });
       }),
     );
 
@@ -5043,9 +5246,7 @@ async function startIndexingInternal({ files, mode = "local" }) {
       try {
         localVideoExtractor = await loadLocalVideoMetadataExtractor();
       } catch (error) {
-        sendToRenderer("index-log", {
-          message: `Video extractor unavailable, using video fallback metadata. ${String(error?.message || error)}`,
-        });
+        // Video extractor is optional at startup; runtime path will fallback per file.
       }
     }
     const cloudExtractor = useCloud ? await loadCloudMetadataExtractor() : null;
@@ -5245,7 +5446,7 @@ async function startIndexingInternal({ files, mode = "local" }) {
 
     const requestedParallelism = Number(
       process.env.SNOOLINK_INDEX_CONCURRENCY
-      || (useCloud ? 5 : 2),
+      || (useCloud ? 4 : 1),
     );
     const indexingConcurrency = Math.max(1, Math.min(8, Math.floor(requestedParallelism || 1)));
     sendToRenderer("index-log", {
@@ -5370,8 +5571,6 @@ async function startIndexingInternal({ files, mode = "local" }) {
     async function processSingleTarget(imagePath, targetIndex) {
       const activeCloudGroup = useCloud
         ? (cloudGroupByRepresentative.get(imagePath) || {
-          group_id: null,
-          representative: imagePath,
           members: [imagePath],
         })
         : null;
@@ -5875,6 +6074,14 @@ ipcMain.handle("retry-failed-indexing", async () => {
 });
 
 app.whenReady().then(async () => {
+  // Periodic memory usage logging for debugging OOM
+  setInterval(() => {
+    try {
+      const mem = process.memoryUsage();
+      const mb = (bytes) => (bytes / 1024 / 1024).toFixed(1);
+      console.log(`[snoolink-lens] Heap: ${mb(mem.heapUsed)} MB / ${mb(mem.heapTotal)} MB | RSS: ${mb(mem.rss)} MB | External: ${mb(mem.external)} MB`);
+    } catch {}
+  }, 15000);
   await ensureEnvFileExists();
   const envSettings = await readEnvSettings();
   process.env.AWS_REGION = String(envSettings.aws_region || "us-east-1");
@@ -5897,5 +6104,5 @@ app.whenReady().then(async () => {
 app.on("window-all-closed", () => { 
   if (process.platform !== "darwin") { 
     app.quit(); 
-  } 
+  }
 });

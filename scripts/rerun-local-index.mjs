@@ -1,3 +1,6 @@
+// NOTE: For RAM efficiency, throttle/batch indexing jobs and avoid loading too many files at once.
+// Explicitly dereference large objects after each file is indexed.
+
 import fs from "node:fs/promises";
 import path from "node:path";
 

@@ -1,10 +1,10 @@
 # Snoolink Lens
 
-Snoolink Lens is an Electron desktop app to scan media folders, index image/video metadata, and search with semantic ranking plus practical filters. 
+Snoolink Lens is an Electron desktop app to scan media folders, index image/video metadata, and search with semantic ranking plus practical filters.
 
-It is designed for fast local workflows first, with optional cloud enrichment. 
+It is designed for fast local workflows first, with optional cloud enrichment.
 
-## Features Overview 
+## Features Overview
 
 - Scan local drives and custom folders for images and videos.
 - Build a persistent master catalog with stable item IDs.
@@ -17,6 +17,42 @@ It is designed for fast local workflows first, with optional cloud enrichment.
 - Review people groups in the Faces workspace and assign names.
 - Manual app-data backup from Settings (including cloud/local metadata outputs).
 - Welcome gallery randomizes per load and cards show loading state while previews are prepared.
+
+## Performance and Memory Efficiency (Recent Improvements)
+
+Snoolink Lens now includes stronger protections to keep large libraries responsive and avoid app crashes from memory pressure.
+
+### Search Engine Efficiency
+
+- Switched from dense TF-IDF vectors to sparse term-frequency based scoring to reduce RAM usage on large metadata sets.
+- Uses a two-pass ranking strategy (fast pre-pass + capped fuzzy rerank) to reduce CPU spikes.
+- Uses compact derived cache artifacts for search (`.snoolink-search-cache`) with NDJSON shards instead of always loading full JSON payloads.
+- Strict cache invalidation is enforced with source file fingerprint checks (size + mtime) and cache versioning.
+
+### Data Loading Efficiency
+
+- Metadata loading is mode-aware:
+  - compact mode for most searches
+  - full mode only when advanced filters or timeframe-specific video matching require full row payloads
+- Derived cache files are stored as incremental shards and rebuilt automatically when stale.
+
+### UI Rendering Efficiency
+
+- Hard caps are enforced for rendered cards to prevent unbounded DOM growth.
+- Search results now use windowed/incremental rendering (not just the welcome gallery).
+- Search result rows are compacted before rendering/storage to reduce in-memory object size.
+- Search result storage is capped to avoid runaway memory usage in renderer state.
+
+### Media Preview Memory Safety
+
+- Card media loading remains lazy (viewport-driven) with strict release/unload behavior when cards move out of range.
+- Recycled cards are unobserved and their media resources are explicitly released.
+
+### Runtime Safety Limits
+
+- Top-K result limits are clamped in both renderer and search engine layers.
+- Large search result responses are trimmed to a safe in-memory bound before windowed rendering.
+- Worker concurrency remains tunable with safety limits to prevent over-allocation.
 
 ## Install and Run Desktop App
 

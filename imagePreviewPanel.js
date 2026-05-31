@@ -513,6 +513,7 @@ export function createImagePreviewPanel(options = {}) {
       <span class="ipp-bc-current ipp-title">Details</span>
     </div>
     <div class="ipp-topbar-actions">
+      <button class="ipp-btn ipp-show-meta-btn"      type="button">Show Metadata</button>
       <button class="ipp-btn accent ipp-album-btn"  type="button">Add to album</button>
       <button class="ipp-btn ipp-export-btn"         type="button">Download</button>
       <button class="ipp-btn ipp-cloud-index-btn"    type="button">Cloud index</button>
@@ -647,6 +648,7 @@ export function createImagePreviewPanel(options = {}) {
   const zoomBadge           = overlay.querySelector(".ipp-zoom-badge");
   const prevBtn             = overlay.querySelector(".ipp-nav.prev");
   const nextBtn             = overlay.querySelector(".ipp-nav.next");
+  const showMetaBtn         = overlay.querySelector(".ipp-show-meta-btn");
   const albumBtn            = overlay.querySelector(".ipp-album-btn");
   const exportBtn           = overlay.querySelector(".ipp-export-btn");
   const cloudIndexBtn       = overlay.querySelector(".ipp-cloud-index-btn");
@@ -670,6 +672,10 @@ export function createImagePreviewPanel(options = {}) {
   const stars               = overlay.querySelectorAll(".ipp-star");
 
   let currentDetails = null;
+  let currentRow = null;
+  let metadataLoaded = false;
+  let metadataRequestToken = 0;
+  let metadataLoadInFlight = false;
   let currentRating  = 0;
   let albumActionInFlight = false;
 
@@ -683,6 +689,19 @@ export function createImagePreviewPanel(options = {}) {
   let _lockPlaybackToHighlight = false;
   // Tracks all timeline segment items for active-segment styling
   let _timelineItems = [];
+  let _clipTimeUpdateHandler = null;
+  let _clipEmptiedHandler = null;
+
+  function clearVideoClipPlaybackHandlers() {
+    if (_clipTimeUpdateHandler) {
+      videoEl.removeEventListener("timeupdate", _clipTimeUpdateHandler);
+      _clipTimeUpdateHandler = null;
+    }
+    if (_clipEmptiedHandler) {
+      videoEl.removeEventListener("emptied", _clipEmptiedHandler);
+      _clipEmptiedHandler = null;
+    }
+  }
 
   function applyVideoHighlight(startSecs, endSecs) {
     _activeHighlight = { startSecs, endSecs };
@@ -848,6 +867,7 @@ export function createImagePreviewPanel(options = {}) {
 
   async function applyPreviewImageSource(imagePath, preferredPreviewSrc, mediaType, previewContext = null) {
     const normalized = normalizeMediaType(mediaType, imagePath);
+    clearVideoClipPlaybackHandlers();
 
     if (normalized === "video") {
       imageEl.classList.add("hidden");
@@ -902,23 +922,26 @@ export function createImagePreviewPanel(options = {}) {
           videoEl.addEventListener("loadedmetadata", applyClipWindow, { once: true });
         }
         // Stop playback at end time
-        const onTimeUpdate = () => {
+        _clipTimeUpdateHandler = () => {
           if (videoEl.currentTime >= clipEndSeconds) {
             videoEl.pause();
             videoEl.currentTime = clipStartSeconds;
           }
         };
-        videoEl.addEventListener("timeupdate", onTimeUpdate);
+        videoEl.addEventListener("timeupdate", _clipTimeUpdateHandler);
         // Remove listener on source change
-        videoEl.addEventListener("emptied", () => {
-          videoEl.removeEventListener("timeupdate", onTimeUpdate);
-        }, { once: true });
+        _clipEmptiedHandler = () => {
+          clearVideoClipPlaybackHandlers();
+        };
+        videoEl.addEventListener("emptied", _clipEmptiedHandler, { once: true });
       }
       return;
     }
 
+    clearVideoClipPlaybackHandlers();
     videoEl.pause();
     videoEl.src = "";
+    videoEl.load();
     videoEl.classList.add("hidden");
     videoHighlightTrack.style.display = "none";
     let src = String(preferredPreviewSrc || "").trim() || normalizeImageSrc(imagePath);
@@ -1216,6 +1239,76 @@ export function createImagePreviewPanel(options = {}) {
     all.forEach(t => addTag(t));
   }
 
+  function setMetadataDeferredUi() {
+    aiDescLabel.textContent = "Metadata";
+    aiDesc.innerHTML = `<div class="ipp-ai-card">Metadata is deferred. Click "Show Metadata" to load full analysis.</div>`;
+    objectsList.innerHTML = "";
+    ocrText.textContent = "Metadata not loaded.";
+    metaRaw.textContent = "Metadata is deferred. Click \"Show Metadata\" to load it.";
+  }
+
+  async function loadMetadataForCurrentRow() {
+    if (!currentRow || metadataLoaded || metadataLoadInFlight) {
+      return;
+    }
+
+    metadataLoadInFlight = true;
+    const requestToken = ++metadataRequestToken;
+    showMetaBtn.disabled = true;
+    showMetaBtn.textContent = "Loading…";
+    setStatus("Loading metadata…");
+
+    const imagePath = String(currentRow?.path || currentRow?.image_path || "");
+    const mediaType = normalizeMediaType(currentRow?.media_type || currentRow?.metadata?.media_type, imagePath);
+
+    try {
+      const resolved = await resolveDetails(currentRow);
+      if (requestToken !== metadataRequestToken) {
+        return;
+      }
+
+      currentDetails = {
+        path: imagePath,
+        media_type: mediaType,
+        ...resolved,
+        clip_mode: currentRow?.clip_mode || null,
+        clip_start_seconds: currentRow?.clip_start_seconds,
+        clip_end_seconds: currentRow?.clip_end_seconds,
+      };
+      titleEl.textContent = currentDetails?.metadata?.title || titleEl.textContent;
+      metaRaw.textContent = toMetadataText(currentDetails);
+      renderStatusStrip(currentDetails);
+      populateFileSection(currentDetails);
+      populateAISection(currentDetails);
+      populateTagsSection(currentDetails);
+      metadataLoaded = true;
+      showMetaBtn.textContent = "Metadata loaded";
+      setStatus("Metadata loaded.");
+    } catch (err) {
+      if (requestToken !== metadataRequestToken) {
+        return;
+      }
+      currentDetails = {
+        path: imagePath,
+        media_type: mediaType,
+        status: "failed",
+        metadata: currentRow?.metadata || {},
+        error: String(err?.message || err),
+      };
+      metaRaw.textContent = toMetadataText(currentDetails);
+      showMetaBtn.disabled = false;
+      showMetaBtn.textContent = "Show Metadata";
+      setStatus(`Could not load metadata: ${String(err?.message || err)}`);
+    } finally {
+      if (requestToken === metadataRequestToken) {
+        metadataLoadInFlight = false;
+        if (metadataLoaded) {
+          showMetaBtn.disabled = true;
+        }
+      }
+    }
+  }
+
   // ── NAV ───────────────────────────────────────────────────────────
 
   prevBtn.addEventListener("click", () => onNavigate("prev"));
@@ -1283,9 +1376,17 @@ export function createImagePreviewPanel(options = {}) {
     setStatus(r?.ok ? "Opened source folder." : `Could not open: ${r?.message || "Unknown error"}`);
   });
 
+  showMetaBtn.addEventListener("click", () => {
+    void loadMetadataForCurrentRow();
+  });
+
   // ── OPEN / CLOSE ──────────────────────────────────────────────────
 
   function close() {
+    clearVideoClipPlaybackHandlers();
+    videoEl.pause();
+    videoEl.removeAttribute("src");
+    videoEl.load();
     overlay.classList.add("hidden");
     overlay.setAttribute("aria-hidden", "true");
     document.body.classList.remove("preview-open");
@@ -1314,8 +1415,12 @@ export function createImagePreviewPanel(options = {}) {
     await applyPreviewImageSource(imagePath, row?.preview_src, mediaType, row);
     resetTransformState();
 
-    metaRaw.textContent = "Loading…";
-    aiDesc.innerHTML = `<div class="ipp-ai-card">Loading…</div>`;
+    currentRow = row && typeof row === "object" ? { ...row } : null;
+    metadataLoaded = false;
+    metadataLoadInFlight = false;
+    metadataRequestToken += 1;
+    showMetaBtn.disabled = false;
+    showMetaBtn.textContent = "Show Metadata";
 
     currentDetails = {
       path: imagePath, image_path: imagePath, media_type: mediaType,
@@ -1329,28 +1434,8 @@ export function createImagePreviewPanel(options = {}) {
     renderStatusStrip(currentDetails);
     populateFileSection(currentDetails);
     populateTagsSection(currentDetails);
+    setMetadataDeferredUi();
     open();
-
-    try {
-      const resolved = await resolveDetails(row);
-      currentDetails = {
-        path: imagePath,
-        media_type: mediaType,
-        ...resolved,
-        clip_mode: row?.clip_mode || null,
-        clip_start_seconds: row?.clip_start_seconds,
-        clip_end_seconds: row?.clip_end_seconds,
-      };
-      titleEl.textContent = currentDetails?.metadata?.title || titleEl.textContent;
-      metaRaw.textContent = toMetadataText(currentDetails);
-      renderStatusStrip(currentDetails);
-      populateFileSection(currentDetails);
-      populateAISection(currentDetails);
-      populateTagsSection(currentDetails);
-    } catch (err) {
-      currentDetails = { path: imagePath, media_type: mediaType, status: "failed", metadata: row?.metadata || {}, error: String(err?.message || err) };
-      metaRaw.textContent = toMetadataText(currentDetails);
-    }
   }
 
   // ── GLOBAL KEYBOARD ───────────────────────────────────────────────

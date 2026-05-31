@@ -7,6 +7,15 @@ const inMemoryIndex = new Map();
 const jsonPayloadCache = new Map();
 const validationCache = new Map();
 const DEFAULT_FRAME_INTERVAL_SECONDS = 1;
+const DERIVED_INDEX_CACHE_VERSION = 1;
+const DERIVED_INDEX_SHARD_SIZE = 1000;
+const DERIVED_INDEX_DIR_NAME = ".snoolink-search-cache";
+const MAX_SAFE_TOPK = 200;
+const MAX_JSON_PAYLOAD_CACHE_FILE_BYTES = 64 * 1024 * 1024;
+const MAX_COMPACT_DOC_TEXT_CHARS = 2400;
+const MAX_COMPACT_TAGS = 24;
+const MAX_COMPACT_CANDIDATE_POOL = 4000;
+const COMPACT_BATCH_MIN_SCORE = 0.001;
 
 async function resolveMetadataPath(filePath) {
   const rawPath = String(filePath || "").trim();
@@ -83,76 +92,91 @@ function tokenize(text) {
   return text.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim().split(/\s+/).filter(Boolean);
 }
 
-function buildVocabAndTfIdf(docs) {
+function buildTermFrequency(tokens) {
+  const tf = new Map();
+  for (const token of tokens) {
+    tf.set(token, (tf.get(token) || 0) + 1);
+  }
+  return tf;
+}
+
+function buildSparseTfIdfCorpus(docs) {
   const docTokens = docs.map(tokenize);
   const docCount = docTokens.length;
+  const docTermFreqs = docTokens.map((tokens) => buildTermFrequency(tokens));
 
-  // Document frequency: how many docs contain each term
+  // Document frequency: how many docs contain each term.
   const df = new Map();
   for (const tokens of docTokens) {
     const seen = new Set(tokens);
-    for (const t of seen) {
-      df.set(t, (df.get(t) || 0) + 1);
+    for (const token of seen) {
+      df.set(token, (df.get(token) || 0) + 1);
     }
   }
 
-  // Build vocabulary (sorted for consistent indexing)
-  const vocab = Array.from(df.keys()).sort();
-  const vocabIndex = new Map();
-  vocab.forEach((term, i) => vocabIndex.set(term, i));
-
-  // IDF: log(N / df)
-  const idf = new Float64Array(vocab.length);
-  for (let i = 0; i < vocab.length; i++) {
-    idf[i] = Math.log(docCount / (df.get(vocab[i]) || 1));
+  const idfByTerm = new Map();
+  for (const [term, freq] of df) {
+    idfByTerm.set(term, Math.log(docCount / Math.max(1, freq)));
   }
 
-  // TF-IDF vectors per document
-  const vectors = docTokens.map((tokens) => {
-    const tf = new Map();
-    for (const t of tokens) {
-      tf.set(t, (tf.get(t) || 0) + 1);
-    }
-    const vec = new Float64Array(vocab.length);
+  const docNorms = docTermFreqs.map((tf) => {
+    let sumSquares = 0;
     for (const [term, count] of tf) {
-      const idx = vocabIndex.get(term);
-      if (idx !== undefined) {
-        vec[idx] = count * idf[idx];
-      }
+      const idf = Number(idfByTerm.get(term) || 0);
+      const weight = count * idf;
+      sumSquares += weight * weight;
     }
-    return vec;
+    return Math.sqrt(sumSquares);
   });
 
-  return { vocab, vocabIndex, idf, vectors };
+  return {
+    docTermFreqs,
+    idfByTerm,
+    docNorms,
+  };
 }
 
-function queryToVector(query, vocabIndex, idf) {
+function buildSparseQueryVector(query, idfByTerm) {
   const tokens = tokenize(query);
-  const tf = new Map();
-  for (const t of tokens) {
-    tf.set(t, (tf.get(t) || 0) + 1);
-  }
-  const vec = new Float64Array(vocabIndex.size);
+  const tf = buildTermFrequency(tokens);
+  const weights = new Map();
+  let sumSquares = 0;
+
   for (const [term, count] of tf) {
-    const idx = vocabIndex.get(term);
-    if (idx !== undefined) {
-      vec[idx] = count * idf[idx];
+    const idf = Number(idfByTerm.get(term) || 0);
+    if (idf <= 0) {
+      continue;
     }
+    const weight = count * idf;
+    weights.set(term, weight);
+    sumSquares += weight * weight;
   }
-  return vec;
+
+  return {
+    weights,
+    norm: Math.sqrt(sumSquares),
+  };
 }
 
-function cosineSimilarity(a, b) {
-  let dot = 0;
-  let aNorm = 0;
-  let bNorm = 0;
-  for (let i = 0; i < a.length; i += 1) {
-    dot += a[i] * b[i];
-    aNorm += a[i] * a[i];
-    bNorm += b[i] * b[i];
+function cosineSimilaritySparse(queryVector, docTf, idfByTerm, docNorm) {
+  const qNorm = Number(queryVector?.norm || 0);
+  const dNorm = Number(docNorm || 0);
+  if (qNorm <= 0 || dNorm <= 0) {
+    return 0;
   }
-  const denom = Math.sqrt(aNorm) * Math.sqrt(bNorm);
-  return denom === 0 ? 0 : dot / denom;
+
+  let dot = 0;
+  for (const [term, qWeight] of queryVector.weights) {
+    const docCount = Number(docTf.get(term) || 0);
+    if (docCount <= 0) {
+      continue;
+    }
+    const idf = Number(idfByTerm.get(term) || 0);
+    const dWeight = docCount * idf;
+    dot += qWeight * dWeight;
+  }
+
+  return dot / (qNorm * dNorm);
 }
 
 function buildCharNgrams(text, n = 3) {
@@ -465,19 +489,89 @@ async function readJsonFile(filePath) {
   return JSON.parse(text);
 }
 
-function getMemoKey(filePath, stats) {
-  return `${filePath}:${stats.size}:${stats.mtimeMs}`;
+function getMemoKey(filePath, stats, mode = "full") {
+  return `${filePath}:${stats.size}:${stats.mtimeMs}:${mode}`;
 }
 
-async function getJsonPayload(filePath, stats) {
+function getSourceFingerprint(stats) {
+  return `${stats.size}:${Math.round(stats.mtimeMs)}`;
+}
+
+function getDerivedCacheDir(metadataPath) {
+  const sourceName = path.basename(metadataPath, path.extname(metadataPath));
+  return path.join(path.dirname(metadataPath), DERIVED_INDEX_DIR_NAME, sourceName);
+}
+
+function getDerivedManifestPath(metadataPath) {
+  return path.join(getDerivedCacheDir(metadataPath), "manifest.json");
+}
+
+function getDerivedShardPath(metadataPath, shardIndex) {
+  const shardLabel = String(shardIndex + 1).padStart(5, "0");
+  return path.join(getDerivedCacheDir(metadataPath), `items-${shardLabel}.ndjson`);
+}
+
+async function readJsonSafe(filePath) {
+  try {
+    const text = await fs.readFile(filePath, "utf-8");
+    return JSON.parse(text);
+  } catch {
+    return null;
+  }
+}
+
+async function readNdjsonFile(filePath) {
+  const rows = [];
+  const text = await fs.readFile(filePath, "utf-8");
+  const lines = text.split(/\r?\n/);
+  for (const line of lines) {
+    const trimmed = String(line || "").trim();
+    if (!trimmed) {
+      continue;
+    }
+    try {
+      rows.push(JSON.parse(trimmed));
+    } catch {
+      // Ignore malformed lines and continue reading healthy entries.
+    }
+  }
+  return rows;
+}
+
+async function cleanupDerivedShardFiles(metadataPath) {
+  const cacheDir = getDerivedCacheDir(metadataPath);
+  let entries = [];
+  try {
+    entries = await fs.readdir(cacheDir, { withFileTypes: true });
+  } catch {
+    return;
+  }
+
+  const deletions = [];
+  for (const entry of entries) {
+    if (!entry.isFile()) {
+      continue;
+    }
+    if (!entry.name.toLowerCase().endsWith(".ndjson")) {
+      continue;
+    }
+    deletions.push(fs.unlink(path.join(cacheDir, entry.name)).catch(() => {}));
+  }
+  await Promise.all(deletions);
+}
+
+async function getJsonPayload(filePath, stats, options = {}) {
+  const allowCache = options?.allowCache !== false && Number(stats?.size || 0) <= MAX_JSON_PAYLOAD_CACHE_FILE_BYTES;
   const memoKey = getMemoKey(filePath, stats);
-  if (jsonPayloadCache.has(memoKey)) {
+  if (allowCache && jsonPayloadCache.has(memoKey)) {
     return { memoKey, payload: jsonPayloadCache.get(memoKey) };
   }
 
   const payload = await readJsonFile(filePath);
-  jsonPayloadCache.clear();
-  jsonPayloadCache.set(memoKey, payload);
+  if (allowCache) {
+    jsonPayloadCache.clear();
+    jsonPayloadCache.set(memoKey, payload);
+  }
   return { memoKey, payload };
 }
 
@@ -494,6 +588,385 @@ function toDocText(record) {
   const cloudOcr = extractOcrCorpusText(record);
 
   return [title, description, tags, objects, style, colors, cloudDescription, cloudOcr].join(" ");
+}
+
+function clampCompactText(value, maxChars = MAX_COMPACT_DOC_TEXT_CHARS) {
+  const text = String(value || "").trim();
+  if (!text) {
+    return "";
+  }
+  if (text.length <= maxChars) {
+    return text;
+  }
+  return text.slice(0, maxChars);
+}
+
+function toCompactCacheRow(item, docText) {
+  const metadata = item?.metadata && typeof item.metadata === "object" ? item.metadata : {};
+  return {
+    id: item?.id ?? null,
+    path: String(item?.path || ""),
+    metadata: {
+      ...metadata,
+      title: clampCompactText(metadata?.title, 220),
+      description: clampCompactText(metadata?.description, 1200),
+      tags: Array.isArray(metadata?.tags)
+        ? metadata.tags.slice(0, MAX_COMPACT_TAGS).map((value) => clampCompactText(value, 80)).filter(Boolean)
+        : [],
+      objects: Array.isArray(metadata?.objects)
+        ? metadata.objects.slice(0, MAX_COMPACT_TAGS).map((value) => clampCompactText(value, 80)).filter(Boolean)
+        : [],
+    },
+    doc: clampCompactText(docText, MAX_COMPACT_DOC_TEXT_CHARS),
+  };
+}
+
+async function loadCompactRowsFromCache(metadataPath, sourceFingerprint) {
+  const manifestPath = getDerivedManifestPath(metadataPath);
+  const manifest = await readJsonSafe(manifestPath);
+  if (!manifest || typeof manifest !== "object") {
+    return null;
+  }
+
+  if (Number(manifest.version) !== DERIVED_INDEX_CACHE_VERSION) {
+    return null;
+  }
+  if (String(manifest.sourceFingerprint || "") !== String(sourceFingerprint || "")) {
+    return null;
+  }
+
+  const shardCount = Number(manifest.shardCount || 0);
+  if (!Number.isInteger(shardCount) || shardCount < 0) {
+    return null;
+  }
+  if (shardCount === 0) {
+    return [];
+  }
+
+  const rows = [];
+  for (let i = 0; i < shardCount; i += 1) {
+    const shardPath = getDerivedShardPath(metadataPath, i);
+    try {
+      const shardRows = await readNdjsonFile(shardPath);
+      for (const shardRow of shardRows) {
+        if (!shardRow || typeof shardRow !== "object") {
+          continue;
+        }
+        const itemPath = String(shardRow.path || "").trim();
+        if (!itemPath) {
+          continue;
+        }
+        rows.push({
+          id: shardRow.id,
+          path: itemPath,
+          metadata: shardRow.metadata && typeof shardRow.metadata === "object" ? shardRow.metadata : {},
+          doc: String(shardRow.doc || ""),
+        });
+      }
+    } catch {
+      return null;
+    }
+  }
+
+  return rows;
+}
+
+async function buildCompactRowsFromPayload(metadataPath, sourceFingerprint, payload) {
+  const rawResults = Array.isArray(payload?.results) ? payload.results : [];
+  const items = rawResults
+    .map((row) => normalizeRecord(row))
+    .filter((row) => row && row.status === "ok" && row.path);
+  const docs = items.map((item) => toDocText(item));
+  const compactRows = items.map((item, idx) => toCompactCacheRow(item, docs[idx]));
+
+  const cacheDir = getDerivedCacheDir(metadataPath);
+  await fs.mkdir(cacheDir, { recursive: true });
+  await cleanupDerivedShardFiles(metadataPath);
+
+  let shardCount = 0;
+  for (let offset = 0; offset < compactRows.length; offset += DERIVED_INDEX_SHARD_SIZE) {
+    const shardRows = compactRows.slice(offset, offset + DERIVED_INDEX_SHARD_SIZE);
+    if (shardRows.length === 0) {
+      continue;
+    }
+    const shardPath = getDerivedShardPath(metadataPath, shardCount);
+    const content = `${shardRows.map((row) => JSON.stringify(row)).join("\n")}\n`;
+    await fs.writeFile(shardPath, content, "utf-8");
+    shardCount += 1;
+  }
+
+  const manifest = {
+    version: DERIVED_INDEX_CACHE_VERSION,
+    sourcePath: metadataPath,
+    sourceFingerprint,
+    shardSize: DERIVED_INDEX_SHARD_SIZE,
+    shardCount,
+    total: compactRows.length,
+    generatedAt: new Date().toISOString(),
+  };
+  await fs.writeFile(getDerivedManifestPath(metadataPath), JSON.stringify(manifest, null, 2), "utf-8");
+
+  return compactRows;
+}
+
+async function readCompactCacheManifest(metadataPath, sourceFingerprint) {
+  const manifestPath = getDerivedManifestPath(metadataPath);
+  const manifest = await readJsonSafe(manifestPath);
+  if (!manifest || typeof manifest !== "object") {
+    return null;
+  }
+  if (Number(manifest.version) !== DERIVED_INDEX_CACHE_VERSION) {
+    return null;
+  }
+  if (String(manifest.sourceFingerprint || "") !== String(sourceFingerprint || "")) {
+    return null;
+  }
+  const shardCount = Number(manifest.shardCount || 0);
+  if (!Number.isInteger(shardCount) || shardCount < 0) {
+    return null;
+  }
+  return {
+    ...manifest,
+    shardCount,
+  };
+}
+
+async function ensureCompactCacheManifest(metadataPath, stats, sourceFingerprint) {
+  let manifest = await readCompactCacheManifest(metadataPath, sourceFingerprint);
+  if (manifest) {
+    return manifest;
+  }
+
+  const { payload } = await getJsonPayload(metadataPath, stats, { allowCache: false });
+  await buildCompactRowsFromPayload(metadataPath, sourceFingerprint, payload);
+  jsonPayloadCache.clear();
+  manifest = await readCompactCacheManifest(metadataPath, sourceFingerprint);
+  if (!manifest) {
+    throw new Error("Failed to initialize compact search cache.");
+  }
+  return manifest;
+}
+
+function getCompactFilterValue(metadata, key, fallback = "") {
+  const value = metadata?.[key];
+  if (value == null) {
+    return String(fallback || "").toLowerCase();
+  }
+  return String(value || "").toLowerCase();
+}
+
+function toCompactFilterTagSet(metadata, key) {
+  const list = Array.isArray(metadata?.[key]) ? metadata[key] : [];
+  return new Set(list.map((value) => String(value || "").trim().toLowerCase()).filter(Boolean));
+}
+
+function compactRowMatchesFilters(row, filters, allowedImagePathSet) {
+  const itemPath = String(row?.path || "").trim();
+  if (!itemPath) {
+    return false;
+  }
+  if (allowedImagePathSet && !allowedImagePathSet.has(itemPath)) {
+    return false;
+  }
+
+  const activeFilters = filters && typeof filters === "object" ? filters : {};
+  const metadata = row?.metadata && typeof row.metadata === "object" ? row.metadata : {};
+  const mediaType = String(metadata?.media_type || getMediaTypeFromPath(itemPath, "image")).toLowerCase();
+  const styleValue = getCompactFilterValue(metadata, "style");
+  const orientationValue = getCompactFilterValue(metadata, "orientation");
+  const brightnessValue = getCompactFilterValue(metadata, "brightness_category");
+  const resolutionMegapixelsValue = getCompactFilterValue(metadata, "resolution_megapixels");
+  const aspectRatioValue = getCompactFilterValue(metadata, "aspect_ratio");
+  const fileTypeValue = String(path.extname(itemPath).replace(".", "")).toLowerCase();
+  const durationBucketValue = getCompactFilterValue(metadata, "duration_bucket");
+  const fpsLabelValue = getCompactFilterValue(metadata, "fps_label");
+  const hasAudioValue = getCompactFilterValue(metadata, "has_audio", "");
+  const audioTypeValue = getCompactFilterValue(metadata, "audio_type");
+  const hasCaptionsValue = getCompactFilterValue(metadata, "has_captions", "");
+  const motionLevelValue = getCompactFilterValue(metadata, "motion_level");
+  const containsPeople = metadata?.contains_people === true;
+  const containsText = metadata?.contains_text === true;
+  const tagsSet = toCompactFilterTagSet(metadata, "tags");
+  const objectsSet = toCompactFilterTagSet(metadata, "objects");
+  const docLower = String(row?.doc || "").toLowerCase();
+  const ocrTerms = splitOcrQueryTerms(activeFilters?.ocrTextQuery);
+
+  const mediaTypeFilter = String(activeFilters?.mediaType || "any").toLowerCase();
+  if (mediaTypeFilter !== "any" && mediaType !== mediaTypeFilter) {
+    return false;
+  }
+
+  const containsPeopleFilter = String(activeFilters?.containsPeople || "any").toLowerCase();
+  if (containsPeopleFilter === "yes" && !containsPeople) {
+    return false;
+  }
+  if (containsPeopleFilter === "no" && containsPeople) {
+    return false;
+  }
+
+  const containsTextFilter = String(activeFilters?.containsText || "any").toLowerCase();
+  if (containsTextFilter === "yes" && !containsText) {
+    return false;
+  }
+  if (containsTextFilter === "no" && containsText) {
+    return false;
+  }
+
+  const simpleEnumChecks = [
+    ["style", styleValue],
+    ["orientation", orientationValue],
+    ["brightnessCategory", brightnessValue],
+    ["resolutionMegapixels", resolutionMegapixelsValue],
+    ["aspectRatio", aspectRatioValue],
+    ["fileType", fileTypeValue],
+    ["durationBucket", durationBucketValue],
+    ["fpsLabel", fpsLabelValue],
+    ["hasAudio", hasAudioValue],
+    ["audioType", audioTypeValue],
+    ["hasCaptions", hasCaptionsValue],
+    ["motionLevel", motionLevelValue],
+  ];
+
+  for (const [key, value] of simpleEnumChecks) {
+    const filterValue = String(activeFilters?.[key] || "any").toLowerCase();
+    if (filterValue !== "any" && filterValue && value !== filterValue) {
+      return false;
+    }
+  }
+
+  const sceneValues = Array.isArray(activeFilters?.sceneTag) ? activeFilters.sceneTag : [activeFilters?.sceneTag];
+  const sceneSelected = sceneValues.map((value) => String(value || "").toLowerCase().trim()).filter((value) => value && value !== "any");
+  if (sceneSelected.length > 0 && !sceneSelected.some((value) => tagsSet.has(value))) {
+    return false;
+  }
+
+  const objectValues = Array.isArray(activeFilters?.objectTag) ? activeFilters.objectTag : [activeFilters?.objectTag];
+  const objectSelected = objectValues.map((value) => String(value || "").toLowerCase().trim()).filter((value) => value && value !== "any");
+  if (objectSelected.length > 0 && !objectSelected.some((value) => objectsSet.has(value) || tagsSet.has(value))) {
+    return false;
+  }
+
+  const activityValues = Array.isArray(activeFilters?.activityTag) ? activeFilters.activityTag : [activeFilters?.activityTag];
+  const activitySelected = activityValues.map((value) => String(value || "").toLowerCase().trim()).filter((value) => value && value !== "any");
+  if (activitySelected.length > 0 && !activitySelected.some((value) => tagsSet.has(value))) {
+    return false;
+  }
+
+  if (ocrTerms.length > 0 && !hasExactOcrTermMatch(docLower, ocrTerms)) {
+    return false;
+  }
+
+  return true;
+}
+
+function scoreCompactRow(row, queryTokens, queryTrigrams, expandedTrigrams, requiredPhrases) {
+  const docText = String(row?.doc || "").toLowerCase();
+  if (!docText) {
+    return 0;
+  }
+
+  const docTokenSet = new Set(tokenize(docText));
+  const lexical = tokenOverlapScore(queryTokens, docTokenSet);
+  const docTrigrams = buildCharNgrams(docText, 3);
+  const fuzzy = Math.max(
+    jaccardSimilarity(queryTrigrams, docTrigrams),
+    jaccardSimilarity(expandedTrigrams, docTrigrams) * 0.95,
+  );
+  const phrase = phraseCoverageScore(requiredPhrases, docText);
+
+  return combineScore({
+    semantic: lexical,
+    lexical,
+    fuzzy,
+    phrase,
+  });
+}
+
+async function runCompactBatchedSearch(payload, context) {
+  const query = String(payload?.query || "").trim();
+  const topK = Math.max(1, Math.min(Number(payload?.topK || 20), MAX_SAFE_TOPK));
+  const minScoreInput = Number(payload?.minScore);
+  const minScore = Number.isFinite(minScoreInput) ? Math.max(0, minScoreInput) : COMPACT_BATCH_MIN_SCORE;
+  const filters = payload?.filters && typeof payload.filters === "object" ? payload.filters : {};
+  const allowedImagePathSet = Array.isArray(payload?.allowedImagePaths)
+    ? new Set(payload.allowedImagePaths.map((value) => String(value || "").trim()).filter(Boolean))
+    : null;
+
+  const expanded = await expandQuery(query);
+  const expandedTokens = tokenize(expanded.expandedQuery);
+  const queryTrigrams = buildCharNgrams(query, 3);
+  const expandedTrigrams = expanded.changed
+    ? buildCharNgrams(expanded.expandedQuery, 3)
+    : queryTrigrams;
+  const requiredPhrases = expanded?.intent?.required_phrases;
+  const candidatePoolLimit = Math.max(topK * 20, Math.min(MAX_COMPACT_CANDIDATE_POOL, topK * 80));
+
+  const manifest = await ensureCompactCacheManifest(context.resolvedPath, context.stats, context.sourceFingerprint);
+  let filteredCount = 0;
+  const fallback = [];
+  let candidates = [];
+
+  for (let shardIndex = 0; shardIndex < manifest.shardCount; shardIndex += 1) {
+    const shardPath = getDerivedShardPath(context.resolvedPath, shardIndex);
+    const shardRows = await readNdjsonFile(shardPath);
+    for (const row of shardRows) {
+      if (!compactRowMatchesFilters(row, filters, allowedImagePathSet)) {
+        continue;
+      }
+
+      filteredCount += 1;
+      if (!query) {
+        if (fallback.length < topK) {
+          fallback.push({
+            score: 0,
+            id: row?.id,
+            path: String(row?.path || ""),
+            metadata: row?.metadata || {},
+            clip_mode: "full_video",
+          });
+        }
+        continue;
+      }
+
+      const score = scoreCompactRow(row, expandedTokens, queryTrigrams, expandedTrigrams, requiredPhrases);
+      if (!Number.isFinite(score) || score < minScore) {
+        continue;
+      }
+
+      candidates.push({
+        score,
+        id: row?.id,
+        path: String(row?.path || ""),
+        metadata: row?.metadata || {},
+      });
+
+      if (candidates.length > candidatePoolLimit) {
+        candidates.sort((a, b) => Number(b.score || 0) - Number(a.score || 0));
+        candidates = candidates.slice(0, candidatePoolLimit);
+      }
+    }
+  }
+
+  if (!query) {
+    return { ok: true, results: fallback, filteredCount };
+  }
+
+  candidates.sort((a, b) => Number(b.score || 0) - Number(a.score || 0));
+  return {
+    ok: true,
+    results: candidates.slice(0, topK).map((row) => ({
+      ...row,
+      clip_mode: "full_video",
+    })),
+    filteredCount,
+    queryExpansion: {
+      expanded: expanded.expandedQuery,
+      addedTerms: expanded.addedTerms,
+      intent: expanded.intent,
+      intentSource: expanded.intentSource,
+      intentFilteredCount: 0,
+    },
+  };
 }
 
 function splitOcrQueryTerms(value) {
@@ -806,36 +1279,66 @@ function extractOrientationValue(item, itemMediaType) {
 
 // --- Index builder ---
 
-async function buildIndex(filePath) {
+async function buildIndex(filePath, options = {}) {
+  const mode = String(options?.mode || "full").toLowerCase() === "compact" ? "compact" : "full";
   const { resolvedPath, stats } = await resolveMetadataPath(filePath);
-  const memoKey = getMemoKey(resolvedPath, stats);
+  const memoKey = getMemoKey(resolvedPath, stats, mode);
+  const sourceFingerprint = getSourceFingerprint(stats);
+  const canUseInMemoryIndexCache = mode === "compact";
 
-  if (inMemoryIndex.has(memoKey)) {
+  if (canUseInMemoryIndexCache && inMemoryIndex.has(memoKey)) {
     return inMemoryIndex.get(memoKey);
   }
 
-  const { payload } = await getJsonPayload(resolvedPath, stats);
-  const rawResults = Array.isArray(payload.results) ? payload.results : [];
-  const items = rawResults
-    .map((row) => normalizeRecord(row))
-    .filter((row) => row && row.status === "ok" && row.path);
+  let items = [];
+  let docs = [];
 
-  const docs = items.map((item) => toDocText(item));
-  const { vocabIndex, idf, vectors } = buildVocabAndTfIdf(docs);
+  if (mode === "compact") {
+    let compactRows = await loadCompactRowsFromCache(resolvedPath, sourceFingerprint);
+
+    if (!compactRows) {
+      const { payload } = await getJsonPayload(resolvedPath, stats, { allowCache: true });
+      compactRows = await buildCompactRowsFromPayload(resolvedPath, sourceFingerprint, payload);
+    }
+
+    items = compactRows.map((row) => ({
+      id: row.id,
+      status: "ok",
+      path: row.path,
+      metadata: row.metadata,
+      raw: null,
+    }));
+    docs = compactRows.map((row) => String(row.doc || ""));
+  } else {
+    // Full mode can include large raw video/frame metadata; avoid caching that payload in-process.
+    const { payload } = await getJsonPayload(resolvedPath, stats, { allowCache: false });
+    const rawResults = Array.isArray(payload.results) ? payload.results : [];
+    items = rawResults
+      .map((row) => normalizeRecord(row))
+      .filter((row) => row && row.status === "ok" && row.path);
+    docs = items.map((item) => toDocText(item));
+  }
+
+  const { docTermFreqs, idfByTerm, docNorms } = buildSparseTfIdfCorpus(docs);
   const docTextsLower = docs.map((doc) => String(doc || "").toLowerCase());
   const docTokenSets = docs.map((doc) => new Set(tokenize(doc)));
-  const docTrigramSets = docs.map((doc) => buildCharNgrams(doc, 3));
 
   const index = {
+    mode,
     items,
-    vocabIndex,
-    idf,
-    vectors,
+    docTermFreqs,
+    idfByTerm,
+    docNorms,
     docTextsLower,
     docTokenSets,
-    docTrigramSets,
   };
-  inMemoryIndex.clear();
+  if (!canUseInMemoryIndexCache) {
+    return index;
+  }
+
+  if (inMemoryIndex.size >= 2) {
+    inMemoryIndex.clear();
+  }
   inMemoryIndex.set(memoKey, index);
   return index;
 }
@@ -1034,6 +1537,11 @@ function applyFilters(items, filters) {
   });
 }
 
+function shouldUseCompactIndex(payload) {
+  const videoResultMode = normalizeVideoResultMode(payload?.videoResultMode);
+  return videoResultMode !== "matching_timeframes";
+}
+
 // --- Public API ---
 
 export async function validateMetadataFile(filePath) {
@@ -1072,7 +1580,7 @@ export async function validateMetadataFile(filePath) {
 export async function runSemanticSearch(payload) {
   try {
     const query = String(payload?.query || "").trim();
-    const topK = Math.max(1, Math.min(Number(payload?.topK || 20), 200));
+    const topK = Math.max(1, Math.min(Number(payload?.topK || 20), MAX_SAFE_TOPK));
     const minScoreInput = Number(payload?.minScore);
     const minScore = Number.isFinite(minScoreInput) ? Math.max(0, minScoreInput) : 0.001;
     const videoResultMode = normalizeVideoResultMode(payload?.videoResultMode);
@@ -1082,15 +1590,26 @@ export async function runSemanticSearch(payload) {
       return { ok: false, message: "Metadata file path is required." };
     }
 
+    const indexMode = shouldUseCompactIndex(payload) ? "compact" : "full";
+
+    if (indexMode === "compact") {
+      const { resolvedPath, stats } = await resolveMetadataPath(filePath);
+      const sourceFingerprint = getSourceFingerprint(stats);
+      return runCompactBatchedSearch(payload, {
+        resolvedPath,
+        stats,
+        sourceFingerprint,
+      });
+    }
+
     const {
       items,
-      vocabIndex,
-      idf,
-      vectors,
+      docTermFreqs,
+      idfByTerm,
+      docNorms,
       docTextsLower,
       docTokenSets,
-      docTrigramSets,
-    } = await buildIndex(filePath);
+    } = await buildIndex(filePath, { mode: indexMode });
     const rawFilters = payload?.filters || {};
     const allowedImagePathSet = Array.isArray(payload?.allowedImagePaths)
       ? new Set(payload.allowedImagePaths.map((value) => String(value || "").trim()).filter(Boolean))
@@ -1116,9 +1635,9 @@ export async function runSemanticSearch(payload) {
     }
 
     const expanded = await expandQuery(query);
-    const qVec = queryToVector(query, vocabIndex, idf);
+    const qVec = buildSparseQueryVector(query, idfByTerm);
     const qVecExpanded = expanded.changed
-      ? queryToVector(expanded.expandedQuery, vocabIndex, idf)
+      ? buildSparseQueryVector(expanded.expandedQuery, idfByTerm)
       : qVec;
     const expandedTokens = tokenize(expanded.expandedQuery);
     const queryTrigrams = buildCharNgrams(query, 3);
@@ -1128,37 +1647,80 @@ export async function runSemanticSearch(payload) {
     const intentFilteredItems = filteredItems.filter((item) => matchesExpandedIntent(item, expanded.intent));
     const sourceItems = intentFilteredItems.length > 0 ? intentFilteredItems : filteredItems;
     const filteredSet = new Set(sourceItems);
+    const itemLookupByPath = new Map(items.map((item) => [String(item?.path || ""), item]));
 
-    const scored = [];
+    const scoredPrePass = [];
     for (let i = 0; i < items.length; i += 1) {
       const item = items[i];
       if (!filteredSet.has(item)) {
         continue;
       }
-      const baseScore = cosineSimilarity(qVec, vectors[i]);
-      const expandedScore = cosineSimilarity(qVecExpanded, vectors[i]);
+
+      const baseScore = cosineSimilaritySparse(qVec, docTermFreqs[i], idfByTerm, docNorms[i]);
+      const expandedScore = cosineSimilaritySparse(qVecExpanded, docTermFreqs[i], idfByTerm, docNorms[i]);
       const semanticScore = Math.max(baseScore, expandedScore * 0.94);
       const lexicalScore = tokenOverlapScore(expandedTokens, docTokenSets[i]);
-      const fuzzyScore = Math.max(
-        jaccardSimilarity(queryTrigrams, docTrigramSets[i]),
-        jaccardSimilarity(expandedTrigrams, docTrigramSets[i]) * 0.95,
-      );
       const phraseScore = phraseCoverageScore(expanded?.intent?.required_phrases, docTextsLower[i]);
-      const score = combineScore({
+
+      // Fast pre-pass excludes fuzzy to keep large-dataset searches responsive.
+      const preScore = combineScore({
         semantic: semanticScore,
         lexical: lexicalScore,
-        fuzzy: fuzzyScore,
+        fuzzy: 0,
         phrase: phraseScore,
       });
-      const boostedScore = Math.min(1, score + computeDirectTagMatchBonus(expanded.expandedQuery, item));
-      if (boostedScore < minScore) {
+
+      if (preScore <= 0) {
         continue;
       }
-      scored.push({
-        score: boostedScore,
+
+      scoredPrePass.push({
+        preScore,
+        semanticScore,
+        lexicalScore,
+        phraseScore,
         id: item.id,
         path: item.path,
         metadata: item.metadata,
+        _docIndex: i,
+      });
+    }
+
+    scoredPrePass.sort((a, b) => Number(b.preScore || 0) - Number(a.preScore || 0));
+
+    const fuzzyCandidateCount = Math.min(
+      scoredPrePass.length,
+      Math.max(400, Math.min(3000, topK * 20)),
+    );
+    const fuzzyCandidates = scoredPrePass.slice(0, fuzzyCandidateCount);
+
+    const scored = [];
+    for (const candidate of fuzzyCandidates) {
+      const i = Number(candidate._docIndex || 0);
+      const docText = docTextsLower[i] || "";
+      const docTrigrams = buildCharNgrams(docText, 3);
+      const fuzzyScore = Math.max(
+        jaccardSimilarity(queryTrigrams, docTrigrams),
+        jaccardSimilarity(expandedTrigrams, docTrigrams) * 0.95,
+      );
+
+      const score = combineScore({
+        semantic: candidate.semanticScore,
+        lexical: candidate.lexicalScore,
+        fuzzy: fuzzyScore,
+        phrase: candidate.phraseScore,
+      });
+      const sourceItem = itemLookupByPath.get(String(candidate.path || ""));
+      const boostedScore = Math.min(1, score + computeDirectTagMatchBonus(expanded.expandedQuery, sourceItem));
+      if (boostedScore < minScore) {
+        continue;
+      }
+
+      scored.push({
+        score: boostedScore,
+        id: candidate.id,
+        path: candidate.path,
+        metadata: candidate.metadata,
       });
     }
 
@@ -1177,7 +1739,7 @@ export async function runSemanticSearch(payload) {
           continue;
         }
 
-        const sourceItem = items.find((item) => item.id === scoredItem.id && item.path === scoredItem.path);
+        const sourceItem = itemLookupByPath.get(String(scoredItem.path || ""));
         if (!sourceItem) {
           clipCandidates.push({ ...scoredItem, clip_mode: "full_video" });
           continue;
