@@ -364,12 +364,16 @@ function renderGalleryClips(clips, clipSec) {
     <div class="copy-row gallery-copy-all">
       <button class="copy-btn" id="copyAllClipsBtn">${ci} Copy all search terms</button>
       <button class="copy-btn" id="searchFirstClipBtn">${si} Search clip 1 now</button>
+      <button class="copy-btn" id="searchAllClipsBtn">${si} Search phrases one by one</button>
     </div>`;
 
   const allKeywords = clips.map(c => c.searchKeywords).join(' | ');
   document.getElementById('copyAllClipsBtn').onclick = function() { copyRaw(allKeywords, this); };
   document.getElementById('searchFirstClipBtn').onclick = function() {
     searchClipFromWizard(0, this);
+  };
+  document.getElementById('searchAllClipsBtn').onclick = function() {
+    searchAllClipsFromWizard(this);
   };
 }
 
@@ -389,6 +393,34 @@ function searchClipFromWizard(clipIndex, btn) {
   const query = optimizeClipSearchPhrase(clip);
   const clipLabel = `Clip ${clip.clipNumber || Number(clipIndex) + 1}`;
   runGallerySearchFromWizard(query, clipLabel, btn);
+}
+
+function searchAllClipsFromWizard(btn) {
+  const clips = Array.isArray(window._galleryClips) ? window._galleryClips : [];
+  const queries = clips
+    .map((clip) => optimizeClipSearchPhrase(clip))
+    .map((value) => String(value || '').trim())
+    .filter(Boolean);
+
+  if (queries.length === 0) {
+    showError('No clip phrases available to search.');
+    return;
+  }
+
+  const payload = {
+    type: 'wizard-search-all-clips',
+    queries,
+  };
+
+  if (window.parent && window.parent !== window) {
+    window.parent.postMessage(payload, '*');
+    const orig = btn.innerHTML;
+    btn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg> Running phrase-by-phrase search...';
+    setTimeout(() => { btn.innerHTML = orig; }, 2200);
+    return;
+  }
+
+  showError('Unable to trigger app search from this window.');
 }
 
 function runGallerySearchFromWizard(query, clipLabel, btn) {

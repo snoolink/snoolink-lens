@@ -13,6 +13,7 @@ contextBridge.exposeInMainWorld("desktopAPI", {
   exportMediaFile: (payload) => ipcRenderer.invoke("export-media-file", payload),
   deleteMediaFile: (payload) => ipcRenderer.invoke("delete-media-file", payload),
   copyText: (text) => ipcRenderer.invoke("copy-text", text),
+  readBinaryFile: (payload) => ipcRenderer.invoke("read-binary-file", payload),
   wizardGeneratePlan: (payload) => ipcRenderer.invoke("wizard-generate-plan", payload),
   getMasterDirectory: (options) => ipcRenderer.invoke("get-master-directory", options),
   pickCustomFolders: () => ipcRenderer.invoke("pick-custom-folders"),
@@ -33,6 +34,10 @@ contextBridge.exposeInMainWorld("desktopAPI", {
   assignImagesToAlbums: (payload) => ipcRenderer.invoke("assign-images-to-albums", payload),
   removeImagesFromAlbum: (payload) => ipcRenderer.invoke("remove-images-from-album", payload),
   getAlbumImages: (payload) => ipcRenderer.invoke("get-album-images", payload),
+  setStitchSelection: (payload) => ipcRenderer.invoke("set-stitch-selection", payload),
+  getStitchSelection: () => ipcRenderer.invoke("get-stitch-selection"),
+  clearStitchSelection: () => ipcRenderer.invoke("clear-stitch-selection"),
+  generateStitchVideo: (payload) => ipcRenderer.invoke("generate-stitch-video", payload),
 
   startFullScan: (options) => ipcRenderer.invoke("start-full-scan", options),
   pauseScan: () => ipcRenderer.invoke("pause-scan"),
@@ -78,5 +83,10 @@ contextBridge.exposeInMainWorld("desktopAPI", {
     const wrapped = (_event, payload) => handler(payload);
     ipcRenderer.on("index-complete", wrapped);
     return () => ipcRenderer.removeListener("index-complete", wrapped);
+  },
+  onStitchProgress: (handler) => {
+    const wrapped = (_event, payload) => handler(payload);
+    ipcRenderer.on("stitch-progress", wrapped);
+    return () => ipcRenderer.removeListener("stitch-progress", wrapped);
   },
 });

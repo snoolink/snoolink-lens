@@ -4,6 +4,7 @@
 
 import { createImagePreviewPanel } from "./imagePreviewPanel.js";
 import { normalizeMediaType } from "./previewVideo.js";
+import { installTooltipSystem } from "./tooltipSystem.js";
 
 const pickFileBtn = document.getElementById("pickFileBtn");
 const validateBtn = document.getElementById("validateBtn");
@@ -37,6 +38,7 @@ const settingsResultsDensitySelect = document.getElementById("settingsResultsDen
 const settingsAutoExpandFiltersInput = document.getElementById("settingsAutoExpandFilters");
 const settingsAutoCloseSidebarOnSettingsNavInput = document.getElementById("settingsAutoCloseSidebarOnSettingsNav");
 const settingsGalleryVideoAutoplayInput = document.getElementById("settingsGalleryVideoAutoplay");
+const settingsEnableTooltipsInput = document.getElementById("settingsEnableTooltips");
 const settingsCacheTranscodedMovPreviewInput = document.getElementById("settingsCacheTranscodedMovPreview");
 const settingsCacheTranscodedHeicPreviewInput = document.getElementById("settingsCacheTranscodedHeicPreview");
 const settingsCacheTranscodedHeifPreviewInput = document.getElementById("settingsCacheTranscodedHeifPreview");
@@ -58,6 +60,11 @@ const scanAlbumsSelect = document.getElementById("scanAlbumsSelect");
 const scanCreateAlbumInput = document.getElementById("scanCreateAlbumInput");
 const addSelectedToAlbumBtn = document.getElementById("addSelectedToAlbumBtn");
 const removeSelectedFromAlbumBtn = document.getElementById("removeSelectedFromAlbumBtn");
+const toggleStitchModeBtn = document.getElementById("toggleStitchModeBtn");
+const stitchSelectionBar = document.getElementById("stitchSelectionBar");
+const stitchSelectionSummary = document.getElementById("stitchSelectionSummary");
+const openInStitchBtn = document.getElementById("openInStitchBtn");
+const clearStitchSelectionBtn = document.getElementById("clearStitchSelectionBtn");
 const albumViewMeta = document.getElementById("albumViewMeta");
 const activeAlbumName = document.getElementById("activeAlbumName");
 const activeAlbumCount = document.getElementById("activeAlbumCount");
@@ -80,6 +87,7 @@ const openAppSettingsLink = document.getElementById("openAppSettingsLink");
 const openWizardWorkspaceBtn = document.getElementById("openWizardWorkspaceBtn");
 const openFacesWorkspaceBtn = document.getElementById("openFacesWorkspaceBtn");
 const openReelAnalyzerBtn = document.getElementById("openReelAnalyzerBtn");
+const openStitchWorkspaceBtn = document.getElementById("openStitchWorkspaceBtn");
 const backToHomeBtn = document.getElementById("backToHomeBtn");
 const homeScreen = document.getElementById("home-screen");
 const settingsScreen = document.getElementById("settings-screen");
@@ -88,6 +96,8 @@ const wizardScreen = document.getElementById("wizard-screen");
 const wizardSearchFrame = document.getElementById("wizardSearchFrame");
 const reelAnalyzerScreen = document.getElementById("reel-analyzer-screen");
 const reelAnalyzerFrame = document.getElementById("reelAnalyzerFrame");
+const stitchScreen = document.getElementById("stitch-screen");
+const stitchFrame = document.getElementById("stitchFrame");
 const facesRefreshBtn = document.getElementById("facesRefreshBtn");
 const facesRebuildBtn = document.getElementById("facesRebuildBtn");
 const facesStatusEl = document.getElementById("facesStatus");
@@ -232,6 +242,7 @@ const userSettingsState = {
   autoExpandFilters: false,
   autoCloseSidebarOnSettingsNav: true,
   galleryVideoAutoplay: false,
+  enableTooltips: true,
   cacheTranscodedMovPreview: false,
   cacheTranscodedHeicPreview: false,
   cacheTranscodedHeifPreview: false,
@@ -257,6 +268,13 @@ const albumsState = {
 };
 
 const selectedImagePaths = new Set();
+const stitchModeState = {
+  enabled: false,
+  selectedVideos: new Map(),
+  syncTimer: null,
+};
+const STITCH_SELECTION_SNAPSHOT_KEY = "snoolink.stitch.selection.v1";
+const TOOLTIP_SETTINGS_KEY = "snoolink.tooltips.enabled.v1";
 const CONVERTIBLE_PREVIEW_EXTENSIONS = new Set([".heic", ".heif", ".avif", ".tif", ".tiff"]);
 const CARD_MEDIA_ROOT_MARGIN = "1400px 0px 1400px 0px";
 const CARD_MEDIA_SWEEP_DEBOUNCE_MS = 120;
@@ -267,6 +285,31 @@ let bulkDownloadInProgress = false;
 const cardMediaState = new WeakMap();
 let cardMediaObserver = null;
 let cardMediaSweepTimer = null;
+let tooltipSystemController = null;
+
+const MAIN_APP_TOOLTIP_TEXT = {
+  query: "Does: Captures your search intent. Why: Better prompts produce higher quality matches. Tip: Use specific nouns, actions, and scene details.",
+  searchBtn: "Does: Runs semantic search on your indexed media. Why: This is the main retrieval action. Tip: Set filters first, then run search once.",
+  topK: "Does: Sets how many top matches to return. Why: Lower values improve precision, higher values broaden discovery. Tip: Start at 20, then tune.",
+  containsPeople: "Does: Filters by whether people appear in media. Why: Helps narrow noisy results quickly. Tip: Use Yes for portraits/interviews and No for landscapes.",
+  containsText: "Does: Filters by visible text in media. Why: Useful for screenshots, signage, and captions. Tip: Pair with OCR Text Contains for best results.",
+  ocrTextQuery: "Does: Matches OCR text fragments in media. Why: Finds assets by words visible inside frames/images. Tip: Use short exact phrases first.",
+  mediaType: "Does: Limits results to image or video. Why: Prevents mixed result sets when you need one format. Tip: Select Video before Stitch workflows.",
+  clearAllFiltersBtn: "Does: Resets all filters to defaults. Why: Clears stale constraints that can hide good results. Tip: Use this before troubleshooting empty results.",
+  toggleFiltersBtn: "Does: Expands or collapses advanced filters. Why: Keeps the UI focused while preserving filtering power. Tip: Expand when refining search quality.",
+  downloadTopResultsBtn: "Does: Downloads top current results in one batch. Why: Speeds up shortlist export. Tip: Validate relevance first to avoid unnecessary downloads.",
+  toggleStitchModeBtn: "Does: Enables selecting videos for Stitch queue. Why: Stitch only uses videos you mark here. Tip: Turn on, select clips, then open Stitch.",
+  openInStitchBtn: "Does: Opens Stitch workspace with selected videos. Why: Starts compilation workflow from current selection. Tip: Select at least two clips first.",
+  clearStitchSelectionBtn: "Does: Clears all videos selected for Stitch. Why: Prevents old clips from entering a new compilation. Tip: Clear before starting a fresh sequence.",
+  addSelectedToAlbumBtn: "Does: Adds checked results to album(s). Why: Organizes reusable collections for future search and export. Tip: Select similar assets together.",
+  removeSelectedFromAlbumBtn: "Does: Removes checked assets from active album. Why: Keeps album curation clean and intentional. Tip: Use in album view to prune quickly.",
+  filePath: "Does: Points to active metadata JSON. Why: Search/index actions depend on this source. Tip: Revalidate after changing files.",
+  settingsEnableTooltips: "Does: Enables or disables app tooltips. Why: Helpful for onboarding, optional for experienced users. Tip: Turn off if tips feel distracting.",
+  pickFileBtn: "Does: Opens file picker for metadata JSON. Why: Connects the app to your indexed dataset. Tip: Choose the latest generated metadata file.",
+  validateBtn: "Does: Validates selected metadata file. Why: Prevents runtime search/index errors from malformed files. Tip: Validate after scans or manual file switches.",
+  status: "Does: Shows current app status messages. Why: This is your primary diagnostics line. Tip: Read it first when something seems off.",
+  counts: "Does: Displays result and processing counts. Why: Verifies scope and impact of your current query. Tip: Watch count changes as you adjust filters.",
+};
 
 function isValidAlbumId(value) {
   const id = Number(value);
@@ -328,12 +371,16 @@ function showSettingsScreen() {
   if (reelAnalyzerScreen) {
     reelAnalyzerScreen.classList.add("hidden");
   }
+  if (stitchScreen) {
+    stitchScreen.classList.add("hidden");
+  }
   if (settingsScreen) {
     settingsScreen.classList.remove("hidden");
   }
   if (backToHomeBtn) {
     backToHomeBtn.classList.remove("hidden");
   }
+  updateStitchModeUi();
 }
 
 function showFacesScreen() {
@@ -349,12 +396,16 @@ function showFacesScreen() {
   if (reelAnalyzerScreen) {
     reelAnalyzerScreen.classList.add("hidden");
   }
+  if (stitchScreen) {
+    stitchScreen.classList.add("hidden");
+  }
   if (facesScreen) {
     facesScreen.classList.remove("hidden");
   }
   if (backToHomeBtn) {
     backToHomeBtn.classList.remove("hidden");
   }
+  updateStitchModeUi();
 }
 
 function showHomeScreen() {
@@ -370,12 +421,16 @@ function showHomeScreen() {
   if (reelAnalyzerScreen) {
     reelAnalyzerScreen.classList.add("hidden");
   }
+  if (stitchScreen) {
+    stitchScreen.classList.add("hidden");
+  }
   if (homeScreen) {
     homeScreen.classList.remove("hidden");
   }
   if (backToHomeBtn) {
     backToHomeBtn.classList.add("hidden");
   }
+  updateStitchModeUi();
 }
 
 function showWizardScreen() {
@@ -391,6 +446,9 @@ function showWizardScreen() {
   if (reelAnalyzerScreen) {
     reelAnalyzerScreen.classList.add("hidden");
   }
+  if (stitchScreen) {
+    stitchScreen.classList.add("hidden");
+  }
   if (wizardScreen) {
     wizardScreen.classList.remove("hidden");
   }
@@ -400,6 +458,7 @@ function showWizardScreen() {
   if (wizardSearchFrame && !wizardSearchFrame.getAttribute("src")) {
     wizardSearchFrame.setAttribute("src", "./wizard-search.html");
   }
+  updateStitchModeUi();
 }
 
 function showReelAnalyzerScreen() {
@@ -415,6 +474,9 @@ function showReelAnalyzerScreen() {
   if (wizardScreen) {
     wizardScreen.classList.add("hidden");
   }
+  if (stitchScreen) {
+    stitchScreen.classList.add("hidden");
+  }
   if (reelAnalyzerScreen) {
     reelAnalyzerScreen.classList.remove("hidden");
   }
@@ -424,6 +486,237 @@ function showReelAnalyzerScreen() {
   if (reelAnalyzerFrame && !reelAnalyzerFrame.getAttribute("src")) {
     reelAnalyzerFrame.setAttribute("src", "./instagram-reel-analyzer.html");
   }
+  updateStitchModeUi();
+}
+
+function showStitchScreen() {
+  if (homeScreen) {
+    homeScreen.classList.add("hidden");
+  }
+  if (settingsScreen) {
+    settingsScreen.classList.add("hidden");
+  }
+  if (facesScreen) {
+    facesScreen.classList.add("hidden");
+  }
+  if (wizardScreen) {
+    wizardScreen.classList.add("hidden");
+  }
+  if (reelAnalyzerScreen) {
+    reelAnalyzerScreen.classList.add("hidden");
+  }
+  if (stitchScreen) {
+    stitchScreen.classList.remove("hidden");
+  }
+  if (backToHomeBtn) {
+    backToHomeBtn.classList.remove("hidden");
+  }
+  if (stitchFrame && !stitchFrame.getAttribute("src")) {
+    stitchFrame.setAttribute("src", "./stitch.html");
+  }
+  queueStitchSelectionBroadcast();
+  updateStitchModeUi();
+}
+
+function isTextEntryTarget(target) {
+  if (!(target instanceof HTMLElement)) {
+    return false;
+  }
+  const tag = String(target.tagName || "").toLowerCase();
+  if (["input", "textarea", "select", "option", "button"].includes(tag)) {
+    return true;
+  }
+  return Boolean(target.isContentEditable);
+}
+
+function scheduleStitchSelectionSync() {
+  if (stitchModeState.syncTimer) {
+    clearTimeout(stitchModeState.syncTimer);
+  }
+  stitchModeState.syncTimer = setTimeout(() => {
+    stitchModeState.syncTimer = null;
+    const items = Array.from(stitchModeState.selectedVideos.values());
+    persistStitchSelectionSnapshot(items);
+    if (window.desktopAPI?.setStitchSelection) {
+      void window.desktopAPI.setStitchSelection({ items });
+    }
+    queueStitchSelectionBroadcast();
+  }, 100);
+}
+
+function refreshStitchModeCardDecorations() {
+  const cards = resultsEl.querySelectorAll(".search-result");
+  for (const card of cards) {
+    const mediaType = String(card?.dataset?.mediaType || "");
+    const imagePath = String(card?.dataset?.imagePath || "").trim();
+    const isVideo = mediaType === "video";
+    const stitchCheckbox = card.querySelector(".result-stitch-checkbox");
+
+    if (!stitchModeState.enabled) {
+      card.classList.remove("stitch-disabled");
+      if (stitchCheckbox) {
+        stitchCheckbox.remove();
+      }
+      continue;
+    }
+
+    if (!isVideo || !imagePath) {
+      card.classList.add("stitch-disabled");
+      if (stitchCheckbox) {
+        stitchCheckbox.remove();
+      }
+      continue;
+    }
+
+    card.classList.remove("stitch-disabled");
+    if (!stitchCheckbox) {
+      const input = document.createElement("input");
+      input.type = "checkbox";
+      input.className = "result-stitch-checkbox";
+      input.title = "Select for Stitch";
+      input.checked = stitchModeState.selectedVideos.has(imagePath);
+      input.addEventListener("click", (event) => {
+        event.stopPropagation();
+      });
+      input.addEventListener("change", () => {
+        if (input.checked) {
+          const stitchTitle = String(card.dataset.stitchTitle || card.querySelector(".title")?.textContent || "Untitled video");
+          const stitchPreviewSrc = String(card.dataset.stitchPreviewSrc || "");
+          stitchModeState.selectedVideos.set(imagePath, {
+            path: imagePath,
+            media_type: "video",
+            title: stitchTitle,
+            preview_src: stitchPreviewSrc,
+          });
+          card.classList.add("stitch-selected");
+        } else {
+          stitchModeState.selectedVideos.delete(imagePath);
+          card.classList.remove("stitch-selected");
+        }
+        updateStitchModeUi();
+        scheduleStitchSelectionSync();
+      });
+      card.appendChild(input);
+    } else {
+      stitchCheckbox.checked = stitchModeState.selectedVideos.has(imagePath);
+    }
+
+    card.classList.toggle("stitch-selected", stitchModeState.selectedVideos.has(imagePath));
+  }
+}
+
+function updateStitchModeUi() {
+  const selectedCount = stitchModeState.selectedVideos.size;
+  const isHomeVisible = Boolean(homeScreen) && !homeScreen.classList.contains("hidden");
+
+  if (toggleStitchModeBtn) {
+    toggleStitchModeBtn.classList.toggle("hidden", !isHomeVisible);
+    toggleStitchModeBtn.classList.toggle("active", stitchModeState.enabled);
+    toggleStitchModeBtn.setAttribute("aria-pressed", stitchModeState.enabled ? "true" : "false");
+    toggleStitchModeBtn.textContent = stitchModeState.enabled ? "Stitch Mode: On" : "Stitch Mode";
+  }
+
+  if (stitchSelectionSummary) {
+    stitchSelectionSummary.textContent = `${selectedCount} video${selectedCount === 1 ? "" : "s"} selected for Stitch`;
+  }
+
+  if (openInStitchBtn) {
+    openInStitchBtn.disabled = selectedCount < 2;
+  }
+
+  if (stitchSelectionBar) {
+    const showBar = stitchModeState.enabled && selectedCount > 0 && isHomeVisible;
+    stitchSelectionBar.classList.toggle("hidden", !showBar);
+  }
+
+  refreshStitchModeCardDecorations();
+}
+
+function setStitchModeEnabled(enabled) {
+  const nextEnabled = Boolean(enabled);
+  stitchModeState.enabled = nextEnabled;
+  updateStitchModeUi();
+  if (nextEnabled) {
+    setStatus("Stitch Mode enabled. Select video cards to compile.");
+  } else {
+    setStatus("Stitch Mode disabled. Selection is preserved.");
+  }
+}
+
+function getStitchSelectionItems() {
+  return Array.from(stitchModeState.selectedVideos.values());
+}
+
+function persistStitchSelectionSnapshot(items = getStitchSelectionItems()) {
+  try {
+    const safeItems = Array.isArray(items) ? items : [];
+    try {
+      window.__SNOOLINK_STITCH_SELECTION__ = {
+        updatedAt: new Date().toISOString(),
+        items: safeItems,
+      };
+    } catch {
+      // Ignore window assignment errors.
+    }
+    window.localStorage.setItem(
+      STITCH_SELECTION_SNAPSHOT_KEY,
+      JSON.stringify({
+        updatedAt: new Date().toISOString(),
+        items: safeItems,
+      }),
+    );
+  } catch {
+    // Ignore storage errors and continue using IPC/postMessage path.
+  }
+}
+
+function notifyStitchFrameSelectionChanged() {
+  if (!stitchFrame?.contentWindow) {
+    return;
+  }
+  const items = getStitchSelectionItems();
+  persistStitchSelectionSnapshot(items);
+  stitchFrame.contentWindow.postMessage({
+    type: "stitch-selection-updated",
+    count: items.length,
+    items,
+  }, "*");
+}
+
+function queueStitchSelectionBroadcast() {
+  notifyStitchFrameSelectionChanged();
+  window.setTimeout(() => {
+    notifyStitchFrameSelectionChanged();
+  }, 160);
+  window.setTimeout(() => {
+    notifyStitchFrameSelectionChanged();
+  }, 700);
+}
+
+async function hydrateStitchSelectionFromBackend() {
+  if (!window.desktopAPI?.getStitchSelection) {
+    return;
+  }
+  const result = await window.desktopAPI.getStitchSelection();
+  if (!result?.ok) {
+    return;
+  }
+  stitchModeState.selectedVideos.clear();
+  const items = Array.isArray(result?.items) ? result.items : [];
+  for (const item of items) {
+    const itemPath = String(item?.path || item?.image_path || "").trim();
+    if (!itemPath) {
+      continue;
+    }
+    stitchModeState.selectedVideos.set(itemPath, {
+      path: itemPath,
+      media_type: "video",
+      title: String(item?.title || "Untitled video"),
+      preview_src: String(item?.preview_src || ""),
+    });
+  }
+  persistStitchSelectionSnapshot(getStitchSelectionItems());
+  updateStitchModeUi();
 }
 
 function resetSearchControlsToDefaults() {
@@ -491,6 +784,31 @@ function applyUiPreferences() {
     "results-density-cinematic",
   );
   document.body.classList.add(`results-density-${density}`);
+}
+
+function applyTooltipPreferences() {
+  const enabled = Boolean(userSettingsState.enableTooltips);
+  try {
+    window.localStorage.setItem(TOOLTIP_SETTINGS_KEY, enabled ? "1" : "0");
+  } catch {
+    // Ignore storage failures.
+  }
+  if (!tooltipSystemController) {
+    if (stitchFrame?.contentWindow) {
+      stitchFrame.contentWindow.postMessage({
+        type: "stitch-tooltip-settings-updated",
+        enabled,
+      }, "*");
+    }
+    return;
+  }
+  tooltipSystemController.setEnabled(enabled);
+  if (stitchFrame?.contentWindow) {
+    stitchFrame.contentWindow.postMessage({
+      type: "stitch-tooltip-settings-updated",
+      enabled,
+    }, "*");
+  }
 }
 
 function jumpToSidebarSection(sectionId) {
@@ -1094,6 +1412,7 @@ function clearResults() {
   updateAlbumActionButtons();
   searchAligner.classList.remove("searching");
   updateDownloadTopResultsButtonState();
+  updateStitchModeUi();
 }
 
 function getSearchDownloadRows() {
@@ -2173,6 +2492,10 @@ async function loadSettingsUiState() {
         settings.gallery_video_autoplay === undefined
           ? false
           : Boolean(settings.gallery_video_autoplay);
+      userSettingsState.enableTooltips =
+        settings.enable_tooltips === undefined
+          ? true
+          : Boolean(settings.enable_tooltips);
       userSettingsState.cacheTranscodedMovPreview = Boolean(settings.cache_transcoded_mov_preview);
       userSettingsState.cacheTranscodedHeicPreview = Boolean(settings.cache_transcoded_heic_preview);
       userSettingsState.cacheTranscodedHeifPreview = Boolean(settings.cache_transcoded_heif_preview);
@@ -2205,6 +2528,9 @@ async function loadSettingsUiState() {
       }
       if (settingsGalleryVideoAutoplayInput) {
         settingsGalleryVideoAutoplayInput.checked = userSettingsState.galleryVideoAutoplay;
+      }
+      if (settingsEnableTooltipsInput) {
+        settingsEnableTooltipsInput.checked = userSettingsState.enableTooltips;
       }
       if (settingsCacheTranscodedMovPreviewInput) {
         settingsCacheTranscodedMovPreviewInput.checked = userSettingsState.cacheTranscodedMovPreview;
@@ -2251,6 +2577,7 @@ async function loadSettingsUiState() {
   renderDynamicFilters();
   await loadFaceClustersForSettings();
   applyUiPreferences();
+  applyTooltipPreferences();
   if (homeScreen && !homeScreen.classList.contains("hidden")) {
     setFiltersExpanded(Boolean(userSettingsState.autoExpandFilters));
   }
@@ -2889,6 +3216,17 @@ function renderResults(results, options = {}) {
     node.querySelector(".objects").textContent = objects ? `Objects: ${objects}` : "";
     node.querySelector(".path").textContent = row.path || row.image_path || "";
 
+    if (mediaType === "video" && imagePath && stitchModeState.selectedVideos.has(imagePath)) {
+      const existingItem = stitchModeState.selectedVideos.get(imagePath) || {};
+      stitchModeState.selectedVideos.set(imagePath, {
+        ...existingItem,
+        path: imagePath,
+        media_type: "video",
+        title: String(title || existingItem.title || "Untitled video"),
+        preview_src: String(row.preview_src || existingItem.preview_src || ""),
+      });
+    }
+
     const img = node.querySelector(".search-result-background");
     const card = node.querySelector(".search-result");
     card.dataset.mediaType = mediaType;
@@ -2928,6 +3266,8 @@ function renderResults(results, options = {}) {
     card.setAttribute("role", "button");
     card.setAttribute("aria-label", `Open ${mediaType} preview for ${title}`);
     card.draggable = Boolean(imagePath);
+    card.dataset.stitchTitle = String(title || "Untitled video");
+    card.dataset.stitchPreviewSrc = String(row.preview_src || "");
     if (imagePath) {
       card.dataset.imagePath = imagePath;
     }
@@ -3039,6 +3379,7 @@ function renderResults(results, options = {}) {
   }
 
   updateDownloadTopResultsButtonState();
+  updateStitchModeUi();
 
   const maxRenderedCards = isWelcome
     ? WELCOME_GALLERY_MAX_RENDERED_CARDS
@@ -3073,6 +3414,8 @@ function renderResults(results, options = {}) {
       }
     }
   }
+
+  updateStitchModeUi();
 }
 
 async function loadMoreWelcomeGallery() {
@@ -3371,6 +3714,100 @@ async function doSearch() {
   renderResults(resultRows);
 }
 
+async function runWizardCombinedClipSearch(queries, label = "Wizard clips") {
+  const searchRunId = ++latestSearchRunId;
+
+  disableSearchResultsWindowing();
+  clearWelcomeGalleryCache();
+
+  const ready = await validateFile();
+  if (!ready) {
+    return;
+  }
+
+  const cleanedQueries = (Array.isArray(queries) ? queries : [])
+    .map((value) => extractAlbumIdsFromQuery(String(value || "")).cleanedQuery)
+    .filter((value) => Boolean(value));
+
+  if (cleanedQueries.length === 0) {
+    setStatus("Wizard combined search request was empty.");
+    return;
+  }
+
+  welcomeGalleryState.active = false;
+  scanUiState.hasSearchRun = true;
+
+  const topKValue = Math.max(1, Math.min(200, Number(topKInput.value || 20)));
+  const minScore = Number(userSettingsState.minMatchScore || 0.001);
+  const baseFilters = buildFiltersPayload();
+  const mergedRowsByPath = new Map();
+  let successfulQueries = 0;
+
+  for (let i = 0; i < cleanedQueries.length; i += 1) {
+    const query = cleanedQueries[i];
+    setStatus(`Searching phrase ${i + 1}/${cleanedQueries.length} from ${label}...`);
+
+    const payload = {
+      filePath: filePathInput.value.trim(),
+      query,
+      topK: topKValue,
+      minScore,
+      videoResultMode: "matching_timeframes",
+      filters: {
+        ...baseFilters,
+        mediaType: "video",
+      },
+    };
+
+    const result = await window.desktopAPI.semanticSearch(payload);
+    if (searchRunId !== latestSearchRunId) {
+      return;
+    }
+
+    if (!result?.ok) {
+      continue;
+    }
+
+    successfulQueries += 1;
+    const rows = Array.isArray(result.results) ? result.results : [];
+    for (const row of rows) {
+      const compact = toCompactSearchResultRow(row);
+      const key = String(compact.path || compact.image_path || compact.id || "").trim();
+      if (!key) {
+        continue;
+      }
+      const existing = mergedRowsByPath.get(key);
+      if (!existing || Number(compact.score || 0) > Number(existing.score || 0)) {
+        mergedRowsByPath.set(key, compact);
+      }
+    }
+  }
+
+  const mergedRows = Array.from(mergedRowsByPath.values())
+    .sort((a, b) => Number(b.score || 0) - Number(a.score || 0))
+    .slice(0, SEARCH_RESULTS_MAX_STORED_ROWS);
+
+  if (mergedRows.length === 0) {
+    clearResults();
+    countsEl.textContent = "filtered=0 | shown=0";
+    setStatus(`No matching results found across ${cleanedQueries.length} suggested phrase(s).`);
+    return;
+  }
+
+  countsEl.textContent = `phrases=${cleanedQueries.length} | successful=${successfulQueries} | shown=${mergedRows.length}`;
+
+  if (mergedRows.length > SEARCH_RESULTS_WINDOW_PAGE_SIZE) {
+    enableSearchResultsWindowing(mergedRows);
+    clearResults();
+    await loadMoreSearchResultsWindowed();
+  } else {
+    previewRows = mergedRows;
+    renderResults(mergedRows);
+  }
+
+  setStatus(`Phrase-by-phrase Wizard search complete. Ranked ${mergedRows.length} result(s) by highest match score.`);
+}
+
 if (downloadTopResultsBtn) {
   downloadTopResultsBtn.addEventListener("click", async () => {
     if (bulkDownloadInProgress) {
@@ -3510,6 +3947,7 @@ if (saveUserSettingsBtn) {
         settingsAutoCloseSidebarOnSettingsNavInput?.checked,
       );
       userSettingsState.galleryVideoAutoplay = Boolean(settingsGalleryVideoAutoplayInput?.checked);
+      userSettingsState.enableTooltips = Boolean(settingsEnableTooltipsInput?.checked ?? true);
       userSettingsState.cacheTranscodedMovPreview = Boolean(settingsCacheTranscodedMovPreviewInput?.checked);
       userSettingsState.cacheTranscodedHeicPreview = Boolean(settingsCacheTranscodedHeicPreviewInput?.checked);
       userSettingsState.cacheTranscodedHeifPreview = Boolean(settingsCacheTranscodedHeifPreviewInput?.checked);
@@ -3546,6 +3984,7 @@ if (saveUserSettingsBtn) {
         auto_expand_filters: userSettingsState.autoExpandFilters,
         auto_close_sidebar_on_settings_nav: userSettingsState.autoCloseSidebarOnSettingsNav,
         gallery_video_autoplay: userSettingsState.galleryVideoAutoplay,
+        enable_tooltips: userSettingsState.enableTooltips,
         cache_transcoded_mov_preview: userSettingsState.cacheTranscodedMovPreview,
         cache_transcoded_heic_preview: userSettingsState.cacheTranscodedHeicPreview,
         cache_transcoded_heif_preview: userSettingsState.cacheTranscodedHeifPreview,
@@ -3561,6 +4000,7 @@ if (saveUserSettingsBtn) {
         return;
       }
       await syncHomepageFiltersFromSavedSettings();
+      applyTooltipPreferences();
       setStatus("Settings saved.");
     } catch (error) {
       setStatus(`Could not save settings: ${String(error?.message || error)}`);
@@ -3711,22 +4151,11 @@ window.addEventListener("message", (event) => {
     }
 
     const payload = event?.data && typeof event.data === "object" ? event.data : null;
-    if (!payload || payload.type !== "wizard-search-clip") {
-      return;
-    }
-
-    const query = String(payload.query || "").trim();
-    const clipLabel = String(payload.clipLabel || "").trim();
-
-    if (!query) {
-      setStatus("Wizard search request was empty.");
+    if (!payload || (payload.type !== "wizard-search-clip" && payload.type !== "wizard-search-all-clips")) {
       return;
     }
 
     showHomeScreen();
-    if (queryInput) {
-      queryInput.value = query;
-    }
     if (mediaTypeSelect) {
       mediaTypeSelect.value = "video";
     }
@@ -3736,6 +4165,25 @@ window.addEventListener("message", (event) => {
     }
     if (topKInput) {
       topKInput.value = "30";
+    }
+
+    if (payload.type === "wizard-search-all-clips") {
+      const queries = Array.isArray(payload.queries) ? payload.queries : [];
+      if (queryInput) {
+        queryInput.value = String(queries[0] || "").trim();
+      }
+      void runWizardCombinedClipSearch(queries, "Wizard clips");
+      return;
+    }
+
+    const query = String(payload.query || "").trim();
+    const clipLabel = String(payload.clipLabel || "").trim();
+    if (!query) {
+      setStatus("Wizard search request was empty.");
+      return;
+    }
+    if (queryInput) {
+      queryInput.value = query;
     }
 
     setStatus(`Searching ${clipLabel || "selected clip"} for best matching video frames...`);
@@ -3751,6 +4199,251 @@ if (openReelAnalyzerBtn) {
     if (userSettingsState.autoCloseSidebarOnSettingsNav) {
       closeSidebar();
     }
+  });
+}
+
+if (openStitchWorkspaceBtn) {
+  openStitchWorkspaceBtn.addEventListener("click", () => {
+    showStitchScreen();
+    if (userSettingsState.autoCloseSidebarOnSettingsNav) {
+      closeSidebar();
+    }
+  });
+}
+
+if (stitchFrame) {
+  stitchFrame.addEventListener("load", () => {
+    queueStitchSelectionBroadcast();
+  });
+}
+
+if (toggleStitchModeBtn) {
+  toggleStitchModeBtn.addEventListener("click", () => {
+    if (homeScreen?.classList.contains("hidden")) {
+      showHomeScreen();
+    }
+    setStitchModeEnabled(!stitchModeState.enabled);
+  });
+}
+
+if (clearStitchSelectionBtn) {
+  clearStitchSelectionBtn.addEventListener("click", async () => {
+    stitchModeState.selectedVideos.clear();
+    persistStitchSelectionSnapshot([]);
+    updateStitchModeUi();
+    if (window.desktopAPI?.clearStitchSelection) {
+      await window.desktopAPI.clearStitchSelection();
+    } else {
+      scheduleStitchSelectionSync();
+    }
+  });
+}
+
+if (openInStitchBtn) {
+  openInStitchBtn.addEventListener("click", async () => {
+    const items = Array.from(stitchModeState.selectedVideos.values());
+    if (items.length < 2) {
+      setStatus("Select at least 2 videos for Stitch.");
+      return;
+    }
+    if (window.desktopAPI?.setStitchSelection) {
+      await window.desktopAPI.setStitchSelection({ items });
+    }
+    persistStitchSelectionSnapshot(items);
+    showStitchScreen();
+  });
+}
+
+document.addEventListener("keydown", (event) => {
+  if (event.defaultPrevented) {
+    return;
+  }
+  if (event.ctrlKey || event.metaKey || event.altKey) {
+    return;
+  }
+  if (String(event.key || "").toLowerCase() !== "s") {
+    return;
+  }
+  if (isTextEntryTarget(event.target)) {
+    return;
+  }
+  if (homeScreen?.classList.contains("hidden")) {
+    return;
+  }
+  event.preventDefault();
+  setStitchModeEnabled(!stitchModeState.enabled);
+});
+
+window.addEventListener("message", (event) => {
+  const payload = event?.data && typeof event.data === "object" ? event.data : null;
+  if (!payload) {
+    return;
+  }
+
+  const payloadType = String(payload.type || "");
+  if (!payloadType.startsWith("stitch-")) {
+    return;
+  }
+
+  if (payload.type === "stitch-open-home") {
+    showHomeScreen();
+    return;
+  }
+
+  if (payload.type === "stitch-request-selection-sync") {
+    notifyStitchFrameSelectionChanged();
+    return;
+  }
+
+  if (payload.type === "stitch-request-selection-data") {
+    const items = getStitchSelectionItems();
+    const response = {
+      type: "stitch-selection-data",
+      requestId: String(payload.requestId || ""),
+      count: items.length,
+      items,
+    };
+    try {
+      if (event.source && typeof event.source.postMessage === "function") {
+        event.source.postMessage(response, "*");
+        return;
+      }
+    } catch {
+      // Fall back to posting on iframe window if event source cannot be messaged directly.
+    }
+    if (stitchFrame?.contentWindow) {
+      stitchFrame.contentWindow.postMessage(response, "*");
+    }
+    return;
+  }
+
+  if (payload.type === "stitch-read-file-request") {
+    const requestId = String(payload.requestId || "");
+    const sourcePath = String(payload.path || "").trim();
+
+    const respond = (responsePayload) => {
+      const envelope = {
+        type: "stitch-read-file-response",
+        requestId,
+        ...responsePayload,
+      };
+      try {
+        if (event.source && typeof event.source.postMessage === "function") {
+          event.source.postMessage(envelope, "*");
+          return;
+        }
+      } catch {
+        // Fall back to posting on iframe window if direct source response fails.
+      }
+      if (stitchFrame?.contentWindow) {
+        stitchFrame.contentWindow.postMessage(envelope, "*");
+      }
+    };
+
+    if (!sourcePath) {
+      respond({ ok: false, message: "path is required." });
+      return;
+    }
+
+    void (async () => {
+      try {
+        if (window.desktopAPI?.readBinaryFile) {
+          const result = await window.desktopAPI.readBinaryFile({ path: sourcePath });
+          if (!result?.ok) {
+            respond({ ok: false, message: String(result?.message || "Could not read source file.") });
+            return;
+          }
+          respond({ ok: true, bytes: result.bytes });
+          return;
+        }
+
+        // Fallback path when preload bridge is stale/unavailable: read bytes via file URL fetch.
+        const fileUrl = /^[a-z]+:\/\//i.test(sourcePath)
+          ? sourcePath
+          : /^([a-zA-Z]):\\/.test(sourcePath)
+            ? `file:///${sourcePath.replace(/\\/g, "/")}`
+            : sourcePath;
+        const response = await fetch(fileUrl);
+        if (!response.ok) {
+          respond({ ok: false, message: `Could not read source file: HTTP ${response.status}` });
+          return;
+        }
+        const buffer = await response.arrayBuffer();
+        respond({ ok: true, bytes: new Uint8Array(buffer) });
+      } catch (error) {
+        respond({ ok: false, message: String(error?.message || error) });
+      }
+    })();
+    return;
+  }
+
+  if (payload.type === "stitch-generate-request" || payload.type === "stitch-download-request") {
+    const requestId = String(payload.requestId || "");
+    const respond = (responsePayload) => {
+      const envelope = {
+        type: "stitch-action-response",
+        requestId,
+        ...responsePayload,
+      };
+      try {
+        if (event.source && typeof event.source.postMessage === "function") {
+          event.source.postMessage(envelope, "*");
+          return;
+        }
+      } catch {
+        // Fall back to iframe postMessage when direct source response fails.
+      }
+      if (stitchFrame?.contentWindow) {
+        stitchFrame.contentWindow.postMessage(envelope, "*");
+      }
+    };
+
+    if (payload.type === "stitch-generate-request") {
+      if (!window.desktopAPI?.generateStitchVideo) {
+        respond({ ok: false, message: "Generate API unavailable." });
+        return;
+      }
+      void (async () => {
+        try {
+          const result = await window.desktopAPI.generateStitchVideo(payload.payload || {});
+          respond(result || { ok: false, message: "Empty generate response." });
+        } catch (error) {
+          respond({ ok: false, message: String(error?.message || error) });
+        }
+      })();
+      return;
+    }
+
+    if (!window.desktopAPI?.exportMediaFile) {
+      respond({ ok: false, message: "Download API unavailable." });
+      return;
+    }
+
+    void (async () => {
+      try {
+        const sourcePath = String(payload?.payload?.sourcePath || "").trim();
+        if (!sourcePath) {
+          respond({ ok: false, message: "sourcePath is required." });
+          return;
+        }
+        const result = await window.desktopAPI.exportMediaFile({ sourcePath });
+        respond(result || { ok: false, message: "Empty download response." });
+      } catch (error) {
+        respond({ ok: false, message: String(error?.message || error) });
+      }
+    })();
+  }
+});
+
+if (window.desktopAPI?.onStitchProgress) {
+  window.desktopAPI.onStitchProgress((payload) => {
+    if (!stitchFrame?.contentWindow) {
+      return;
+    }
+    stitchFrame.contentWindow.postMessage({
+      type: "stitch-progress",
+      payload,
+    }, "*");
   });
 }
 
@@ -4297,8 +4990,14 @@ initializeSidebarSectionToggles();
 updateScanSectionOptionBadges();
 
 (async () => {
+  tooltipSystemController = installTooltipSystem({
+    customTextById: MAIN_APP_TOOLTIP_TEXT,
+    buttonHoverDelayMs: 1500,
+  });
   showHomeScreen();
+  await hydrateStitchSelectionFromBackend();
   await loadAlbums();
   await syncHomepageFiltersFromSavedSettings();
   await initializeDefaultMetadataFile();
+  tooltipSystemController?.refresh();
 })();

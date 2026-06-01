@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Stitch Workspace</title>
+    <link rel="stylesheet" href="./stitch.css" />
+  </head>
+  <body>
+    <main class="stitch-page">
+      <section class="hero-card">
+        <p class="hero-kicker">Video Compilation Tool</p>
+        <h1>Stitch Mode</h1>
+        <p class="hero-subtitle">Pick clips in Search or Gallery, then generate one polished merged video with fixed timing and aspect ratio.</p>
+        <div class="hero-actions">
+          <button id="goHomeBtn" type="button" class="ghost-btn">Back to Search</button>
+          <button id="refreshSelectionBtn" type="button" class="ghost-btn">Refresh Selection</button>
+        </div>
+      </section>
+
+      <section class="stitch-unified-card">
+        <div class="stitch-flow">
+          <div class="stitch-queue-block">
+            <div class="selection-header">
+              <h2>Selected Video Queue</h2>
+              <span id="selectionHint">Drag rows using the ⠿ handle to reorder output sequence.</span>
+            </div>
+            <div id="selectedVideosList" class="selection-list" aria-label="Selected videos queue"></div>
+          </div>
+          <div class="stitch-controls-block">
+            <div class="stitch-controls-row">
+              <label class="field" for="videoCountInput">
+                <span>Number of Videos</span>
+                <div class="stepper-row">
+                  <button id="decreaseVideoCountBtn" type="button" aria-label="Decrease video count">-</button>
+                  <input id="videoCountInput" type="number" min="1" max="50" value="1" />
+                  <button id="increaseVideoCountBtn" type="button" aria-label="Increase video count">+</button>
+                </div>
+              </label>
+              <label class="field" for="secondsPerVideoRange">
+                <span>Seconds Per Video</span>
+                <div class="slider-row">
+                  <input id="secondsPerVideoRange" type="range" min="1" max="60" value="2" />
+                  <input id="secondsPerVideoInput" type="number" min="1" max="60" value="2" />
+                </div>
+              </label>
+              <label class="field" for="resolutionSelect">
+                <span>Output Ratio / Resolution</span>
+                <select id="resolutionSelect">
+                  <option value="1080x1920" selected>9:16 vertical (1080x1920)</option>
+                  <option value="720x1280">9:16 vertical (720x1280)</option>
+                  <option value="1920x1080">16:9 horizontal (1920x1080)</option>
+                  <option value="1280x720">16:9 horizontal (1280x720)</option>
+                  <option value="1080x1080">1:1 square (1080x1080)</option>
+                  <option value="720x720">1:1 square (720x720)</option>
+                </select>
+              </label>
+              <label class="field toggle-field" for="muteAllClipsInput">
+                <span>Audio</span>
+                <div class="toggle-row">
+                  <input id="muteAllClipsInput" type="checkbox" checked />
+                  <span>🔇 Mute all clips</span>
+                </div>
+              </label>
+            </div>
+            <div class="stitch-summary-row">
+              <div class="summary-grid">
+                <div>
+                  <p class="summary-label">Selected</p>
+                  <p id="selectedCountValue" class="summary-value">0</p>
+                </div>
+                <div>
+                  <p class="summary-label">Will Use</p>
+                  <p id="usedCountValue" class="summary-value">0</p>
+                </div>
+                <div>
+                  <p class="summary-label">Seconds / Clip</p>
+                  <p id="secondsValue" class="summary-value">2s</p>
+                </div>
+              </div>
+              <div class="duration-display" aria-live="polite">
+                <p class="duration-label">Total Output Duration</p>
+                <p id="durationValue" class="duration-value">0s</p>
+              </div>
+            </div>
+            <div class="stitch-actions-row">
+              <button id="generateStitchBtn" type="button" class="primary-btn" disabled>Generate</button>
+              <button id="downloadStitchBtn" type="button" class="primary-btn alt" disabled>Download</button>
+              <button id="reconfigureBtn" type="button" class="ghost-btn" disabled>Re-configure</button>
+            </div>
+            <div class="progress-block">
+              <div class="progress-meta">
+                <span id="progressStatusText">Idle</span>
+                <span id="progressPercentText">0%</span>
+              </div>
+              <div id="stitchProgressBar" class="progress-track" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+                <div id="stitchProgressFill" class="progress-fill"></div>
+              </div>
+              <p id="outputPathLabel" class="output-path"></p>
+            </div>
+            <div id="generatedPreviewBlock" class="generated-preview-block hidden" aria-live="polite">
+              <p class="generated-preview-title">Generated Preview</p>
+              <video id="generatedPreviewVideo" class="generated-preview-video" controls preload="metadata"></video>
+            </div>
+            <div id="ffmpegErrorPanel" class="ffmpeg-error-panel hidden">
+              <p class="ffmpeg-error-title">FFmpeg stderr</p>
+              <pre id="ffmpegErrorText" class="ffmpeg-error-text"></pre>
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <script type="module" src="./stitch.js"></script>
+  </body>
+</html>

@@ -32,6 +32,7 @@
       "*.cjs",
       "*.html",
       "*.css",
+      "assets/**/*",
       "assets/*.ico",
       "assets/*.icns",
       "assets/*.png",
@@ -99,6 +100,9 @@
   },
   "dependencies": {
     "@aws-sdk/client-bedrock-runtime": "^3.1022.0",
+    "@ffmpeg/core": "^0.12.10",
+    "@ffmpeg/ffmpeg": "^0.12.15",
+    "@ffmpeg/util": "^0.12.2",
     "@tensorflow/tfjs": "^4.20.0",
     "@tensorflow/tfjs-backend-wasm": "^4.22.0",
     "@vladmandic/face-api": "^1.7.15",

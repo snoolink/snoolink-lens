@@ -125,6 +125,7 @@ const CLOUD_GROUPS_OUTPUT_PATH = path.join(DATA_DIR_PATH, "cloud_index_groups.js
 const LOCAL_GROUPS_OUTPUT_PATH = path.join(DATA_DIR_PATH, "local_index_groups.json");
 const LOCAL_FACE_CLUSTERS_OUTPUT_PATH = path.join(DATA_DIR_PATH, "local_face_clusters.json");
 const SEARCH_HISTORY_PATH = path.join(DATA_DIR_PATH, "search_history.json");
+const STITCH_EXPORT_DIR_PATH = path.join(DATA_DIR_PATH, "stitch-exports");
 const MAX_SEARCH_HISTORY_ENTRIES = 10000;
 const MAX_FILTER_LOOKUP_OCR_CORPUS_CHARS = 1200;
 const MAX_FILTER_LOOKUP_FRAME_ROWS = 8;
@@ -1294,6 +1295,12 @@ let localFilterLookupCache = {
   fingerprint: "",
   payload: null,
 };
+let stitchSelectionState = {
+  items: [],
+  updatedAt: null,
+};
+const METADATA_PATH_LOOKUP_CACHE_MAX_ENTRIES = 240;
+const metadataPathLookupCache = new Map();
 
 async function getPathFingerprint(targetPath) {
   try {
@@ -1302,6 +1309,196 @@ async function getPathFingerprint(targetPath) {
   } catch {
     return "missing";
   }
+}
+
+function setMetadataPathLookupCacheEntry(cacheKey, value) {
+  if (!cacheKey) {
+    return;
+  }
+  if (metadataPathLookupCache.has(cacheKey)) {
+    metadataPathLookupCache.delete(cacheKey);
+  }
+  metadataPathLookupCache.set(cacheKey, value);
+  if (metadataPathLookupCache.size > METADATA_PATH_LOOKUP_CACHE_MAX_ENTRIES) {
+    const oldestKey = metadataPathLookupCache.keys().next().value;
+    metadataPathLookupCache.delete(oldestKey);
+  }
+}
+
+async function findMetadataRowByPathInResultsJson(resultsFilePath, targetPath) {
+  const normalizedPath = String(targetPath || "").trim();
+  if (!normalizedPath) {
+    return null;
+  }
+
+  const cacheKey = `${resultsFilePath}::${normalizedPath.toLowerCase()}`;
+  if (metadataPathLookupCache.has(cacheKey)) {
+    return metadataPathLookupCache.get(cacheKey);
+  }
+
+  if (!(await pathExists(resultsFilePath))) {
+    setMetadataPathLookupCacheEntry(cacheKey, null);
+    return null;
+  }
+
+  const needle = normalizedPath.toLowerCase();
+
+  const foundRow = await new Promise((resolve) => {
+    const stream = fsSync.createReadStream(resultsFilePath, { encoding: "utf-8" });
+    const resultsPattern = '"results"';
+    let resultsPatternIndex = 0;
+    let waitingForResultsColon = false;
+    let waitingForResultsArrayStart = false;
+    let inResultsArray = false;
+    let resultsArrayDepth = 0;
+    let inString = false;
+    let escaped = false;
+    let collectingObject = false;
+    let currentObjectDepth = 0;
+    let currentObjectBuffer = "";
+    let settled = false;
+
+    const finish = (value) => {
+      if (settled) {
+        return;
+      }
+      settled = true;
+      try {
+        stream.destroy();
+      } catch {
+        // Ignore stream close errors.
+      }
+      resolve(value || null);
+    };
+
+    stream.on("error", () => finish(null));
+    stream.on("end", () => finish(null));
+
+    stream.on("data", (chunk) => {
+      if (settled) {
+        return;
+      }
+
+      const text = String(chunk || "");
+      for (let i = 0; i < text.length; i += 1) {
+        const ch = text[i];
+
+        if (!inResultsArray) {
+          if (!waitingForResultsColon && !waitingForResultsArrayStart) {
+            if (ch === resultsPattern[resultsPatternIndex]) {
+              resultsPatternIndex += 1;
+              if (resultsPatternIndex === resultsPattern.length) {
+                waitingForResultsColon = true;
+                resultsPatternIndex = 0;
+              }
+            } else {
+              resultsPatternIndex = ch === resultsPattern[0] ? 1 : 0;
+            }
+            continue;
+          }
+
+          if (waitingForResultsColon) {
+            if (/\s/.test(ch)) {
+              continue;
+            }
+            waitingForResultsColon = false;
+            waitingForResultsArrayStart = ch === ":";
+            continue;
+          }
+
+          if (waitingForResultsArrayStart) {
+            if (/\s/.test(ch)) {
+              continue;
+            }
+            waitingForResultsArrayStart = false;
+            if (ch === "[") {
+              inResultsArray = true;
+              resultsArrayDepth = 1;
+            }
+            continue;
+          }
+
+          continue;
+        }
+
+        if (collectingObject) {
+          currentObjectBuffer += ch;
+        }
+
+        if (inString) {
+          if (escaped) {
+            escaped = false;
+            continue;
+          }
+          if (ch === "\\") {
+            escaped = true;
+            continue;
+          }
+          if (ch === '"') {
+            inString = false;
+          }
+          continue;
+        }
+
+        if (ch === '"') {
+          inString = true;
+          continue;
+        }
+
+        if (ch === "[") {
+          resultsArrayDepth += 1;
+          continue;
+        }
+
+        if (ch === "]") {
+          resultsArrayDepth -= 1;
+          if (resultsArrayDepth <= 0) {
+            finish(null);
+            return;
+          }
+          continue;
+        }
+
+        if (ch === "{") {
+          if (!collectingObject && resultsArrayDepth === 1) {
+            collectingObject = true;
+            currentObjectDepth = 1;
+            currentObjectBuffer = "{";
+            continue;
+          }
+
+          if (collectingObject) {
+            currentObjectDepth += 1;
+          }
+          continue;
+        }
+
+        if (ch === "}" && collectingObject) {
+          currentObjectDepth -= 1;
+          if (currentObjectDepth === 0) {
+            let parsed = null;
+            try {
+              parsed = JSON.parse(currentObjectBuffer);
+            } catch {
+              parsed = null;
+            }
+
+            collectingObject = false;
+            currentObjectBuffer = "";
+
+            const candidatePath = String(parsed?.path || parsed?.image_path || "").trim().toLowerCase();
+            if (candidatePath && candidatePath === needle) {
+              finish(parsed);
+              return;
+            }
+          }
+        }
+      }
+    });
+  });
+
+  setMetadataPathLookupCacheEntry(cacheKey, foundRow || null);
+  return foundRow || null;
 }
 
 function normalizeBinaryFromEnv(pathOrDir, binaryName) {
@@ -1582,6 +1779,253 @@ async function transcodeVideoTimeframePreviewToMp4(sourcePath, outputPath, start
     windowsHide: true,
     maxBuffer: 30 * 1024 * 1024,
   });
+}
+
+function parseStitchResolution(value) {
+  const raw = String(value || "").trim();
+  const match = raw.match(/^(\d{3,5})x(\d{3,5})$/i);
+  if (!match) {
+    return { width: 1080, height: 1920, value: "1080x1920" };
+  }
+  const width = Number(match[1]);
+  const height = Number(match[2]);
+  if (!Number.isFinite(width) || !Number.isFinite(height) || width < 320 || height < 320) {
+    return { width: 1080, height: 1920, value: "1080x1920" };
+  }
+  return { width, height, value: `${width}x${height}` };
+}
+
+function sanitizeStitchSelectionItems(items) {
+  const list = Array.isArray(items) ? items : [];
+  const byPath = new Map();
+  for (const item of list) {
+    const itemPath = String(item?.path || item?.image_path || "").trim();
+    if (!itemPath) {
+      continue;
+    }
+    const mediaType = String(item?.media_type || getMediaTypeFromPath(itemPath, "image")).toLowerCase();
+    if (mediaType !== "video") {
+      continue;
+    }
+    byPath.set(itemPath, {
+      path: itemPath,
+      media_type: "video",
+      title: String(item?.title || item?.metadata?.title || path.basename(itemPath) || "Untitled video"),
+      preview_src: String(item?.preview_src || ""),
+    });
+  }
+  return Array.from(byPath.values());
+}
+
+function escapeConcatListPath(filePath) {
+  return String(filePath || "").replace(/'/g, "'\\''");
+}
+
+async function generateStitchVideo(payload = {}) {
+  const requestedItems = sanitizeStitchSelectionItems(payload?.items);
+  const selectedItems = requestedItems.length > 0
+    ? requestedItems
+    : sanitizeStitchSelectionItems(stitchSelectionState.items);
+
+  const requestedCount = Math.max(2, Math.min(50, Number(payload?.videoCount || selectedItems.length || 2)));
+  const secondsPerVideo = Math.max(1, Math.min(60, Number(payload?.secondsPerVideo || 2)));
+  const resolution = parseStitchResolution(payload?.resolution || "1080x1920");
+  const muteAll = Boolean(payload?.muteAll ?? true);
+  const stitchFps = 30;
+  const stitchGop = stitchFps * 2;
+
+  const trimmed = selectedItems.slice(0, requestedCount);
+  const verifiedItems = [];
+  for (const item of trimmed) {
+    if (await pathExists(item.path)) {
+      verifiedItems.push(item);
+    }
+  }
+
+  if (verifiedItems.length < 2) {
+    return { ok: false, message: "Please select at least 2 available videos." };
+  }
+
+  await fs.mkdir(STITCH_EXPORT_DIR_PATH, { recursive: true });
+  const runToken = `${Date.now()}-${Math.random().toString(16).slice(2, 8)}`;
+  const tempDir = path.join(STITCH_EXPORT_DIR_PATH, `tmp-${runToken}`);
+  await fs.mkdir(tempDir, { recursive: true });
+
+  sendToRenderer("stitch-progress", {
+    phase: "start",
+    progress: 0,
+    message: `Preparing ${verifiedItems.length} clips...`,
+    current: 0,
+    total: verifiedItems.length,
+  });
+
+  try {
+    const ffmpegBinary = await resolveFfmpegBinary();
+    const clipPaths = [];
+    for (let i = 0; i < verifiedItems.length; i += 1) {
+      const item = verifiedItems[i];
+      const clipPath = path.join(tempDir, `clip-${String(i + 1).padStart(3, "0")}.mp4`);
+      const filter = [
+        `scale=${resolution.width}:${resolution.height}:force_original_aspect_ratio=increase:flags=lanczos`,
+        `crop=${resolution.width}:${resolution.height}`,
+        `fps=${stitchFps}`,
+        "format=yuv420p",
+        "setsar=1",
+      ].join(",");
+      const args = [
+        "-hide_banner",
+        "-loglevel",
+        "error",
+        "-y",
+        "-stream_loop",
+        "-1",
+        "-i",
+        item.path,
+        "-t",
+        String(secondsPerVideo),
+        "-vf",
+        filter,
+        "-r",
+        String(stitchFps),
+        "-vsync",
+        "cfr",
+        "-c:v",
+        "libx264",
+        "-preset",
+        "veryfast",
+        "-g",
+        String(stitchGop),
+        "-keyint_min",
+        String(stitchGop),
+        "-sc_threshold",
+        "0",
+        "-crf",
+        "21",
+        "-pix_fmt",
+        "yuv420p",
+        "-movflags",
+        "+faststart",
+        clipPath,
+      ];
+      const outputArgIndex = Math.max(0, args.indexOf("-movflags"));
+
+      if (muteAll) {
+        args.splice(outputArgIndex, 0, "-an");
+      } else {
+        args.splice(outputArgIndex, 0, "-af", "aresample=async=1:first_pts=0", "-c:a", "aac", "-b:a", "128k", "-shortest");
+      }
+
+      await execFileAsync(ffmpegBinary, args, {
+        windowsHide: true,
+        maxBuffer: 60 * 1024 * 1024,
+      });
+
+      clipPaths.push(clipPath);
+      sendToRenderer("stitch-progress", {
+        phase: "clips",
+        progress: Math.round(((i + 1) / (verifiedItems.length + 1)) * 90),
+        message: `Processing clip ${i + 1} of ${verifiedItems.length}...`,
+        current: i + 1,
+        total: verifiedItems.length,
+      });
+    }
+
+    const concatListPath = path.join(tempDir, "concat-list.txt");
+    const concatLines = clipPaths.map((clipPath) => `file '${escapeConcatListPath(clipPath)}'`).join("\n");
+    await fs.writeFile(concatListPath, `${concatLines}\n`, "utf-8");
+
+    const outputName = `snoolink-stich-${Date.now()}-${Math.random().toString(16).slice(2, 8)}.mp4`;
+    const outputPath = path.join(STITCH_EXPORT_DIR_PATH, outputName);
+    const concatArgs = [
+      "-hide_banner",
+      "-loglevel",
+      "error",
+      "-y",
+      "-f",
+      "concat",
+      "-safe",
+      "0",
+      "-i",
+      concatListPath,
+      "-r",
+      String(stitchFps),
+      "-vsync",
+      "cfr",
+      "-c:v",
+      "libx264",
+      "-preset",
+      "veryfast",
+      "-g",
+      String(stitchGop),
+      "-keyint_min",
+      String(stitchGop),
+      "-sc_threshold",
+      "0",
+      "-crf",
+      "21",
+      "-pix_fmt",
+      "yuv420p",
+      ...(muteAll ? ["-an"] : ["-af", "aresample=async=1:first_pts=0", "-c:a", "aac", "-b:a", "128k"]),
+      "-movflags",
+      "+faststart",
+      outputPath,
+    ];
+
+    sendToRenderer("stitch-progress", {
+      phase: "merge",
+      progress: 92,
+      message: "Merging clips into one video...",
+      current: verifiedItems.length,
+      total: verifiedItems.length,
+    });
+
+    await execFileAsync(ffmpegBinary, concatArgs, {
+      windowsHide: true,
+      maxBuffer: 80 * 1024 * 1024,
+    });
+
+    sendToRenderer("stitch-progress", {
+      phase: "complete",
+      progress: 100,
+      message: "Stitch complete.",
+      current: verifiedItems.length,
+      total: verifiedItems.length,
+      path: outputPath,
+    });
+
+    return {
+      ok: true,
+      path: outputPath,
+      fileName: outputName,
+      usedCount: verifiedItems.length,
+      secondsPerVideo,
+      resolution: resolution.value,
+      durationSeconds: verifiedItems.length * secondsPerVideo,
+    };
+  } catch (error) {
+    const message = String(error?.message || error || "Unknown error");
+    const isMissingFfmpeg = /ENOENT|not found|not recognized/i.test(message);
+    const safeMessage = isMissingFfmpeg
+      ? "ffmpeg was not found. Install FFmpeg and/or set FFMPEG_PATH to the ffmpeg binary path."
+      : message;
+    sendToRenderer("stitch-progress", {
+      phase: "error",
+      progress: 0,
+      message: safeMessage,
+      current: 0,
+      total: 0,
+    });
+    return {
+      ok: false,
+      message: safeMessage,
+    };
+  } finally {
+    try {
+      await fs.rm(tempDir, { recursive: true, force: true });
+    } catch {
+      // Ignore cleanup errors.
+    }
+  }
 }
 
 async function loadSharpModule() {
@@ -2265,6 +2709,7 @@ async function readUserSettings() {
     auto_expand_filters: false,
     auto_close_sidebar_on_settings_nav: true,
     gallery_video_autoplay: false,
+    enable_tooltips: true,
     cache_transcoded_mov_preview: false,
     cache_transcoded_heic_preview: false,
     cache_transcoded_heif_preview: false,
@@ -2324,6 +2769,10 @@ async function readUserSettings() {
         payload?.gallery_video_autoplay === undefined
           ? defaults.gallery_video_autoplay
           : Boolean(payload?.gallery_video_autoplay),
+      enable_tooltips:
+        payload?.enable_tooltips === undefined
+          ? defaults.enable_tooltips
+          : Boolean(payload?.enable_tooltips),
       cache_transcoded_mov_preview:
         payload?.cache_transcoded_mov_preview === undefined
           ? Boolean(payload?.cache_transcoded_preview_media)
@@ -2528,6 +2977,10 @@ async function writeUserSettings(settings) {
       settings?.gallery_video_autoplay === undefined
         ? false
         : Boolean(settings?.gallery_video_autoplay),
+    enable_tooltips:
+      settings?.enable_tooltips === undefined
+        ? true
+        : Boolean(settings?.enable_tooltips),
     cache_transcoded_mov_preview: Boolean(settings?.cache_transcoded_mov_preview),
     cache_transcoded_heic_preview: Boolean(settings?.cache_transcoded_heic_preview),
     cache_transcoded_heif_preview: Boolean(settings?.cache_transcoded_heif_preview),
@@ -4275,34 +4728,69 @@ ipcMain.handle("get-image-metadata-by-path", async (_event, payload) => {
         getMediaTypeFromPath(imagePath, "image"),
       );
 
-      const metadata = snapshot?.metadata && typeof snapshot.metadata === "object"
-        ? snapshot.metadata
+      const localPath = path.join(DATA_DIR_PATH, "local-image_metadata_results.json");
+      const cloudPath = path.join(DATA_DIR_PATH, "cloud-image_metadata_results.json");
+      const [localRow, cloudRow] = await Promise.all([
+        findMetadataRowByPathInResultsJson(localPath, imagePath),
+        findMetadataRowByPathInResultsJson(cloudPath, imagePath),
+      ]);
+
+      const effectiveLocalRow = localRow || null;
+      const effectiveCloudRow = cloudRow || null;
+
+      const metadata = effectiveLocalRow?.metadata && typeof effectiveLocalRow.metadata === "object"
+        ? effectiveLocalRow.metadata
+        : snapshot?.metadata && typeof snapshot.metadata === "object"
+          ? snapshot.metadata
         : {
           title: path.basename(imagePath) || `Untitled ${inferredMediaType}`,
-          description: "",
+          description: String(effectiveCloudRow?.description || ""),
           tags: [],
           objects: [],
           media_type: inferredMediaType,
         };
 
+      const cloudMetadata = effectiveCloudRow
+        ? {
+          ...effectiveCloudRow,
+          id: effectiveCloudRow?.id ?? null,
+          image_path: String(effectiveCloudRow?.image_path || effectiveCloudRow?.path || imagePath),
+          model_id: effectiveCloudRow?.model_id || null,
+          analyzed_at: effectiveCloudRow?.analyzed_at || null,
+          description: String(effectiveCloudRow?.description || ""),
+          ocr: effectiveCloudRow?.ocr || { all_text: "", entries: [] },
+          status: effectiveCloudRow?.status || "unknown",
+          error: effectiveCloudRow?.error || "",
+        }
+        : snapshot?.cloud_metadata || null;
+
+      const localMetadata = effectiveLocalRow
+        ? effectiveLocalRow?.local_metadata || effectiveLocalRow
+        : snapshot?.local_metadata || null;
+
       const pathOnlyResult = {
-        id: snapshot?.id ?? null,
+        id: effectiveLocalRow?.id ?? effectiveCloudRow?.id ?? snapshot?.id ?? null,
         path: imagePath,
         image_path: imagePath,
         media_type: inferredMediaType,
-        status: String(snapshot?.status || "ok"),
+        status: String(effectiveLocalRow?.status || effectiveCloudRow?.status || snapshot?.status || "ok"),
         metadata,
         local_metadata: {
-          ...(snapshot?.local_metadata && typeof snapshot.local_metadata === "object" ? snapshot.local_metadata : {}),
+          ...(localMetadata && typeof localMetadata === "object" ? localMetadata : {}),
           size_bytes: sizeBytes,
           modified_at: modifiedAt,
         },
-        cloud_metadata: snapshot?.cloud_metadata || null,
-        model_id: snapshot?.model_id || null,
-        analyzed_at: snapshot?.analyzed_at || null,
-        description: snapshot?.description || null,
-        ocr: snapshot?.ocr || null,
-        error: String(snapshot?.error || ""),
+        cloud_metadata: cloudMetadata,
+        model_id: cloudMetadata?.model_id || snapshot?.model_id || null,
+        analyzed_at: cloudMetadata?.analyzed_at || snapshot?.analyzed_at || null,
+        description: cloudMetadata?.description || snapshot?.description || null,
+        ocr: cloudMetadata?.ocr || snapshot?.ocr || null,
+        error: String(
+          effectiveLocalRow?.error ||
+          effectiveCloudRow?.error ||
+          snapshot?.error ||
+          "",
+        ),
       };
 
       return {
@@ -4437,6 +4925,52 @@ ipcMain.handle("get-image-metadata-by-path", async (_event, payload) => {
   }
 });
 
+ipcMain.handle("set-stitch-selection", async (_event, payload) => {
+  try {
+    const items = sanitizeStitchSelectionItems(payload?.items);
+    stitchSelectionState = {
+      items,
+      updatedAt: new Date().toISOString(),
+    };
+    return {
+      ok: true,
+      count: items.length,
+      updatedAt: stitchSelectionState.updatedAt,
+    };
+  } catch (error) {
+    return { ok: false, message: String(error?.message || error) };
+  }
+});
+
+ipcMain.handle("get-stitch-selection", async () => {
+  return {
+    ok: true,
+    items: Array.isArray(stitchSelectionState.items) ? stitchSelectionState.items.slice() : [],
+    count: Array.isArray(stitchSelectionState.items) ? stitchSelectionState.items.length : 0,
+    updatedAt: stitchSelectionState.updatedAt,
+  };
+});
+
+ipcMain.handle("clear-stitch-selection", async () => {
+  stitchSelectionState = {
+    items: [],
+    updatedAt: new Date().toISOString(),
+  };
+  return {
+    ok: true,
+    count: 0,
+    updatedAt: stitchSelectionState.updatedAt,
+  };
+});
+
+ipcMain.handle("generate-stitch-video", async (_event, payload) => {
+  try {
+    return await generateStitchVideo(payload);
+  } catch (error) {
+    return { ok: false, message: String(error?.message || error) };
+  }
+});
+
 ipcMain.handle("open-original-source-folder", async (_event, imagePath) => {
   try {
     const targetPath = String(imagePath || "").trim();
@@ -4543,6 +5077,25 @@ ipcMain.handle("copy-text", async (_event, text) => {
   try {
     clipboard.writeText(String(text || ""));
     return { ok: true };
+  } catch (error) {
+    return { ok: false, message: String(error?.message || error) };
+  }
+});
+
+ipcMain.handle("read-binary-file", async (_event, payload) => {
+  try {
+    const sourcePath = String(payload?.path || "").trim();
+    if (!sourcePath) {
+      return { ok: false, message: "path is required." };
+    }
+
+    const normalizedPath = path.resolve(sourcePath);
+    if (!(await pathExists(normalizedPath))) {
+      return { ok: false, message: "Source file not found." };
+    }
+
+    const bytes = await fs.readFile(normalizedPath);
+    return { ok: true, bytes };
   } catch (error) {
     return { ok: false, message: String(error?.message || error) };
   }

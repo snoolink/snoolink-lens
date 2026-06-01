@@ -733,6 +733,32 @@ select[multiple] option:checked {
   background: linear-gradient(120deg, rgba(110, 207, 255, 0.4), rgba(77, 164, 255, 0.26));
 }
 
+#toggleStitchModeBtn {
+  background: linear-gradient(120deg, rgba(255, 171, 72, 0.28), rgba(255, 110, 72, 0.25));
+  border: 1px solid rgba(255, 198, 156, 0.34);
+  border-radius: 999px;
+  color: #fff1e7;
+  font-size: 0.76rem;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  min-height: 34px;
+  position: fixed;
+  padding: 0 12px;
+  right: 16px;
+  top: 14px;
+  z-index: 40;
+}
+
+#toggleStitchModeBtn:hover,
+#toggleStitchModeBtn:focus-visible {
+  background: linear-gradient(120deg, rgba(255, 184, 102, 0.4), rgba(255, 126, 90, 0.34));
+}
+
+#toggleStitchModeBtn.active {
+  border-color: rgba(255, 223, 183, 0.65);
+  box-shadow: 0 0 0 2px rgba(255, 170, 92, 0.22);
+}
+
 #wizard-screen {
   height: calc(100vh - 70px);
   width: 100%;
@@ -754,6 +780,19 @@ select[multiple] option:checked {
 #reelAnalyzerFrame {
   background: rgba(10, 12, 18, 0.75);
   border: 1px solid rgba(148, 182, 255, 0.16);
+  border-radius: 12px;
+  height: 100%;
+  width: 100%;
+}
+
+#stitch-screen {
+  height: calc(100vh - 70px);
+  width: 100%;
+}
+
+#stitchFrame {
+  background: rgba(10, 12, 18, 0.75);
+  border: 1px solid rgba(255, 174, 123, 0.2);
   border-radius: 12px;
   height: 100%;
   width: 100%;
@@ -1171,6 +1210,54 @@ select[multiple] option:checked {
   z-index: 2;
 }
 
+.stitch-selection-bar {
+  align-items: center;
+  backdrop-filter: blur(8px);
+  background: linear-gradient(120deg, rgba(37, 22, 16, 0.88), rgba(77, 33, 22, 0.78));
+  border: 1px solid rgba(255, 174, 123, 0.45);
+  border-radius: 14px;
+  bottom: 12px;
+  box-shadow: 0 14px 28px rgba(0, 0, 0, 0.32);
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+  padding: 10px 12px;
+  position: sticky;
+  z-index: 9;
+}
+
+.stitch-selection-bar p {
+  color: #ffe8d9;
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+.stitch-selection-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.stitch-selection-actions button {
+  background: rgba(255, 227, 205, 0.12);
+  border: 1px solid rgba(255, 215, 187, 0.36);
+  border-radius: 999px;
+  color: #ffeede;
+  font-size: 0.74rem;
+  font-weight: 700;
+  min-height: 30px;
+  padding: 0 12px;
+}
+
+.stitch-selection-actions button:hover,
+.stitch-selection-actions button:focus-visible {
+  background: rgba(255, 227, 205, 0.2);
+}
+
+.stitch-selection-actions button:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
 #results {
   display: grid;
   gap: 14px;
@@ -1247,6 +1334,27 @@ select[multiple] option:checked {
   position: absolute;
   top: 10px;
   z-index: 5;
+}
+
+.result-stitch-checkbox {
+  accent-color: #ff9148;
+  position: absolute;
+  right: 48px;
+  top: 13px;
+  transform: scale(1.1);
+  z-index: 7;
+}
+
+.search-result.stitch-disabled {
+  filter: grayscale(0.9);
+  opacity: 0.5;
+}
+
+.search-result.stitch-selected {
+  box-shadow:
+    rgba(255, 138, 78, 0.5) 0 0 0 2px,
+    rgba(50, 50, 93, 0.15) 0px 30px 60px -20px,
+    rgba(0, 0, 0, 0.2) 0px 18px 36px -18px;
 }
 
 .result-download-btn {

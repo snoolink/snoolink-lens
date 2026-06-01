@@ -28,6 +28,7 @@
             <!-- <button id="openSidebarBtn" type="button">Settings</button> -->
             <button id="addSelectedToAlbumBtn" type="button" class="hidden">Add Selected To Album</button>
             <button id="removeSelectedFromAlbumBtn" type="button" class="hidden">Remove Selected</button>
+            <button id="toggleStitchModeBtn" type="button" aria-pressed="false" title="Toggle Stitch Mode (S)">Stitch Mode</button>
             <button id="backToHomeBtn" class="hidden" type="button" title="Back to home" aria-label="Back to home">
               <span class="back-icon" aria-hidden="true">&#x2190;</span>
               <span class="back-label">Home</span>
@@ -116,6 +117,13 @@
             </div>
 
             <div id="search-results-wrapper">
+              <div id="stitchSelectionBar" class="stitch-selection-bar hidden" aria-live="polite">
+                <p id="stitchSelectionSummary">0 videos selected for Stitch</p>
+                <div class="stitch-selection-actions">
+                  <button id="openInStitchBtn" type="button" disabled>Open in Stitch</button>
+                  <button id="clearStitchSelectionBtn" type="button">Clear Selection</button>
+                </div>
+              </div>
               <div id="albumViewMeta" class="album-view-meta hidden">
                 <div>
                   <p id="activeAlbumName">Album</p>
@@ -148,6 +156,14 @@
               id="reelAnalyzerFrame"
               src="./instagram-reel-analyzer.html"
               title="Instagram Reel Analyzer"
+              loading="lazy"
+            ></iframe>
+          </section>
+          <section id="stitch-screen" class="hidden" aria-label="Stitch Workspace">
+            <iframe
+              id="stitchFrame"
+              src="./stitch.html"
+              title="Stitch Workspace"
               loading="lazy"
             ></iframe>
           </section>
