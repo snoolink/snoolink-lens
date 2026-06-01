@@ -129,6 +129,8 @@ const STITCH_EXPORT_DIR_PATH = path.join(DATA_DIR_PATH, "stitch-exports");
 const MAX_SEARCH_HISTORY_ENTRIES = 10000;
 const MAX_FILTER_LOOKUP_OCR_CORPUS_CHARS = 1200;
 const MAX_FILTER_LOOKUP_FRAME_ROWS = 8;
+const MAX_FILTER_LOOKUP_ROWS = 50000;
+const FACE_ANALYSIS_MAX_DIMENSION_ATTEMPTS = [1920, 1280, 960];
 const MAX_SEARCH_RESULT_TEXT_CHARS = 1200;
 const MAX_SEARCH_RESULT_TITLE_CHARS = 220;
 const MAX_SEARCH_RESULT_TAGS = 24;
@@ -1292,6 +1294,10 @@ let indexingStageLookupCache = {
   payload: null,
 };
 let localFilterLookupCache = {
+  fingerprint: "",
+  payload: null,
+};
+let localFilterOptionsCache = {
   fingerprint: "",
   payload: null,
 };
@@ -3292,91 +3298,111 @@ async function runLocalFaceAnalysis(imagePath, faceSettings) {
     await ensureFaceTfBackendReady(faceapi);
     activeDetectorType = await ensureFaceApiModelsLoaded(faceapi);
 
-    const raw = await sharp(imagePath)
-      .rotate()
-      .toColorspace("srgb")
-      .raw()
-      .toBuffer({ resolveWithObject: true });
+    const minDetectionConfidence = Number(faceSettings?.minDetectionConfidence ?? 0.6);
+    const detectionOptions = activeDetectorType === "ssd"
+      ? new faceapi.SsdMobilenetv1Options({ minConfidence: minDetectionConfidence })
+      : new faceapi.TinyFaceDetectorOptions({
+        inputSize: 416,
+        scoreThreshold: minDetectionConfidence,
+      });
 
-    const width = Number(raw?.info?.width || 0);
-    const height = Number(raw?.info?.height || 0);
-    const channels = Number(raw?.info?.channels || 0);
-    if (!width || !height) {
-      return { ok: false, message: "Invalid image dimensions for face analysis." };
-    }
+    let lastError = null;
+    for (const maxDimension of FACE_ANALYSIS_MAX_DIMENSION_ATTEMPTS) {
+      const raw = await sharp(imagePath)
+        .rotate()
+        .resize({
+          width: maxDimension,
+          height: maxDimension,
+          fit: "inside",
+          withoutEnlargement: true,
+        })
+        .toColorspace("srgb")
+        .raw()
+        .toBuffer({ resolveWithObject: true });
 
-    const rgbPixels = toRgbPixelBuffer(raw?.data, width, height, channels);
+      const width = Number(raw?.info?.width || 0);
+      const height = Number(raw?.info?.height || 0);
+      const channels = Number(raw?.info?.channels || 0);
+      if (!width || !height) {
+        return { ok: false, message: "Invalid image dimensions for face analysis." };
+      }
 
-    const tensor = faceapi.tf.tensor3d(rgbPixels, [height, width, 3], "int32");
+      const rgbPixels = toRgbPixelBuffer(raw?.data, width, height, channels);
+      const tensor = faceapi.tf.tensor3d(rgbPixels, [height, width, 3], "int32");
 
-    try {
-      const minDetectionConfidence = Number(faceSettings?.minDetectionConfidence ?? 0.6);
-      const detectionOptions = activeDetectorType === "ssd"
-        ? new faceapi.SsdMobilenetv1Options({ minConfidence: minDetectionConfidence })
-        : new faceapi.TinyFaceDetectorOptions({
-          inputSize: 416,
-          scoreThreshold: minDetectionConfidence,
-        });
+      try {
+        const detections = await faceapi
+          .detectAllFaces(tensor, detectionOptions)
+          .withFaceLandmarks()
+          .withFaceDescriptors();
 
-      const detections = await faceapi
-        .detectAllFaces(tensor, detectionOptions)
-        .withFaceLandmarks()
-        .withFaceDescriptors();
+        const minQuality = Number(faceSettings?.minQualityScore ?? 0.45);
+        const faces = [];
+        for (let i = 0; i < detections.length; i += 1) {
+          const row = detections[i];
+          const box = row?.detection?.box;
+          const score = Number(row?.detection?.score || 0);
+          if (!box || !Number.isFinite(score)) {
+            continue;
+          }
 
-      const minQuality = Number(faceSettings?.minQualityScore ?? 0.45);
-      const faces = [];
-      for (let i = 0; i < detections.length; i += 1) {
-        const row = detections[i];
-        const box = row?.detection?.box;
-        const score = Number(row?.detection?.score || 0);
-        if (!box || !Number.isFinite(score)) {
-          continue;
+          const areaRatio = Math.max(0, Math.min(1, (Number(box.width || 0) * Number(box.height || 0)) / (width * height)));
+          const qualityScore = Math.max(0, Math.min(1, (score * 0.7) + (areaRatio * 0.3)));
+          if (qualityScore < minQuality) {
+            continue;
+          }
+
+          const descriptor = Array.isArray(row?.descriptor)
+            ? row.descriptor
+            : row?.descriptor?.length
+              ? Array.from(row.descriptor)
+              : [];
+          const embedding = descriptor.map((value) => Number(value)).filter((value) => Number.isFinite(value));
+
+          const faceKey = `${imagePath}:${i}:${box.x}:${box.y}:${box.width}:${box.height}`;
+          faces.push({
+            face_id: createHash("sha1").update(faceKey).digest("hex").slice(0, 16),
+            bbox: {
+              x: Number(box.x || 0) / width,
+              y: Number(box.y || 0) / height,
+              width: Number(box.width || 0) / width,
+              height: Number(box.height || 0) / height,
+            },
+            detection_confidence: score,
+            embedding,
+            quality_score: qualityScore,
+            cluster_id: null,
+            person_label: null,
+          });
         }
 
-        const areaRatio = Math.max(0, Math.min(1, (Number(box.width || 0) * Number(box.height || 0)) / (width * height)));
-        const qualityScore = Math.max(0, Math.min(1, (score * 0.7) + (areaRatio * 0.3)));
-        if (qualityScore < minQuality) {
-          continue;
-        }
-
-        const descriptor = Array.isArray(row?.descriptor)
-          ? row.descriptor
-          : row?.descriptor?.length
-            ? Array.from(row.descriptor)
-            : [];
-        const embedding = descriptor.map((value) => Number(value)).filter((value) => Number.isFinite(value));
-
-        const faceKey = `${imagePath}:${i}:${box.x}:${box.y}:${box.width}:${box.height}`;
-        faces.push({
-          face_id: createHash("sha1").update(faceKey).digest("hex").slice(0, 16),
-          bbox: {
-            x: Number(box.x || 0) / width,
-            y: Number(box.y || 0) / height,
-            width: Number(box.width || 0) / width,
-            height: Number(box.height || 0) / height,
+        return {
+          ok: true,
+          result: {
+            version: modelVersion,
+            processed_at: new Date().toISOString(),
+            face_count: faces.length,
+            faces,
           },
-          detection_confidence: score,
-          embedding,
-          quality_score: qualityScore,
-          cluster_id: null,
-          person_label: null,
-        });
-      }
-
-      return {
-        ok: true,
-        result: {
-          version: modelVersion,
-          processed_at: new Date().toISOString(),
-          face_count: faces.length,
-          faces,
-        },
-      };
-    } finally {
-      if (typeof tensor?.dispose === "function") {
-        tensor.dispose();
+        };
+      } catch (error) {
+        const message = String(error?.message || error || "").toLowerCase();
+        const isWasmTensorAllocationError =
+          message.includes("invalid typed array length")
+          || message.includes("out of memory")
+          || message.includes("wasm");
+        lastError = error;
+        if (!isWasmTensorAllocationError) {
+          throw error;
+        }
+      } finally {
+        if (typeof tensor?.dispose === "function") {
+          tensor.dispose();
+        }
       }
     }
+
+    throw (lastError || new Error("Face analysis failed after all resize attempts."));
   } catch (error) {
     return { ok: false, message: String(error?.message || error) };
   }
@@ -3465,6 +3491,17 @@ function extractFileTypeValue(row) {
   const rawPath = String(row?.path || row?.image_path || "").trim();
   const ext = path.extname(rawPath).toLowerCase();
   return ext.startsWith(".") ? ext.slice(1) : ext;
+}
+
+function normalizeFilterLookupPath(pathValue) {
+  const raw = String(pathValue || "").trim();
+  if (!raw) {
+    return "";
+  }
+  const slashNormalized = raw.replace(/\//g, "\\");
+  return process.platform === "win32"
+    ? slashNormalized.toLowerCase()
+    : slashNormalized;
 }
 
 function toYesNo(value) {
@@ -3852,7 +3889,7 @@ function mergeFilterData(currentValue, nextValue) {
     ])),
     socialMediaBand: String(next.socialMediaBand || current.socialMediaBand || ""),
     instagramBand: String(next.instagramBand || current.instagramBand || ""),
-    aspectRatioSuitability: Array.from(new Set([
+    aspectRatioSuitabilityValues: Array.from(new Set([
       ...(Array.isArray(current.aspectRatioSuitabilityValues) ? current.aspectRatioSuitabilityValues : []),
       ...(Array.isArray(next.aspectRatioSuitabilityValues) ? next.aspectRatioSuitabilityValues : []),
     ])),
@@ -3868,6 +3905,51 @@ function mergeFilterData(currentValue, nextValue) {
 
 function hasLookupDependentGalleryFilters(filters) {
   const activeFilters = filters && typeof filters === "object" ? filters : {};
+  const scalarFilterKeys = [
+    "containsPeople",
+    "containsText",
+    "style",
+    "orientation",
+    "brightnessCategory",
+    "resolutionMegapixels",
+    "aspectRatio",
+    "fileType",
+    "durationBucket",
+    "fpsLabel",
+    "hasAudio",
+    "audioType",
+    "hasCaptions",
+    "motionLevel",
+    "socialMediaBand",
+    "instagramBand",
+    "aspectRatioSuitability",
+    "aestheticStyle",
+    "editingLevel",
+    "visualComplexity",
+    "heroElement",
+    "depthOfField",
+    "personLabel",
+    "faceClusterId",
+  ];
+
+  for (const key of scalarFilterKeys) {
+    const value = String(activeFilters?.[key] || "").trim().toLowerCase();
+    if (value && value !== "any") {
+      return true;
+    }
+  }
+
+  const multiFilterKeys = ["sceneTag", "objectTag", "activityTag"];
+  for (const key of multiFilterKeys) {
+    const values = Array.isArray(activeFilters?.[key]) ? activeFilters[key] : [activeFilters?.[key]];
+    const hasSelection = values
+      .map((value) => String(value || "").trim().toLowerCase())
+      .some((value) => value && value !== "any");
+    if (hasSelection) {
+      return true;
+    }
+  }
+
   return String(activeFilters.ocrTextQuery || "").trim().length > 0;
 }
 
@@ -3878,13 +3960,22 @@ function hasActiveOcrGalleryFilter(filters) {
 
 async function loadLocalFilterLookup(options = {}) {
   const includeOcrCorpus = options?.includeOcrCorpus === true;
+  const selectedMetadataFilePathRaw = String(options?.selectedMetadataFilePath || "").trim();
+  const selectedMetadataFilePath = selectedMetadataFilePathRaw
+    ? (path.isAbsolute(selectedMetadataFilePathRaw)
+      ? selectedMetadataFilePathRaw
+      : path.resolve(process.cwd(), selectedMetadataFilePathRaw))
+    : "";
   const localFilePath = path.join(DATA_DIR_PATH, "local-image_metadata_results.json");
   const cloudFilePath = path.join(DATA_DIR_PATH, "cloud-image_metadata_results.json");
+  const selectedFingerprint = selectedMetadataFilePath
+    ? await getPathFingerprint(selectedMetadataFilePath)
+    : "none";
   const [localFingerprint, cloudFingerprint] = await Promise.all([
     getPathFingerprint(localFilePath),
     getPathFingerprint(cloudFilePath),
   ]);
-  const combinedFingerprint = `${localFingerprint}|${cloudFingerprint}|ocr=${includeOcrCorpus ? "1" : "0"}`;
+  const combinedFingerprint = `${localFingerprint}|${cloudFingerprint}|selected=${selectedMetadataFilePath}|selectedFp=${selectedFingerprint}|ocr=${includeOcrCorpus ? "1" : "0"}`;
 
   if (
     localFilterLookupCache.payload
@@ -3895,8 +3986,25 @@ async function loadLocalFilterLookup(options = {}) {
 
   const lookup = new Map();
 
-  const sourcePaths = [localFilePath, cloudFilePath];
-  for (const sourcePath of sourcePaths) {
+  const sourcePaths = [];
+  const hasSelectedMetadataSource =
+    selectedMetadataFilePath
+    && path.extname(selectedMetadataFilePath).toLowerCase() === ".json"
+    && await pathExists(selectedMetadataFilePath);
+
+  if (hasSelectedMetadataSource) {
+    sourcePaths.push(selectedMetadataFilePath);
+  } else {
+    sourcePaths.push(localFilePath, cloudFilePath);
+  }
+
+  const dedupedSourcePaths = Array.from(new Set(
+    sourcePaths
+      .map((entry) => String(entry || "").trim())
+      .filter(Boolean),
+  ));
+
+  for (const sourcePath of dedupedSourcePaths) {
     if (!(await pathExists(sourcePath))) {
       continue;
     }
@@ -3910,12 +4018,13 @@ async function loadLocalFilterLookup(options = {}) {
         if (String(row?.status || "") !== "ok") {
           continue;
         }
-        const rowPath = String(row?.path || "").trim();
-        if (!rowPath) {
+        const rowPath = String(row?.path || row?.image_path || "").trim();
+        const rowKey = normalizeFilterLookupPath(rowPath);
+        if (!rowKey) {
           continue;
         }
-        const existing = lookup.get(rowPath);
-        lookup.set(rowPath, mergeFilterData(existing, extractLocalFilterData(row, { includeOcrCorpus })));
+        const existing = lookup.get(rowKey);
+        lookup.set(rowKey, mergeFilterData(existing, extractLocalFilterData(row, { includeOcrCorpus })));
       }
     } catch {
       // Continue with available sources.
@@ -3951,8 +4060,9 @@ function applyGalleryFilters(items, localFilterLookup, filters) {
 
   return items.filter((item) => {
     const itemPath = String(item?.path || "");
+    const itemLookupKey = normalizeFilterLookupPath(itemPath);
     const itemMediaType = String(item?.media_type || getMediaTypeFromPath(itemPath, "image")).toLowerCase();
-    const filterData = localFilterLookup.get(String(item?.path || "")) || {};
+    const filterData = localFilterLookup.get(itemLookupKey) || {};
     const containsPeople = String(activeFilters.containsPeople || "any").toLowerCase();
     const containsText = String(activeFilters.containsText || "any").toLowerCase();
     const style = String(activeFilters.style || "any").toLowerCase();
@@ -4086,8 +4196,173 @@ function applyGalleryFilters(items, localFilterLookup, filters) {
   });
 }
 
-async function getLocalFilterOptions() {
-  const localLookup = await loadLocalFilterLookup();
+async function forEachResultRowInResultsJson(resultsFilePath, onRow) {
+  if (!(await pathExists(resultsFilePath)) || typeof onRow !== "function") {
+    return;
+  }
+
+  await new Promise((resolve) => {
+    const stream = fsSync.createReadStream(resultsFilePath, { encoding: "utf-8" });
+    let stage = "seekKey"; // seekKey -> seekColon -> seekArray -> inArray
+    let keyWindow = "";
+    let resultsArrayDepth = 0;
+    let collectingObject = false;
+    let objectInString = false;
+    let objectEscaped = false;
+    let currentObjectDepth = 0;
+    let currentObjectBuffer = "";
+    let settled = false;
+
+    const finish = () => {
+      if (settled) {
+        return;
+      }
+      settled = true;
+      try {
+        stream.destroy();
+      } catch {
+        // Ignore stream destroy errors.
+      }
+      resolve();
+    };
+
+    stream.on("error", () => finish());
+    stream.on("end", () => finish());
+
+    stream.on("data", (chunk) => {
+      if (settled) {
+        return;
+      }
+
+      for (let i = 0; i < chunk.length; i += 1) {
+        const ch = chunk[i];
+
+        if (collectingObject) {
+          currentObjectBuffer += ch;
+
+          if (objectInString) {
+            if (objectEscaped) {
+              objectEscaped = false;
+              continue;
+            }
+            if (ch === "\\") {
+              objectEscaped = true;
+              continue;
+            }
+            if (ch === '"') {
+              objectInString = false;
+            }
+            continue;
+          }
+
+          if (ch === '"') {
+            objectInString = true;
+            continue;
+          }
+
+          if (ch === "{") {
+            currentObjectDepth += 1;
+            continue;
+          }
+
+          if (ch === "}") {
+            currentObjectDepth -= 1;
+            if (currentObjectDepth === 0) {
+              collectingObject = false;
+              try {
+                const parsedRow = JSON.parse(currentObjectBuffer);
+                onRow(parsedRow);
+              } catch {
+                // Ignore malformed rows and continue.
+              }
+              currentObjectBuffer = "";
+            }
+            continue;
+          }
+          continue;
+        }
+
+        if (stage === "seekKey") {
+          keyWindow = `${keyWindow}${ch}`.slice(-32);
+          if (keyWindow.includes('"results"')) {
+            stage = "seekColon";
+            keyWindow = "";
+          }
+          continue;
+        }
+
+        if (stage === "seekColon") {
+          if (/\s/.test(ch)) {
+            continue;
+          }
+          stage = ch === ":" ? "seekArray" : "seekKey";
+          continue;
+        }
+
+        if (stage === "seekArray") {
+          if (/\s/.test(ch)) {
+            continue;
+          }
+          if (ch === "[") {
+            stage = "inArray";
+            resultsArrayDepth = 1;
+            continue;
+          }
+          stage = "seekKey";
+          continue;
+        }
+
+        if (stage === "inArray") {
+          if (ch === "[") {
+            resultsArrayDepth += 1;
+            continue;
+          }
+          if (ch === "]") {
+            resultsArrayDepth -= 1;
+            if (resultsArrayDepth <= 0) {
+              stage = "seekKey";
+            }
+            continue;
+          }
+          if (resultsArrayDepth === 1 && ch === "{") {
+            collectingObject = true;
+            objectInString = false;
+            objectEscaped = false;
+            currentObjectDepth = 1;
+            currentObjectBuffer = "{";
+          }
+        }
+      }
+    });
+  });
+}
+
+async function getLocalFilterOptions(selectedMetadataFilePath = "") {
+  const localFilePath = path.join(DATA_DIR_PATH, "local-image_metadata_results.json");
+  const cloudFilePath = path.join(DATA_DIR_PATH, "cloud-image_metadata_results.json");
+  const normalizedSelectedPathRaw = String(selectedMetadataFilePath || "").trim();
+  const normalizedSelectedPath = normalizedSelectedPathRaw
+    ? (path.isAbsolute(normalizedSelectedPathRaw)
+      ? normalizedSelectedPathRaw
+      : path.resolve(process.cwd(), normalizedSelectedPathRaw))
+    : "";
+  const selectedPathFingerprint = normalizedSelectedPath
+    ? await getPathFingerprint(normalizedSelectedPath)
+    : "none";
+
+  const [localFingerprint, cloudFingerprint] = await Promise.all([
+    getPathFingerprint(localFilePath),
+    getPathFingerprint(cloudFilePath),
+  ]);
+  const combinedFingerprint = `${localFingerprint}|${cloudFingerprint}|selected=${normalizedSelectedPath}|selectedFp=${selectedPathFingerprint}`;
+
+  if (
+    localFilterOptionsCache.payload
+    && localFilterOptionsCache.fingerprint === combinedFingerprint
+  ) {
+    return localFilterOptionsCache.payload;
+  }
+
   const options = {
     resolutionMegapixels: new Set(),
     aspectRatio: new Set(),
@@ -4116,85 +4391,78 @@ async function getLocalFilterOptions() {
     faceClusterId: new Set(),
   };
 
-  for (const filterData of localLookup.values()) {
-    if (filterData.resolutionMegapixels) {
-      options.resolutionMegapixels.add(filterData.resolutionMegapixels);
+  const addScalar = (set, value) => {
+    const normalized = String(value || "").trim().toLowerCase();
+    if (normalized) {
+      set.add(normalized);
     }
-    if (filterData.aspectRatio) {
-      options.aspectRatio.add(filterData.aspectRatio);
+  };
+
+  const addList = (set, values) => {
+    for (const value of Array.isArray(values) ? values : []) {
+      addScalar(set, value);
     }
-    if (filterData.fileType) {
-      options.fileType.add(filterData.fileType);
+  };
+
+  const collectFromRow = (row) => {
+    if (String(row?.status || "").toLowerCase() !== "ok") {
+      return;
     }
-    if (filterData.durationBucket) {
-      options.durationBucket.add(filterData.durationBucket);
-    }
-    if (filterData.fpsLabel) {
-      options.fpsLabel.add(filterData.fpsLabel);
-    }
-    if (filterData.hasAudio) {
-      options.hasAudio.add(filterData.hasAudio);
-    }
-    if (filterData.audioType) {
-      options.audioType.add(filterData.audioType);
-    }
-    if (filterData.hasCaptions) {
-      options.hasCaptions.add(filterData.hasCaptions);
-    }
-    if (filterData.motionLevel) {
-      options.motionLevel.add(filterData.motionLevel);
-    }
-    if (filterData.style) {
-      options.style.add(filterData.style);
-    }
-    if (filterData.orientation) {
-      options.orientation.add(filterData.orientation);
-    }
-    if (filterData.brightnessCategory) {
-      options.brightnessCategory.add(filterData.brightnessCategory);
-    }
-    for (const value of Array.isArray(filterData.sceneTags) ? filterData.sceneTags : []) {
-      options.sceneTag.add(String(value));
-    }
-    for (const value of Array.isArray(filterData.objectTags) ? filterData.objectTags : []) {
-      options.objectTag.add(String(value));
-    }
-    for (const value of Array.isArray(filterData.activityTags) ? filterData.activityTags : []) {
-      options.activityTag.add(String(value));
-    }
-    if (filterData.socialMediaBand) {
-      options.socialMediaBand.add(filterData.socialMediaBand);
-    }
-    if (filterData.instagramBand) {
-      options.instagramBand.add(filterData.instagramBand);
-    }
-    for (const value of Array.isArray(filterData.aspectRatioSuitabilityValues) ? filterData.aspectRatioSuitabilityValues : []) {
-      options.aspectRatioSuitability.add(String(value));
-    }
-    if (filterData.aestheticStyle) {
-      options.aestheticStyle.add(filterData.aestheticStyle);
-    }
-    if (filterData.editingLevel) {
-      options.editingLevel.add(filterData.editingLevel);
-    }
-    if (filterData.visualComplexity) {
-      options.visualComplexity.add(filterData.visualComplexity);
-    }
-    if (filterData.heroElement) {
-      options.heroElement.add(filterData.heroElement);
-    }
-    if (filterData.depthOfField) {
-      options.depthOfField.add(filterData.depthOfField);
-    }
-    for (const value of Array.isArray(filterData.personLabels) ? filterData.personLabels : []) {
-      options.personLabel.add(String(value));
-    }
-    for (const value of Array.isArray(filterData.faceClusterIds) ? filterData.faceClusterIds : []) {
-      options.faceClusterId.add(String(value));
+
+    const filterData = extractLocalFilterData(row, { includeOcrCorpus: false });
+    addScalar(options.resolutionMegapixels, filterData.resolutionMegapixels);
+    addScalar(options.aspectRatio, filterData.aspectRatio);
+    addScalar(options.fileType, filterData.fileType);
+    addScalar(options.durationBucket, filterData.durationBucket);
+    addScalar(options.fpsLabel, filterData.fpsLabel);
+    addScalar(options.hasAudio, filterData.hasAudio);
+    addScalar(options.audioType, filterData.audioType);
+    addScalar(options.hasCaptions, filterData.hasCaptions);
+    addScalar(options.motionLevel, filterData.motionLevel);
+    addScalar(options.style, filterData.style);
+    addScalar(options.orientation, filterData.orientation);
+    addScalar(options.brightnessCategory, filterData.brightnessCategory);
+    addList(options.sceneTag, filterData.sceneTags);
+    addList(options.objectTag, filterData.objectTags);
+    addList(options.activityTag, filterData.activityTags);
+    addScalar(options.socialMediaBand, filterData.socialMediaBand);
+    addScalar(options.instagramBand, filterData.instagramBand);
+    addList(options.aspectRatioSuitability, filterData.aspectRatioSuitabilityValues);
+    addScalar(options.aestheticStyle, filterData.aestheticStyle);
+    addScalar(options.editingLevel, filterData.editingLevel);
+    addScalar(options.visualComplexity, filterData.visualComplexity);
+    addScalar(options.heroElement, filterData.heroElement);
+    addScalar(options.depthOfField, filterData.depthOfField);
+    addList(options.personLabel, filterData.personLabels);
+    addList(options.faceClusterId, filterData.faceClusterIds);
+  };
+
+  const sourcePaths = [];
+  const hasSelectedMetadataSource =
+    normalizedSelectedPath
+    && path.extname(normalizedSelectedPath).toLowerCase() === ".json"
+    && await pathExists(normalizedSelectedPath);
+
+  if (hasSelectedMetadataSource) {
+    sourcePaths.push(normalizedSelectedPath);
+  } else {
+    sourcePaths.push(localFilePath, cloudFilePath);
+  }
+
+  const dedupedSourcePaths = Array.from(new Set(
+    sourcePaths
+      .map((entry) => String(entry || "").trim())
+      .filter(Boolean),
+  ));
+  for (const sourcePath of dedupedSourcePaths) {
+    try {
+      await forEachResultRowInResultsJson(sourcePath, collectFromRow);
+    } catch {
+      // Continue with remaining metadata sources.
     }
   }
 
-  return {
+  const payload = {
     resolutionMegapixels: Array.from(options.resolutionMegapixels).sort(),
     aspectRatio: Array.from(options.aspectRatio).sort(),
     fileType: Array.from(options.fileType).sort(),
@@ -4221,6 +4489,13 @@ async function getLocalFilterOptions() {
     personLabel: Array.from(options.personLabel).sort(),
     faceClusterId: Array.from(options.faceClusterId).sort(),
   };
+
+  localFilterOptionsCache = {
+    fingerprint: combinedFingerprint,
+    payload,
+  };
+
+  return payload;
 }
 
 function getIndexingStageForItem(item, lookup) {
@@ -5221,6 +5496,7 @@ ipcMain.handle("get-master-directory", async (_event, options) => {
     const activeFilters = options?.filters && typeof options.filters === "object" ? options.filters : {};
     const requiresLookupFilters = hasLookupDependentGalleryFilters(activeFilters) || hasActiveOcrGalleryFilter(activeFilters);
     const includeOcrCorpus = hasActiveOcrGalleryFilter(activeFilters);
+    const selectedMetadataFilePath = String(activeFilters?.metadataFilePath || "").trim();
     const settings = await readUserSettings();
     const cacheTranscodedMovPreview = Boolean(settings?.cache_transcoded_mov_preview);
     const cacheTranscodedHeicPreview = Boolean(settings?.cache_transcoded_heic_preview);
@@ -5228,7 +5504,7 @@ ipcMain.handle("get-master-directory", async (_event, options) => {
     const items = Array.isArray(payload?.items) ? payload.items : [];
     const stageLookup = await loadIndexingStageLookup();
     const localFilterLookup = requiresLookupFilters
-      ? await loadLocalFilterLookup({ includeOcrCorpus })
+      ? await loadLocalFilterLookup({ includeOcrCorpus, selectedMetadataFilePath })
       : new Map();
     const requestedOffset = Number(options?.offset);
     const requestedLimit = Number(options?.limit);
@@ -5437,9 +5713,9 @@ ipcMain.handle("backup-app-data", async (event) => {
   }
 });
 
-ipcMain.handle("get-local-filter-options", async () => {
+ipcMain.handle("get-local-filter-options", async (_event, payload) => {
   try {
-    const options = await getLocalFilterOptions();
+    const options = await getLocalFilterOptions(payload?.filePath);
     return { ok: true, options };
   } catch (error) {
     return { ok: false, message: String(error?.message || error), options: {} };
@@ -5681,13 +5957,14 @@ ipcMain.handle("get-album-images", async (_event, payload) => {
     const activeFilters = payload?.filters && typeof payload.filters === "object" ? payload.filters : {};
     const requiresLookupFilters = hasLookupDependentGalleryFilters(activeFilters) || hasActiveOcrGalleryFilter(activeFilters);
     const includeOcrCorpus = hasActiveOcrGalleryFilter(activeFilters);
+    const selectedMetadataFilePath = String(activeFilters?.metadataFilePath || "").trim();
     const settings = await readUserSettings();
     const cacheTranscodedMovPreview = Boolean(settings?.cache_transcoded_mov_preview);
     const cacheTranscodedHeicPreview = Boolean(settings?.cache_transcoded_heic_preview);
     const cacheTranscodedHeifPreview = Boolean(settings?.cache_transcoded_heif_preview);
     const stageLookup = await loadIndexingStageLookup();
     const localFilterLookup = requiresLookupFilters
-      ? await loadLocalFilterLookup({ includeOcrCorpus })
+      ? await loadLocalFilterLookup({ includeOcrCorpus, selectedMetadataFilePath })
       : new Map();
 
     const requestedOffset = Number(payload?.offset);

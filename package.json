@@ -69,7 +69,7 @@
       ]
     },
     "mac": {
-      "icon": "assets/snoolink-sidebar-logo.png",
+      "icon": "assets/favicon.png",
       "target": [
         {
           "target": "dmg",
@@ -89,7 +89,7 @@
       "category": "public.app-category.photography"
     },
     "dmg": {
-      "icon": "assets/snoolink-sidebar-logo.png"
+      "icon": "assets/favicon.png"
     },
     "nsis": {
       "oneClick": false,

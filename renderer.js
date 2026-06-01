@@ -1969,16 +1969,23 @@ function renderFaceClustersForSettings() {
 
 async function loadLocalFilterOptionsFromBackend() {
   if (!window.desktopAPI?.getLocalFilterOptions) {
+    renderDynamicFilters();
     return;
   }
-  const filterOptionsResult = await window.desktopAPI.getLocalFilterOptions();
-  if (filterOptionsResult?.ok && filterOptionsResult.options) {
-    localFilterOptions = {
-      ...localFilterOptions,
-      ...filterOptionsResult.options,
-    };
-    renderDynamicFilters();
+  try {
+    const filterOptionsResult = await window.desktopAPI.getLocalFilterOptions({
+      filePath: String(filePathInput?.value || "").trim(),
+    });
+    if (filterOptionsResult?.ok && filterOptionsResult.options) {
+      localFilterOptions = {
+        ...localFilterOptions,
+        ...filterOptionsResult.options,
+      };
+    }
+  } catch {
+    // Keep existing options and refresh UI so controls remain available.
   }
+  renderDynamicFilters();
 }
 
 async function loadFaceClustersForSettings() {
@@ -2196,6 +2203,7 @@ function buildFiltersPayload() {
     containsText: enabled.has("containsText") ? containsTextSelect.value : "any",
     ocrTextQuery: enabled.has("ocrTextQuery") ? String(ocrTextQueryInput?.value || "").trim() : "",
     mediaType: enabled.has("mediaType") ? String(mediaTypeSelect?.value || "any") : "any",
+    metadataFilePath: String(filePathInput?.value || "").trim(),
     albumIds: Array.from(new Set(albumIds)),
   };
 
@@ -2293,7 +2301,9 @@ function renderDynamicFilters() {
       continue;
     }
 
-    const values = Array.isArray(localFilterOptions[def.key]) ? localFilterOptions[def.key] : [];
+    const values = Array.isArray(localFilterOptions[def.key])
+      ? Array.from(new Set(localFilterOptions[def.key].map((value) => String(value || "").trim()).filter(Boolean)))
+      : [];
 
     const group = document.createElement("div");
     group.className = "filter-group";

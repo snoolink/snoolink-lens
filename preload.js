@@ -22,7 +22,7 @@ contextBridge.exposeInMainWorld("desktopAPI", {
   openInstagramReelAnalyzerWindow: () => ipcRenderer.invoke("open-instagram-reel-analyzer-window"),
   pickInstagramReelVideo: () => ipcRenderer.invoke("pick-instagram-reel-video"),
   analyzeInstagramReel: (payload) => ipcRenderer.invoke("analyze-instagram-reel", payload),
-  getLocalFilterOptions: () => ipcRenderer.invoke("get-local-filter-options"),
+  getLocalFilterOptions: (payload) => ipcRenderer.invoke("get-local-filter-options", payload),
   getFaceClusters: () => ipcRenderer.invoke("get-face-clusters"),
   rebuildFaceClusters: () => ipcRenderer.invoke("rebuild-face-clusters"),
   setFaceClusterLabel: (payload) => ipcRenderer.invoke("set-face-cluster-label", payload),
