@@ -465,6 +465,12 @@ button:disabled {
   color: #2b1205;
 }
 
+.primary-btn.share {
+  background: linear-gradient(120deg, #3fd4a0, #27b6a0);
+  border-color: rgba(63, 212, 160, 0.64);
+  color: #05201a;
+}
+
 .ghost-btn {
   background: rgba(255, 255, 255, 0.07);
   border-color: rgba(168, 198, 233, 0.28);
@@ -629,6 +635,27 @@ button:disabled {
   width: 100%;
 }
 
+.inline-share-row {
+  align-items: center;
+  border-top: 1px solid rgba(100, 150, 240, 0.15);
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+  margin-top: 10px;
+  padding-top: 10px;
+}
+
+.inline-share-label {
+  color: var(--text-secondary);
+  font-size: 0.8rem;
+}
+
+.inline-share-btn {
+  font-size: 0.82rem;
+  padding: 8px 18px;
+  white-space: nowrap;
+}
+
 .ffmpeg-error-panel {
   background: rgba(44, 16, 12, 0.62);
   border: 1px solid rgba(255, 122, 90, 0.4);
@@ -695,4 +722,128 @@ button:disabled {
     grid-column: 3;
     justify-self: end;
   }
+}
+
+/* ─── QR Share Modal ─────────────────────────────────────────── */
+
+.qr-modal {
+  align-items: center;
+  bottom: 0;
+  display: flex;
+  justify-content: center;
+  left: 0;
+  position: fixed;
+  right: 0;
+  top: 0;
+  z-index: 9000;
+}
+
+.qr-modal.hidden {
+  display: none;
+}
+
+.qr-modal-backdrop {
+  background: rgba(2, 6, 16, 0.78);
+  bottom: 0;
+  left: 0;
+  position: absolute;
+  right: 0;
+  top: 0;
+}
+
+.qr-modal-card {
+  background: linear-gradient(160deg, #0c1624, #0e1e32);
+  border: 1px solid rgba(100, 150, 240, 0.3);
+  border-radius: 20px;
+  box-shadow: 0 32px 80px rgba(0, 0, 0, 0.7);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  max-width: 360px;
+  padding: 28px 28px 24px;
+  position: relative;
+  width: 92%;
+  z-index: 1;
+}
+
+.qr-modal-close {
+  background: rgba(255, 255, 255, 0.07);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 50%;
+  color: var(--text-secondary);
+  cursor: pointer;
+  font-size: 0.82rem;
+  height: 30px;
+  line-height: 1;
+  padding: 0;
+  position: absolute;
+  right: 14px;
+  top: 14px;
+  width: 30px;
+}
+
+.qr-modal-close:hover {
+  background: rgba(255, 255, 255, 0.13);
+  color: var(--text);
+}
+
+.qr-modal-title {
+  color: var(--text);
+  font-family: var(--font-body);
+  font-size: 1.1rem;
+  font-weight: 700;
+  margin: 0;
+  text-align: center;
+}
+
+.qr-modal-subtitle {
+  color: var(--text-secondary);
+  font-size: 0.8rem;
+  line-height: 1.5;
+  margin: 0;
+  text-align: center;
+}
+
+.qr-image-wrap {
+  background: #fff;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 10px;
+  margin: 4px 0;
+}
+
+.qr-image {
+  border-radius: 6px;
+  display: block;
+  height: 200px;
+  width: 200px;
+}
+
+.qr-url-label {
+  color: var(--accent);
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  letter-spacing: 0.02em;
+  margin: 0;
+  text-align: center;
+  word-break: break-all;
+}
+
+.qr-status-label {
+  color: var(--good);
+  font-size: 0.78rem;
+  margin: 0;
+  text-align: center;
+}
+
+.qr-status-label.expired {
+  color: var(--warn);
+}
+
+.qr-copy-btn {
+  font-size: 0.8rem;
+  padding: 6px 18px;
 }

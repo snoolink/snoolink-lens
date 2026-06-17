@@ -4,6 +4,8 @@ import { createRequire } from "node:module";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import fs from "node:fs/promises";
 import fsSync from "node:fs";
+import http from "node:http";
+import os from "node:os";
 import {
   BedrockRuntimeClient,
   ConverseCommand,
@@ -36,6 +38,195 @@ const DATA_DIR_PATH = app.isPackaged
 const APP_CACHE_SLUG = String(app.getName() || "snoolink-lens")
   .toLowerCase()
   .replace(/[^a-z0-9._-]+/g, "-");
+
+// --- Mobile share server state ---
+const shareServerState = {
+  server: null,
+  filePath: "",
+  port: 0,
+  autoStopTimer: null,
+  activeConnections: new Set(),
+};
+
+function getLocalIpAddress() {
+  const interfaces = os.networkInterfaces();
+  // Prefer Wi-Fi / Ethernet over other adapters
+  const preferred = ["wi-fi", "wifi", "wlan", "ethernet", "en0", "en1", "eth"];
+  for (const pref of preferred) {
+    for (const name of Object.keys(interfaces)) {
+      if (!name.toLowerCase().includes(pref)) continue;
+      for (const iface of interfaces[name] || []) {
+        if (iface.family === "IPv4" && !iface.internal) return iface.address;
+      }
+    }
+  }
+  // Fallback: first non-internal IPv4
+  for (const name of Object.keys(interfaces)) {
+    for (const iface of interfaces[name] || []) {
+      if (iface.family === "IPv4" && !iface.internal) return iface.address;
+    }
+  }
+  return "127.0.0.1";
+}
+
+function stopShareServer() {
+  if (shareServerState.autoStopTimer) {
+    clearTimeout(shareServerState.autoStopTimer);
+    shareServerState.autoStopTimer = null;
+  }
+  // Destroy all open sockets so server.close() resolves immediately
+  for (const socket of shareServerState.activeConnections) {
+    try { socket.destroy(); } catch { /* ignore */ }
+  }
+  shareServerState.activeConnections.clear();
+  if (shareServerState.server) {
+    shareServerState.server.close();
+    shareServerState.server = null;
+  }
+  shareServerState.filePath = "";
+  shareServerState.port = 0;
+}
+
+async function startShareServer(filePath, autoStopMs = 10 * 60 * 1000) {
+  stopShareServer();
+
+  const stat = await fs.stat(filePath).catch(() => null);
+  if (!stat) {
+    return { ok: false, message: `File not found: ${filePath}` };
+  }
+  const fileSize = stat.size;
+  const fileName = path.basename(filePath);
+
+  return new Promise((resolve) => {
+    const videoPath = `/${encodeURIComponent(fileName)}`;
+    const fileSizeMB = (fileSize / (1024 * 1024)).toFixed(1);
+
+    const landingPage = `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Download – ${fileName}</title>
+<style>
+  body{margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center;background:#060b14;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;color:#dce8ff;}
+  .card{background:#0c1624;border:1px solid rgba(100,150,240,.25);border-radius:20px;padding:32px 28px;max-width:360px;width:92%;text-align:center;box-shadow:0 24px 60px rgba(0,0,0,.6);}
+  h1{font-size:1.15rem;margin:0 0 6px;}
+  p{color:#9bb0d4;font-size:.85rem;margin:0 0 24px;}
+  video{width:100%;border-radius:12px;background:#000;margin-bottom:20px;max-height:260px;}
+  a.dl{display:block;background:linear-gradient(120deg,#3fd4a0,#27b6a0);color:#05201a;font-weight:700;font-size:1rem;padding:14px 20px;border-radius:12px;text-decoration:none;margin-bottom:10px;}
+  .hint{font-size:.72rem;color:#6a85b0;line-height:1.5;}
+</style>
+</head>
+<body>
+<div class="card">
+  <h1>Your Snoolink Stitch</h1>
+  <p>${fileName} &nbsp;·&nbsp; ${fileSizeMB} MB</p>
+  <video src="${videoPath}" controls playsinline preload="metadata"></video>
+  <a class="dl" href="${videoPath}" download="${fileName}">⬇ Save to Device</a>
+  <p class="hint">iOS: tap Save → Files app → Downloads<br>Android: tap Download → Files app → Downloads</p>
+</div>
+</body>
+</html>`;
+
+    const server = http.createServer((req, res) => {
+      // Reset idle-stop timer on every request
+      if (shareServerState.autoStopTimer) clearTimeout(shareServerState.autoStopTimer);
+      shareServerState.autoStopTimer = setTimeout(stopShareServer, autoStopMs);
+
+      const url = new URL(req.url || "/", `http://localhost`);
+      const isVideoRequest = url.pathname === videoPath || url.pathname === `/${fileName}`;
+
+      // Serve landing page for root or non-video paths
+      if (!isVideoRequest) {
+        const html = Buffer.from(landingPage, "utf8");
+        res.writeHead(200, { "Content-Type": "text/html; charset=utf-8", "Content-Length": String(html.length), "Cache-Control": "no-store" });
+        res.end(html);
+        return;
+      }
+
+      // Serve the video file (with range support for streaming)
+      const baseHeaders = {
+        "Content-Type": "video/mp4",
+        "Accept-Ranges": "bytes",
+        "Access-Control-Allow-Origin": "*",
+        "Cache-Control": "no-store",
+        "Connection": "keep-alive",
+      };
+
+      if (req.method === "OPTIONS" || req.method === "HEAD") {
+        res.writeHead(200, { ...baseHeaders, "Content-Length": String(fileSize) });
+        res.end();
+        return;
+      }
+
+      const rangeHeader = req.headers["range"];
+      let start = 0;
+      let end = fileSize - 1;
+      let statusCode = 200;
+
+      if (rangeHeader) {
+        const match = rangeHeader.match(/bytes=(\d+)-(\d*)/);
+        if (match) {
+          start = Number(match[1]);
+          end = match[2] ? Math.min(Number(match[2]), fileSize - 1) : fileSize - 1;
+          statusCode = 206;
+        }
+      }
+
+      if (start > end || start >= fileSize) {
+        res.writeHead(416, { "Content-Range": `bytes */${fileSize}` });
+        res.end();
+        return;
+      }
+
+      const chunkSize = end - start + 1;
+      const headers = { ...baseHeaders, "Content-Length": String(chunkSize) };
+      if (statusCode === 206) {
+        headers["Content-Range"] = `bytes ${start}-${end}/${fileSize}`;
+      } else {
+        headers["Content-Disposition"] = `attachment; filename="${fileName}"`;
+      }
+
+      res.writeHead(statusCode, headers);
+
+      if (req.method === "GET") {
+        const stream = fsSync.createReadStream(filePath, { start, end });
+        stream.on("error", (err) => {
+          console.error("[share-server] stream error:", err.message);
+          if (!res.headersSent) res.writeHead(500);
+          res.end();
+        });
+        res.on("close", () => stream.destroy());
+        stream.pipe(res);
+      } else {
+        res.end();
+      }
+    });
+
+    // Track all open sockets so we can force-close on stop
+    server.on("connection", (socket) => {
+      shareServerState.activeConnections.add(socket);
+      socket.on("close", () => shareServerState.activeConnections.delete(socket));
+    });
+
+    server.on("error", (err) => {
+      resolve({ ok: false, message: String(err?.message || err) });
+    });
+
+    server.listen(0, "0.0.0.0", () => {
+      const addr = server.address();
+      const port = addr?.port || 0;
+      const ip = getLocalIpAddress();
+      shareServerState.server = server;
+      shareServerState.filePath = filePath;
+      shareServerState.port = port;
+
+      shareServerState.autoStopTimer = setTimeout(stopShareServer, autoStopMs);
+
+      resolve({ ok: true, url: `http://${ip}:${port}`, port, ip });
+    });
+  });
+}
 
 function configureChromiumCachePaths() {
   const candidates = [
@@ -1834,10 +2025,10 @@ async function generateStitchVideo(payload = {}) {
     : sanitizeStitchSelectionItems(stitchSelectionState.items);
 
   const requestedCount = Math.max(2, Math.min(50, Number(payload?.videoCount || selectedItems.length || 2)));
-  const secondsPerVideo = Math.max(1, Math.min(60, Number(payload?.secondsPerVideo || 2)));
+  const secondsPerVideo = Math.max(0.1, Math.min(60, Number(payload?.secondsPerVideo || 2)));
   const resolution = parseStitchResolution(payload?.resolution || "1080x1920");
   const muteAll = Boolean(payload?.muteAll ?? true);
-  const stitchFps = 30;
+  const stitchFps = 24;
   const stitchGop = stitchFps * 2;
 
   const trimmed = selectedItems.slice(0, requestedCount);
@@ -1872,7 +2063,7 @@ async function generateStitchVideo(payload = {}) {
       const item = verifiedItems[i];
       const clipPath = path.join(tempDir, `clip-${String(i + 1).padStart(3, "0")}.mp4`);
       const filter = [
-        `scale=${resolution.width}:${resolution.height}:force_original_aspect_ratio=increase:flags=lanczos`,
+        `scale=${resolution.width}:${resolution.height}:force_original_aspect_ratio=increase:flags=bicubic`,
         `crop=${resolution.width}:${resolution.height}`,
         `fps=${stitchFps}`,
         "format=yuv420p",
@@ -1898,7 +2089,7 @@ async function generateStitchVideo(payload = {}) {
         "-c:v",
         "libx264",
         "-preset",
-        "veryfast",
+        "superfast",
         "-g",
         String(stitchGop),
         "-keyint_min",
@@ -1906,7 +2097,7 @@ async function generateStitchVideo(payload = {}) {
         "-sc_threshold",
         "0",
         "-crf",
-        "21",
+        "24",
         "-pix_fmt",
         "yuv420p",
         "-movflags",
@@ -1953,25 +2144,8 @@ async function generateStitchVideo(payload = {}) {
       "0",
       "-i",
       concatListPath,
-      "-r",
-      String(stitchFps),
-      "-vsync",
-      "cfr",
-      "-c:v",
-      "libx264",
-      "-preset",
-      "veryfast",
-      "-g",
-      String(stitchGop),
-      "-keyint_min",
-      String(stitchGop),
-      "-sc_threshold",
-      "0",
-      "-crf",
-      "21",
-      "-pix_fmt",
-      "yuv420p",
-      ...(muteAll ? ["-an"] : ["-af", "aresample=async=1:first_pts=0", "-c:a", "aac", "-b:a", "128k"]),
+      "-c",
+      "copy",
       "-movflags",
       "+faststart",
       outputPath,
@@ -5351,6 +5525,47 @@ ipcMain.handle("delete-media-file", async (_event, payload) => {
 ipcMain.handle("copy-text", async (_event, text) => {
   try {
     clipboard.writeText(String(text || ""));
+    return { ok: true };
+  } catch (error) {
+    return { ok: false, message: String(error?.message || error) };
+  }
+});
+
+ipcMain.handle("start-share-server", async (_event, payload) => {
+  try {
+    let filePath = String(payload?.filePath || "").trim();
+
+    // If bytes are provided instead of a path, write them to a temp file first
+    if (!filePath && payload?.bytes) {
+      const fileName = String(payload?.fileName || `snoolink-share-${Date.now()}.mp4`).replace(/[^a-z0-9._-]/gi, "_");
+      const tmpDir = path.join(app.getPath("temp"), "snoolink-share");
+      await fs.mkdir(tmpDir, { recursive: true });
+      filePath = path.join(tmpDir, fileName);
+      await fs.writeFile(filePath, Buffer.from(payload.bytes));
+    }
+
+    if (!filePath) {
+      return { ok: false, message: "filePath or bytes is required." };
+    }
+    const qrcode = nodeRequire("qrcode");
+    const result = await startShareServer(filePath);
+    if (!result.ok) {
+      return result;
+    }
+    const qrDataUrl = await qrcode.toDataURL(result.url, {
+      width: 280,
+      margin: 2,
+      color: { dark: "#000000", light: "#ffffff" },
+    });
+    return { ...result, qrDataUrl };
+  } catch (error) {
+    return { ok: false, message: String(error?.message || error) };
+  }
+});
+
+ipcMain.handle("stop-share-server", async () => {
+  try {
+    stopShareServer();
     return { ok: true };
   } catch (error) {
     return { ok: false, message: String(error?.message || error) };

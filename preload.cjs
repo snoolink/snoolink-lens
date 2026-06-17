@@ -89,4 +89,6 @@ contextBridge.exposeInMainWorld("desktopAPI", {
     ipcRenderer.on("stitch-progress", wrapped);
     return () => ipcRenderer.removeListener("stitch-progress", wrapped);
   },
+  startShareServer: (payload) => ipcRenderer.invoke("start-share-server", payload),
+  stopShareServer: () => ipcRenderer.invoke("stop-share-server"),
 });

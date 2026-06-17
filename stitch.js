@@ -5,9 +5,6 @@ import { installTooltipSystem } from "./tooltipSystem.js";
 
 const goHomeBtn = document.getElementById("goHomeBtn");
 const refreshSelectionBtn = document.getElementById("refreshSelectionBtn");
-const decreaseVideoCountBtn = document.getElementById("decreaseVideoCountBtn");
-const increaseVideoCountBtn = document.getElementById("increaseVideoCountBtn");
-const videoCountInput = document.getElementById("videoCountInput");
 const secondsPerVideoRange = document.getElementById("secondsPerVideoRange");
 const secondsPerVideoInput = document.getElementById("secondsPerVideoInput");
 const resolutionSelect = document.getElementById("resolutionSelect");
@@ -29,6 +26,14 @@ const ffmpegErrorPanel = document.getElementById("ffmpegErrorPanel");
 const ffmpegErrorText = document.getElementById("ffmpegErrorText");
 const generatedPreviewBlock = document.getElementById("generatedPreviewBlock");
 const generatedPreviewVideo = document.getElementById("generatedPreviewVideo");
+const shareToMobileBtn = document.getElementById("shareToMobileBtn");
+const qrShareModal = document.getElementById("qrShareModal");
+const qrModalCloseBtn = document.getElementById("qrModalCloseBtn");
+const qrImage = document.getElementById("qrImage");
+const qrUrlLabel = document.getElementById("qrUrlLabel");
+const qrStatusLabel = document.getElementById("qrStatusLabel");
+const qrCountdown = document.getElementById("qrCountdown");
+const qrCopyUrlBtn = document.getElementById("qrCopyUrlBtn");
 
 const state = {
   selectedItems: [],
@@ -57,12 +62,14 @@ const pendingFileReadRequests = new Map();
 const pendingActionRequests = new Map();
 const STITCH_SELECTION_SNAPSHOT_KEY = "snoolink.stitch.selection.v1";
 const TOOLTIP_SETTINGS_KEY = "snoolink.tooltips.enabled.v1";
+const MIN_SECONDS_PER_VIDEO = 0.1;
+const MAX_SECONDS_PER_VIDEO = 60;
+const SECONDS_PRECISION = 1;
 let tooltipSystemController = null;
 
 const STITCH_TOOLTIP_TEXT = {
   goHomeBtn: "Does: Returns to Search screen. Why: Lets you adjust clip selection without losing app context. Tip: Re-open Stitch when your queue is ready.",
   refreshSelectionBtn: "Does: Re-reads selected videos from parent workspace. Why: Sync fixes stale queue state. Tip: Use after changing selections on home screen.",
-  videoCountInput: "Does: Sets how many selected videos to use. Why: Controls output length and pacing. Tip: Keep this near your strongest clips first.",
   secondsPerVideoRange: "Does: Sets per-clip duration by slider. Why: Balances rhythm and storytelling. Tip: Use 2-4 seconds for short-form reels.",
   secondsPerVideoInput: "Does: Sets per-clip duration numerically. Why: Gives precise timing control. Tip: Match this to beat or narration tempo.",
   resolutionSelect: "Does: Chooses output frame size and aspect ratio. Why: Platform fit affects visual quality and crop behavior. Tip: Use 9:16 for mobile-first content.",
@@ -87,12 +94,31 @@ function clampNumber(value, min, max, fallback) {
   return Math.max(min, Math.min(max, Math.round(numeric)));
 }
 
-function getVideoCount() {
-  return clampNumber(videoCountInput?.value, 1, 50, 1);
+function clampDecimal(value, min, max, fallback, precision = 2) {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) {
+    return fallback;
+  }
+  const clamped = Math.max(min, Math.min(max, numeric));
+  const factor = 10 ** precision;
+  return Math.round(clamped * factor) / factor;
+}
+
+function formatSeconds(seconds) {
+  const numeric = Number(seconds);
+  const safe = Number.isFinite(numeric) ? numeric : 0;
+  const normalized = Math.round(Math.max(0, safe) * (10 ** SECONDS_PRECISION)) / (10 ** SECONDS_PRECISION);
+  return normalized.toFixed(SECONDS_PRECISION).replace(/\.0+$/, "").replace(/(\.\d*[1-9])0+$/, "$1");
 }
 
 function getSecondsPerVideo() {
-  return clampNumber(secondsPerVideoInput?.value, 1, 60, 2);
+  return clampDecimal(
+    secondsPerVideoInput?.value,
+    MIN_SECONDS_PER_VIDEO,
+    MAX_SECONDS_PER_VIDEO,
+    2,
+    SECONDS_PRECISION,
+  );
 }
 
 function buildStitchFileName() {
@@ -100,7 +126,7 @@ function buildStitchFileName() {
 }
 
 function getUsedCount() {
-  return Math.min(getVideoCount(), state.selectedItems.length);
+  return state.selectedItems.length;
 }
 
 function parseResolution(value) {
@@ -120,11 +146,11 @@ function parseResolution(value) {
 function formatDuration(seconds) {
   const total = Math.max(0, Number(seconds) || 0);
   if (total < 60) {
-    return `${total}s`;
+    return `${formatSeconds(total)}s`;
   }
   const mins = Math.floor(total / 60);
-  const rem = total % 60;
-  return rem === 0 ? `${mins}m` : `${mins}m ${rem}s`;
+  const rem = Math.round((total - mins * 60) * 100) / 100;
+  return rem === 0 ? `${mins}m` : `${mins}m ${formatSeconds(rem)}s`;
 }
 
 function setProgress(percent, message, status = "idle") {
@@ -537,16 +563,20 @@ function updateSummaryAndActions() {
   usedCountValue.textContent = String(usedCount);
   durationValue.textContent = formatDuration(estimatedDuration);
   if (secondsValue) {
-    secondsValue.textContent = `${secondsPerClip}s`;
+    secondsValue.textContent = `${formatSeconds(secondsPerClip)}s`;
   }
 
   generateStitchBtn.disabled = state.generating || selectedCount < 2;
   downloadStitchBtn.disabled = state.generating || (!state.outputBlobUrl && !state.nativeOutputPath);
+  if (shareToMobileBtn) {
+    shareToMobileBtn.disabled = state.generating || (!state.outputBlobUrl && !state.nativeOutputPath);
+  }
+  const inlineShareBtn = document.getElementById("inlineShareToMobileBtn");
+  if (inlineShareBtn) {
+    inlineShareBtn.disabled = state.generating || (!state.outputBlobUrl && !state.nativeOutputPath);
+  }
   reconfigureBtn.disabled = state.generating || (!state.outputBlobUrl && !state.nativeOutputPath && state.clipWarnings.size === 0);
   refreshSelectionBtn.disabled = state.generating;
-  decreaseVideoCountBtn.disabled = state.generating;
-  increaseVideoCountBtn.disabled = state.generating;
-  videoCountInput.disabled = state.generating;
   secondsPerVideoRange.disabled = state.generating;
   secondsPerVideoInput.disabled = state.generating;
   resolutionSelect.disabled = state.generating;
@@ -556,11 +586,9 @@ function updateSummaryAndActions() {
 }
 
 function syncNumericControls() {
-  const safeVideoCount = getVideoCount();
   const safeSeconds = getSecondsPerVideo();
-  videoCountInput.value = String(safeVideoCount);
-  secondsPerVideoInput.value = String(safeSeconds);
-  secondsPerVideoRange.value = String(safeSeconds);
+  secondsPerVideoInput.value = formatSeconds(safeSeconds);
+  secondsPerVideoRange.value = formatSeconds(safeSeconds);
   updateSummaryAndActions();
 }
 
@@ -725,9 +753,6 @@ async function loadSelection() {
 
   state.selectedItems = items;
   state.nativeOutputPath = "";
-  if (state.selectedItems.length > 0) {
-    videoCountInput.value = String(clampNumber(state.selectedItems.length, 1, 50, 1));
-  }
 
   renderSelectedList();
   updateSummaryAndActions();
@@ -873,7 +898,7 @@ function markClipWarning(item, message) {
 }
 
 async function generateStitch() {
-  const queuedItems = state.selectedItems.slice(0, getVideoCount());
+  const queuedItems = state.selectedItems.slice();
   if (queuedItems.length < 2) {
     setProgress(0, "Select at least 2 videos before generating.", "error");
     return;
@@ -895,10 +920,10 @@ async function generateStitch() {
   const seconds = getSecondsPerVideo();
   const muteAll = Boolean(muteAllClipsInput?.checked ?? true);
   const { width, height } = parseResolution(resolutionSelect.value);
-  const stitchFps = 30;
+  const stitchFps = 24;
   const stitchGop = stitchFps * 2;
   const normalizedVideoFilter = [
-    `scale=${width}:${height}:force_original_aspect_ratio=increase:flags=lanczos`,
+    `scale=${width}:${height}:force_original_aspect_ratio=increase:flags=bicubic`,
     `crop=${width}:${height}`,
     `fps=${stitchFps}`,
     "format=yuv420p",
@@ -906,7 +931,6 @@ async function generateStitch() {
   ].join(",");
   const fallbackPayload = {
     items: queuedItems,
-    videoCount: queuedItems.length,
     secondsPerVideo: seconds,
     resolution: `${width}x${height}`,
     muteAll,
@@ -914,6 +938,19 @@ async function generateStitch() {
 
   state.generating = true;
   updateSummaryAndActions();
+
+  setProgress(1, "Using native FFmpeg for faster generation...", "processing");
+  const nativeFirstResult = await requestActionFromParent("stitch-generate-request", fallbackPayload);
+  if (nativeFirstResult?.ok && nativeFirstResult.path) {
+    state.nativeOutputPath = String(nativeFirstResult.path);
+    state.outputFileName = String(nativeFirstResult.fileName || buildStitchFileName());
+    outputPathLabel.textContent = `Ready (native): ${state.outputFileName}`;
+    showGeneratedPreview(toReadableLocalUrl(state.nativeOutputPath));
+    setProgress(100, "Generated via native FFmpeg.", "complete");
+    state.generating = false;
+    updateSummaryAndActions();
+    return;
+  }
 
   setProgress(1, "Loading FFmpeg.wasm...", "processing");
 
@@ -946,9 +983,8 @@ async function generateStitch() {
   }
 
   const successful = [];
-  const audioSegments = [];
 
-  const estimatedCommands = Math.max(1, queuedItems.length * (muteAll ? 1 : 2) + 3);
+  const estimatedCommands = Math.max(1, queuedItems.length + 1);
   ffmpegState.commandsTotal = estimatedCommands;
   ffmpegState.commandIndex = 0;
   ffmpegState.stderrLines = [];
@@ -974,7 +1010,6 @@ async function generateStitch() {
 
       const inputName = sanitizeFsName("input", i, ".mp4");
       const outputName = sanitizeFsName("output", i, ".mp4");
-      const audioName = sanitizeFsName("audio", i, ".m4a");
 
       await ffmpeg.writeFile(inputName, bytes);
 
@@ -986,10 +1021,11 @@ async function generateStitch() {
         "-r", String(stitchFps),
         "-vsync", "cfr",
         "-c:v", "libx264",
-        "-preset", "veryfast",
+        "-preset", "superfast",
         "-g", String(stitchGop),
         "-keyint_min", String(stitchGop),
         "-sc_threshold", "0",
+        "-crf", "24",
         "-pix_fmt", "yuv420p",
       ];
 
@@ -1002,25 +1038,6 @@ async function generateStitch() {
       clipArgs.push("-movflags", "+faststart");
       clipArgs.push(outputName);
       await runFfmpegCommand(ffmpeg, clipArgs, label);
-
-      if (!muteAll) {
-        try {
-          const audioArgs = [
-            "-i", inputName,
-            "-ss", "0",
-            "-t", String(seconds),
-            "-vn",
-            "-ac", "2",
-            "-ar", "48000",
-            "-c:a", "aac",
-            audioName,
-          ];
-          await runFfmpegCommand(ffmpeg, audioArgs, `${label} audio`);
-          audioSegments.push(audioName);
-        } catch {
-          // Clip has no usable audio; continue with other clips.
-        }
-      }
 
       successful.push({ item, outputName });
 
@@ -1045,54 +1062,18 @@ async function generateStitch() {
       "-r", String(stitchFps),
       "-vsync", "cfr",
       "-c:v", "libx264",
-      "-preset", "veryfast",
+      "-preset", "superfast",
       "-g", String(stitchGop),
       "-keyint_min", String(stitchGop),
       "-sc_threshold", "0",
+      "-crf", "24",
       "-pix_fmt", "yuv420p",
-      "-an",
+      ...(muteAll ? ["-an"] : ["-c:a", "aac", "-b:a", "128k"]),
       "-movflags", "+faststart",
-      "video_concat.mp4",
-    ], "concat re-encode");
+      "final.mp4",
+    ], "concat final");
 
-    let finalName = "video_concat.mp4";
-
-    if (!muteAll && audioSegments.length > 0) {
-      const mixInputs = [];
-      const mixParts = [];
-      const mixRefs = [];
-      const gain = (1 / audioSegments.length).toFixed(4);
-
-      for (let i = 0; i < audioSegments.length; i += 1) {
-        mixInputs.push("-i", audioSegments[i]);
-        const delay = i * seconds * 1000;
-        mixParts.push(`[${i}:a]volume=${gain},adelay=${delay}|${delay}[a${i}]`);
-        mixRefs.push(`[a${i}]`);
-      }
-
-      const filter = `${mixParts.join(";")};${mixRefs.join("")}amix=inputs=${audioSegments.length}:duration=longest:normalize=0[mix]`;
-
-      await runFfmpegCommand(ffmpeg, [
-        ...mixInputs,
-        "-filter_complex", filter,
-        "-map", "[mix]",
-        "-c:a", "aac",
-        "mixed_audio.m4a",
-      ], "mix audio");
-
-      await runFfmpegCommand(ffmpeg, [
-        "-i", "video_concat.mp4",
-        "-i", "mixed_audio.m4a",
-        "-c:v", "copy",
-        "-c:a", "aac",
-        "-shortest",
-        "final.mp4",
-      ], "mux final");
-
-      finalName = "final.mp4";
-    }
-
-    const finalData = await ffmpeg.readFile(finalName);
+    const finalData = await ffmpeg.readFile("final.mp4");
     const blob = new Blob([finalData.buffer], { type: "video/mp4" });
     const blobUrl = URL.createObjectURL(blob);
     const outputFileName = buildStitchFileName();
@@ -1183,6 +1164,173 @@ function resetGenerationState() {
   updateSummaryAndActions();
 }
 
+// ─── QR Share Modal ────────────────────────────────────────────
+
+const qrModalState = {
+  countdownTimer: null,
+  secondsLeft: 0,
+  activeUrl: "",
+};
+
+function closeQrModal() {
+  if (qrShareModal) {
+    qrShareModal.classList.add("hidden");
+  }
+  if (qrModalState.countdownTimer) {
+    clearInterval(qrModalState.countdownTimer);
+    qrModalState.countdownTimer = null;
+  }
+  qrModalState.activeUrl = "";
+  void requestActionFromParent("stitch-stop-share-server-request", {});
+}
+
+function startQrCountdown(seconds) {
+  if (qrModalState.countdownTimer) {
+    clearInterval(qrModalState.countdownTimer);
+  }
+  qrModalState.secondsLeft = seconds;
+
+  function tick() {
+    const m = Math.floor(qrModalState.secondsLeft / 60);
+    const s = qrModalState.secondsLeft % 60;
+    const countdownEl = document.getElementById("qrCountdown");
+    if (countdownEl) {
+      countdownEl.textContent = `${m}:${String(s).padStart(2, "0")}`;
+    }
+    if (qrModalState.secondsLeft <= 0) {
+      clearInterval(qrModalState.countdownTimer);
+      qrModalState.countdownTimer = null;
+      if (qrStatusLabel) {
+        qrStatusLabel.textContent = "Expired — close and try again.";
+        qrStatusLabel.classList.add("expired");
+      }
+    } else {
+      qrModalState.secondsLeft -= 1;
+    }
+  }
+
+  tick();
+  qrModalState.countdownTimer = setInterval(tick, 1000);
+}
+
+function setShareBtnBusy(busy) {
+  const label = busy ? "Starting server…" : "Share to Mobile via QR";
+  const disabled = busy || (!state.outputBlobUrl && !state.nativeOutputPath);
+  [shareToMobileBtn, document.getElementById("inlineShareToMobileBtn")].forEach((btn) => {
+    if (!btn) return;
+    btn.textContent = label;
+    btn.disabled = disabled;
+  });
+}
+
+async function openQrShareModal() {
+  if (!state.outputBlobUrl && !state.nativeOutputPath) {
+    setProgress(0, "No generated video to share. Generate first.", "error");
+    return;
+  }
+
+  setShareBtnBusy(true);
+
+  const filePath = state.nativeOutputPath;
+  let sharePayload;
+
+  if (filePath) {
+    // Native path — pass file path directly
+    sharePayload = { filePath };
+  } else if (state.outputBlobUrl) {
+    // WASM blob — read bytes and send them in one call (main process saves temp file + starts server)
+    try {
+      const response = await fetch(state.outputBlobUrl);
+      const buffer = await response.arrayBuffer();
+      sharePayload = {
+        bytes: new Uint8Array(buffer),
+        fileName: state.outputFileName || `snoolink-share-${Date.now()}.mp4`,
+      };
+    } catch (error) {
+      setShareBtnBusy(false);
+      setProgress(0, `Share setup failed: ${String(error?.message || error)}`, "error");
+      return;
+    }
+  } else {
+    setShareBtnBusy(false);
+    setProgress(0, "No generated video to share.", "error");
+    return;
+  }
+
+  const result = await requestActionFromParent("stitch-share-server-request", sharePayload);
+
+  setShareBtnBusy(false);
+
+  if (!result?.ok) {
+    setProgress(0, `Share failed: ${result?.message || "Unknown error"}`, "error");
+    return;
+  }
+
+  qrModalState.activeUrl = result.url;
+
+  if (qrImage) {
+    qrImage.src = result.qrDataUrl || "";
+    qrImage.alt = "QR code for " + result.url;
+  }
+  if (qrUrlLabel) {
+    qrUrlLabel.textContent = result.url;
+  }
+  if (qrStatusLabel) {
+    qrStatusLabel.classList.remove("expired");
+  }
+
+  if (qrShareModal) {
+    qrShareModal.classList.remove("hidden");
+  }
+
+  startQrCountdown(5 * 60);
+}
+
+if (qrModalCloseBtn) {
+  qrModalCloseBtn.addEventListener("click", closeQrModal);
+}
+
+if (qrShareModal) {
+  const backdrop = qrShareModal.querySelector(".qr-modal-backdrop");
+  if (backdrop) {
+    backdrop.addEventListener("click", closeQrModal);
+  }
+}
+
+if (qrCopyUrlBtn) {
+  qrCopyUrlBtn.addEventListener("click", async () => {
+    const url = qrModalState.activeUrl;
+    if (!url) {
+      return;
+    }
+    try {
+      await navigator.clipboard.writeText(url);
+      qrCopyUrlBtn.textContent = "Copied!";
+      setTimeout(() => {
+        qrCopyUrlBtn.textContent = "Copy URL";
+      }, 2000);
+    } catch {
+      // Fallback to desktop API
+      window.desktopAPI?.copyText?.(url);
+    }
+  });
+}
+
+if (shareToMobileBtn) {
+  shareToMobileBtn.addEventListener("click", () => {
+    void openQrShareModal();
+  });
+}
+
+const inlineShareToMobileBtn = document.getElementById("inlineShareToMobileBtn");
+if (inlineShareToMobileBtn) {
+  inlineShareToMobileBtn.addEventListener("click", () => {
+    void openQrShareModal();
+  });
+}
+
+// ───────────────────────────────────────────────────────────────
+
 if (goHomeBtn) {
   goHomeBtn.addEventListener("click", () => {
     window.parent?.postMessage({ type: "stitch-open-home" }, "*");
@@ -1196,34 +1344,32 @@ if (refreshSelectionBtn) {
   });
 }
 
-if (decreaseVideoCountBtn) {
-  decreaseVideoCountBtn.addEventListener("click", () => {
-    videoCountInput.value = String(clampNumber(getVideoCount() - 1, 1, 50, 1));
-    syncNumericControls();
-  });
-}
-
-if (increaseVideoCountBtn) {
-  increaseVideoCountBtn.addEventListener("click", () => {
-    videoCountInput.value = String(clampNumber(getVideoCount() + 1, 1, 50, 1));
-    syncNumericControls();
-  });
-}
-
-if (videoCountInput) {
-  videoCountInput.addEventListener("input", syncNumericControls);
-}
-
 if (secondsPerVideoRange) {
   secondsPerVideoRange.addEventListener("input", () => {
-    secondsPerVideoInput.value = String(clampNumber(secondsPerVideoRange.value, 1, 60, 2));
+    secondsPerVideoInput.value = formatSeconds(
+      clampDecimal(
+        secondsPerVideoRange.value,
+        MIN_SECONDS_PER_VIDEO,
+        MAX_SECONDS_PER_VIDEO,
+        2,
+        SECONDS_PRECISION,
+      ),
+    );
     syncNumericControls();
   });
 }
 
 if (secondsPerVideoInput) {
   secondsPerVideoInput.addEventListener("input", () => {
-    secondsPerVideoRange.value = String(clampNumber(secondsPerVideoInput.value, 1, 60, 2));
+    secondsPerVideoRange.value = formatSeconds(
+      clampDecimal(
+        secondsPerVideoInput.value,
+        MIN_SECONDS_PER_VIDEO,
+        MAX_SECONDS_PER_VIDEO,
+        2,
+        SECONDS_PRECISION,
+      ),
+    );
     syncNumericControls();
   });
 }
@@ -1279,9 +1425,6 @@ window.addEventListener("message", (event) => {
   if (payload.type === "stitch-selection-updated") {
     if (Array.isArray(payload.items)) {
       state.selectedItems = normalizeItems(payload.items);
-      if (state.selectedItems.length > 0) {
-        videoCountInput.value = String(clampNumber(state.selectedItems.length, 1, 50, 1));
-      }
       state.clipWarnings.clear();
       renderSelectedList();
       updateSummaryAndActions();

@@ -4387,6 +4387,46 @@ window.addEventListener("message", (event) => {
     return;
   }
 
+  if (payload.type === "stitch-share-server-request" || payload.type === "stitch-stop-share-server-request") {
+    const requestId = String(payload.requestId || "");
+    const respond = (responsePayload) => {
+      const envelope = { type: "stitch-action-response", requestId, ...responsePayload };
+      try {
+        if (event.source && typeof event.source.postMessage === "function") {
+          event.source.postMessage(envelope, "*");
+          return;
+        }
+      } catch { /* fall through */ }
+      if (stitchFrame?.contentWindow) {
+        stitchFrame.contentWindow.postMessage(envelope, "*");
+      }
+    };
+
+    if (payload.type === "stitch-share-server-request") {
+      void (async () => {
+        try {
+          const result = await window.desktopAPI.startShareServer(payload.payload || {});
+          respond(result || { ok: false, message: "Empty share response." });
+        } catch (error) {
+          respond({ ok: false, message: String(error?.message || error) });
+        }
+      })();
+      return;
+    }
+
+    if (payload.type === "stitch-stop-share-server-request") {
+      void (async () => {
+        try {
+          const result = await window.desktopAPI.stopShareServer();
+          respond(result || { ok: true });
+        } catch (error) {
+          respond({ ok: false, message: String(error?.message || error) });
+        }
+      })();
+      return;
+    }
+  }
+
   if (payload.type === "stitch-generate-request" || payload.type === "stitch-download-request") {
     const requestId = String(payload.requestId || "");
     const respond = (responsePayload) => {
