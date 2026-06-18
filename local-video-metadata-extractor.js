@@ -56,6 +56,68 @@ const VIDEO_EXTENSIONS = new Set([
 ]);
 
 /**
+ * Normalize an optional binary path from env/config.
+ * @param {string|undefined|null} rawPath - Raw binary path.
+ * @param {string} binaryName - Binary name for fallback join.
+ * @returns {string} Normalized path or empty string.
+ */
+function normalizeBinaryPath(rawPath, binaryName) {
+  const candidate = String(rawPath || "").trim();
+  if (!candidate) {
+    return "";
+  }
+
+  const expanded = candidate.startsWith("~")
+    ? path.join(process.env.HOME || "", candidate.slice(1))
+    : candidate;
+  const resolved = path.resolve(expanded);
+
+  if (path.extname(resolved)) {
+    return resolved;
+  }
+  return path.join(resolved, binaryName);
+}
+
+/**
+ * Resolve likely ffprobe binaries for the current platform.
+ * @returns {string[]} Ordered, de-duplicated candidate list.
+ */
+function resolveFfprobeCandidates() {
+  const rows = [];
+
+  const fromEnv = normalizeBinaryPath(process.env.FFPROBE_PATH, "ffprobe");
+  if (fromEnv) {
+    rows.push(fromEnv);
+  }
+
+  // If only FFMPEG_PATH is set, try sibling ffprobe in the same bin folder.
+  const ffmpegFromEnv = normalizeBinaryPath(process.env.FFMPEG_PATH, "ffmpeg");
+  if (ffmpegFromEnv) {
+    rows.push(path.join(path.dirname(ffmpegFromEnv), "ffprobe"));
+  }
+
+  if (process.platform === "darwin") {
+    rows.push(
+      "/opt/homebrew/bin/ffprobe",
+      "/usr/local/bin/ffprobe",
+      "/opt/local/bin/ffprobe",
+      "/usr/bin/ffprobe",
+    );
+  } else if (process.platform === "linux") {
+    rows.push(
+      "/usr/bin/ffprobe",
+      "/usr/local/bin/ffprobe",
+      "/snap/bin/ffprobe",
+    );
+  }
+
+  // Last fallback: rely on PATH lookup.
+  rows.push("ffprobe");
+
+  return Array.from(new Set(rows.filter(Boolean)));
+}
+
+/**
  * Convert an input date-like value to ISO string.
  * @param {unknown} value - Date-like value.
  * @returns {string|null} ISO timestamp or null when invalid.
@@ -568,7 +630,7 @@ async function runFfprobe(filePath) {
     filePath,
   ];
 
-  const candidates = ["ffprobe"];
+  const candidates = resolveFfprobeCandidates();
 
   let lastError = null;
   for (const binary of candidates) {
@@ -586,7 +648,7 @@ async function runFfprobe(filePath) {
 
   return {
     ok: false,
-    error: String(lastError?.message || "ffprobe not available"),
+    error: String(lastError?.message || `ffprobe not available (candidates: ${candidates.join(", ")})`),
   };
 }
 

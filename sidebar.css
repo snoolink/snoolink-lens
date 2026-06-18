@@ -326,7 +326,7 @@
 
 @media (max-width: 900px) {
   #settings-sidebar {
-    width: min(88vw, 340px);
+    width: min(75vw, 300px);
   }
 
   .control-actions button {

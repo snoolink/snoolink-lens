@@ -67,7 +67,7 @@ Snoolink Lens now includes stronger protections to keep large libraries responsi
 npm install
 ```
 
-### Start in development mode
+### Start in development model
 
 ```powershell
 npm start

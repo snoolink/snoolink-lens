@@ -103,6 +103,7 @@ async function extractImageMetadata(filePath, basicInfo = {}) {
     }
 
     const exif = await extractExifData(filePath);
+    imageInfo = applyExifImageInfoFallback(imageInfo, exif, filePath);
 
     let colorAnalysis;
     try {
@@ -274,6 +275,82 @@ function parseExifNumber(value) {
   const raw = Array.isArray(value) ? value[0] : value;
   const parsed = Number.parseInt(String(raw), 10);
   return Number.isFinite(parsed) ? parsed : null;
+}
+
+/**
+ * Determine whether EXIF orientation implies display dimension swap.
+ * @param {number|null} orientation - EXIF orientation value.
+ * @returns {boolean} True when width/height should be swapped.
+ */
+function exifOrientationSwapsDimensions(orientation) {
+  const value = Number(orientation);
+  return [5, 6, 7, 8].includes(value);
+}
+
+/**
+ * Apply EXIF-based fallback for core image_info fields when decoder metadata is unavailable.
+ * @param {object} imageInfo - Extracted image_info payload.
+ * @param {object|null} exif - Extracted EXIF payload.
+ * @param {string} filePath - Absolute image path.
+ * @returns {object} Image info with EXIF-enriched fallback fields.
+ */
+function applyExifImageInfoFallback(imageInfo, exif, filePath) {
+  const next = imageInfo && typeof imageInfo === "object" ? { ...imageInfo } : {};
+
+  const currentWidth = Number(next.width || 0);
+  const currentHeight = Number(next.height || 0);
+  const hasDimensions = Number.isFinite(currentWidth) && currentWidth > 0 && Number.isFinite(currentHeight) && currentHeight > 0;
+
+  const exifOrientation = parseExifNumber(exif?.orientation);
+  const exifWidthRaw = parseExifNumber(exif?.dimensions?.width);
+  const exifHeightRaw = parseExifNumber(exif?.dimensions?.height);
+  const hasExifDimensions = Number.isFinite(exifWidthRaw) && exifWidthRaw > 0 && Number.isFinite(exifHeightRaw) && exifHeightRaw > 0;
+
+  if (!hasDimensions && hasExifDimensions) {
+    const swap = exifOrientationSwapsDimensions(exifOrientation);
+    next.width = swap ? exifHeightRaw : exifWidthRaw;
+    next.height = swap ? exifWidthRaw : exifHeightRaw;
+  }
+
+  const width = Number(next.width || 0);
+  const height = Number(next.height || 0);
+  const validDimensions = Number.isFinite(width) && width > 0 && Number.isFinite(height) && height > 0;
+
+  if (validDimensions) {
+    const aspectRatio = width / height;
+    if (!Number.isFinite(Number(next.aspect_ratio))) {
+      next.aspect_ratio = Math.round(aspectRatio * 100) / 100;
+    }
+    if (!String(next.aspect_ratio_string || "").trim() || String(next.aspect_ratio_string || "").toLowerCase() === "custom") {
+      next.aspect_ratio_string = getAspectRatioString(aspectRatio);
+    }
+    if (!String(next.orientation || "").trim() || String(next.orientation || "").toLowerCase() === "unknown") {
+      next.orientation = classifyOrientationFromAspectRatio(aspectRatio);
+    }
+    if (!Number.isFinite(Number(next.megapixels))) {
+      next.megapixels = calculateMegapixels(width, height);
+    }
+    if (!String(next.size_category || "").trim() || String(next.size_category || "").toLowerCase() === "unknown") {
+      next.size_category = categorizeImageSizeByPixels(width * height);
+    }
+
+    // Decoder plugin absence does not mean the file is corrupt when EXIF dimensions are valid.
+    next.is_corrupt = false;
+  }
+
+  if (!String(next.format || "").trim()) {
+    const ext = path.extname(String(filePath || "")).toLowerCase().replace(/^\./, "");
+    next.format = ext || null;
+  }
+
+  if (!String(next.orientation || "").trim()) {
+    next.orientation = "unknown";
+  }
+  if (!String(next.aspect_ratio_string || "").trim()) {
+    next.aspect_ratio_string = "custom";
+  }
+
+  return next;
 }
 
 /**
@@ -732,6 +809,12 @@ async function extractExifData(filePath) {
       
       // Orientation
       orientation: exif.Orientation || null,
+
+      // Technical dimensions useful when decoder plugins are unavailable.
+      dimensions: {
+        width: parseExifNumber(exif.ExifImageWidth || exif.ImageWidth || exif.PixelXDimension),
+        height: parseExifNumber(exif.ExifImageHeight || exif.ImageHeight || exif.PixelYDimension),
+      },
       
       // Is this edited?
       is_edited: detectEditedBySoftware(exif.Software)
