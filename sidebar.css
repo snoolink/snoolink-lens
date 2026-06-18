@@ -22,35 +22,36 @@
 
 .sidebar-icon-dock-btn {
   align-items: center;
-  background: rgba(23, 31, 46, 0.82);
-  border: 1px solid rgba(126, 154, 209, 0.42);
+  background: rgba(17, 24, 39, 0.88);
+  border: 1px solid var(--sn-border, rgba(139, 92, 246, 0.34));
   border-radius: 10px;
-  color: #e4edff;
+  color: var(--sn-text-secondary, #e5e7eb);
   cursor: pointer;
   display: inline-flex;
-  font-size: 1rem;
+  font-size: 1.2rem;
   height: 36px;
   justify-content: center;
+  line-height: 1;
   width: 100%;
 }
 
 .sidebar-icon-dock-btn:hover,
 .sidebar-icon-dock-btn:focus-visible {
-  background: rgba(42, 64, 102, 0.82);
-  border-color: rgba(170, 202, 255, 0.62);
+  background: rgba(31, 41, 55, 0.9);
+  border-color: var(--sn-border-strong, rgba(168, 85, 247, 0.52));
 }
 
 .settings-section-header {
   border-radius: 10px;
   cursor: pointer;
   display: flex;
-  margin-bottom: 6px;
-  padding: 6px 8px;
+  margin-bottom: 4px;
+  padding: 4px 6px;
   user-select: none;
 }
 
 .settings-section-header:focus-visible {
-  outline: 2px solid rgba(151, 192, 255, 0.7);
+  outline: 2px solid var(--sn-border-strong, rgba(168, 85, 247, 0.52));
   outline-offset: 2px;
 }
 
@@ -65,99 +66,99 @@
   align-items: center;
   border-radius: 999px;
   display: inline-flex;
-  font-size: 0.85rem;
+  font-size: 1rem;
   height: 22px;
   justify-content: center;
   width: 22px;
 }
 
 .settings-section .section-icon .section-icon-img {
-  height: 14px;
+  height: 16px;
   object-fit: contain;
-  width: 14px;
+  width: 16px;
 }
 
 .settings-section.section-scan .settings-section-header {
-  background: rgba(51, 124, 214, 0.18);
-  border: 1px solid rgba(93, 160, 245, 0.32);
+  background: rgba(93, 30, 244, 0.16);
+  border: 1px solid var(--sn-border, rgba(139, 92, 246, 0.34));
 }
 
 .settings-section.section-scan .section-icon,
 .sidebar-icon-dock-btn.section-scan {
-  background: rgba(62, 152, 255, 0.24);
-  border-color: rgba(107, 186, 255, 0.45);
+  background: rgba(93, 30, 244, 0.22);
+  border-color: var(--sn-border-strong, rgba(168, 85, 247, 0.52));
 }
 
 .settings-section.section-index .settings-section-header {
-  background: rgba(82, 98, 215, 0.18);
-  border: 1px solid rgba(118, 135, 243, 0.32);
+  background: rgba(139, 92, 246, 0.16);
+  border: 1px solid var(--sn-border, rgba(139, 92, 246, 0.34));
 }
 
 .settings-section.section-index .section-icon,
 .sidebar-icon-dock-btn.section-index {
-  background: rgba(114, 125, 255, 0.24);
-  border-color: rgba(160, 173, 255, 0.45);
+  background: rgba(139, 92, 246, 0.22);
+  border-color: var(--sn-border-strong, rgba(168, 85, 247, 0.52));
 }
 
 .settings-section.section-file .settings-section-header {
-  background: rgba(67, 143, 178, 0.18);
-  border: 1px solid rgba(108, 184, 216, 0.32);
+  background: rgba(168, 85, 247, 0.14);
+  border: 1px solid var(--sn-border, rgba(139, 92, 246, 0.34));
 }
 
 .settings-section.section-file .section-icon,
 .sidebar-icon-dock-btn.section-file {
-  background: rgba(94, 188, 221, 0.24);
-  border-color: rgba(153, 214, 236, 0.45);
+  background: rgba(168, 85, 247, 0.22);
+  border-color: var(--sn-border-strong, rgba(168, 85, 247, 0.52));
 }
 
 .settings-section.section-albums .settings-section-header {
-  background: rgba(71, 164, 117, 0.18);
-  border: 1px solid rgba(109, 204, 156, 0.32);
+  background: rgba(139, 92, 246, 0.16);
+  border: 1px solid var(--sn-border, rgba(139, 92, 246, 0.34));
 }
 
 .settings-section.section-albums .section-icon,
 .sidebar-icon-dock-btn.section-albums {
-  background: rgba(87, 190, 131, 0.24);
-  border-color: rgba(140, 221, 176, 0.45);
+  background: rgba(139, 92, 246, 0.22);
+  border-color: var(--sn-border-strong, rgba(168, 85, 247, 0.52));
 }
 
 .settings-section.section-settings .settings-section-header {
-  background: rgba(170, 122, 70, 0.2);
-  border: 1px solid rgba(206, 155, 99, 0.34);
+  background: rgba(168, 85, 247, 0.16);
+  border: 1px solid var(--sn-border, rgba(139, 92, 246, 0.34));
 }
 
 .settings-section.section-settings .section-icon,
 .sidebar-icon-dock-btn.section-settings {
-  background: rgba(214, 160, 92, 0.25);
-  border-color: rgba(239, 198, 143, 0.5);
+  background: rgba(168, 85, 247, 0.22);
+  border-color: var(--sn-border-strong, rgba(168, 85, 247, 0.52));
 }
 
 .settings-section.section-wizard .settings-section-header {
-  background: rgba(120, 90, 196, 0.2);
-  border: 1px solid rgba(163, 131, 236, 0.34);
+  background: rgba(139, 92, 246, 0.2);
+  border: 1px solid var(--sn-border, rgba(139, 92, 246, 0.34));
 }
 
 .settings-section.section-wizard .section-icon,
 .sidebar-icon-dock-btn.section-wizard {
-  background: rgba(151, 117, 235, 0.26);
-  border-color: rgba(194, 172, 250, 0.5);
+  background: rgba(139, 92, 246, 0.24);
+  border-color: var(--sn-border-strong, rgba(168, 85, 247, 0.52));
 }
 
 .settings-section.section-reels .settings-section-header {
-  background: rgba(230, 102, 78, 0.2);
-  border: 1px solid rgba(245, 141, 118, 0.34);
+  background: rgba(236, 72, 153, 0.14);
+  border: 1px solid rgba(236, 72, 153, 0.38);
 }
 
 .settings-section.section-reels .section-icon,
 .sidebar-icon-dock-btn.section-reels {
-  background: rgba(255, 128, 102, 0.26);
-  border-color: rgba(255, 176, 154, 0.5);
+  background: rgba(236, 72, 153, 0.22);
+  border-color: rgba(236, 72, 153, 0.5);
 }
 
 .sidebar-icon-dock-img {
-  height: 16px;
+  height: 19px;
   object-fit: contain;
-  width: 16px;
+  width: 19px;
 }
 
 #settings-sidebar.collapsed #sidebar-content {
@@ -220,8 +221,8 @@
   background: rgba(10, 16, 27, 0.46);
   border: 1px solid rgba(123, 156, 221, 0.2);
   border-radius: 10px;
-  margin-bottom: 10px;
-  padding: 8px;
+  margin-bottom: 6px;
+  padding: 5px 6px;
 }
 
 .settings-subsection:last-child {
@@ -232,12 +233,30 @@
   color: rgba(218, 233, 255, 0.9);
   font-size: 0.68rem;
   letter-spacing: 0.07em;
-  margin-bottom: 7px;
+  margin-bottom: 4px;
   text-transform: uppercase;
 }
 
 .settings-section {
+  margin-bottom: 4px;
+  padding: 7px 8px;
   overflow: hidden;
+}
+
+#sidebar-content .control-group,
+#sidebar-content .progress-block,
+#sidebar-content .logs-block,
+#sidebar-content .control-actions,
+#sidebar-content .indexing-mode-grid {
+  margin-bottom: 6px;
+}
+
+#sidebar-content .control-group:last-child,
+#sidebar-content .progress-block:last-child,
+#sidebar-content .logs-block:last-child,
+#sidebar-content .control-actions:last-child,
+#sidebar-content .indexing-mode-grid:last-child {
+  margin-bottom: 0;
 }
 
 .settings-section-body,

@@ -81,7 +81,7 @@
   </section>
 
   <section class="settings-section section-index" id="index-section">
-    <h3><span class="section-icon" aria-hidden="true">&#9881;</span><span class="section-title-text">Indexing</span></h3>
+    <h3><span class="section-icon" aria-hidden="true">&#128736;</span><span class="section-title-text">Indexing</span></h3>
     <div class="settings-subsection">
       <h4>Mode</h4>
       <div class="indexing-mode-grid">
@@ -130,39 +130,6 @@
     </div>
   </section>
 
-  <section class="settings-section section-file" id="metadata-section">
-    <h3><span class="section-icon" aria-hidden="true">&#128196;</span><span class="section-title-text">Metadata JSON</span></h3>
-    <div class="settings-subsection">
-      <h4>File</h4>
-      <div id="topbar">
-        <button id="pickFileBtn" type="button">Choose JSON</button>
-        <input id="filePath" type="text" placeholder="image_metadata_results.json" />
-        <button id="validateBtn" type="button">Validate</button>
-      </div>
-    </div>
-  </section>
-
-  <section class="settings-section section-albums" id="albums-section">
-    <h3><span class="section-icon" aria-hidden="true">&#128193;</span><span class="section-title-text">Albums</span></h3>
-    <div class="settings-subsection">
-      <h4>Manage</h4>
-      <div class="control-actions">
-        <button id="newAlbumBtn" type="button">+ New Album</button>
-      </div>
-      <div id="albumsList" class="albums-list"></div>
-    </div>
-  </section>
-
-  <section class="settings-section section-settings" id="settings-nav-section">
-    <h3><span class="section-icon" aria-hidden="true">&#9881;</span><span class="section-title-text">Settings</span></h3>
-    <div class="settings-subsection">
-      <h4>App</h4>
-      <div class="control-actions">
-        <button id="openAppSettingsLink" type="button">Open App Settings</button>
-      </div>
-    </div>
-  </section>
-
   <section class="settings-section section-wizard" id="wizard-nav-section">
     <h3>
       <span class="section-icon" aria-hidden="true">
@@ -189,12 +156,23 @@
   </section>
 
   <section class="settings-section section-stitch" id="stitch-nav-section">
-    <h3><span class="section-icon" aria-hidden="true">ST</span><span class="section-title-text">Stitch</span></h3>
+    <h3><span class="section-icon" aria-hidden="true">&#129525;</span><span class="section-title-text">Stitch</span></h3>
     <div class="settings-subsection">
       <h4>Compilation Workspace</h4>
       <div class="control-actions">
         <button id="openStitchWorkspaceBtn" type="button">Open Stitch</button>
       </div>
+    </div>
+  </section>
+
+  <section class="settings-section section-albums" id="albums-section">
+    <h3><span class="section-icon" aria-hidden="true">&#128193;</span><span class="section-title-text">Albums</span></h3>
+    <div class="settings-subsection">
+      <h4>Manage</h4>
+      <div class="control-actions">
+        <button id="newAlbumBtn" type="button">+ New Album</button>
+      </div>
+      <div id="albumsList" class="albums-list"></div>
     </div>
   </section>
 
@@ -207,18 +185,40 @@
       </div>
     </div>
   </section>
+
+  <section class="settings-section section-settings" id="settings-nav-section">
+    <h3><span class="section-icon" aria-hidden="true">&#9881;</span><span class="section-title-text">Settings</span></h3>
+    <div class="settings-subsection">
+      <h4>App</h4>
+      <div class="control-actions">
+        <button id="openAppSettingsLink" type="button">Open App Settings</button>
+      </div>
+    </div>
+  </section>
+
+  <section class="settings-section section-file" id="metadata-section">
+    <h3><span class="section-icon" aria-hidden="true">&#128196;</span><span class="section-title-text">Metadata JSON</span></h3>
+    <div class="settings-subsection">
+      <h4>File</h4>
+      <div id="topbar">
+        <button id="pickFileBtn" type="button">Choose JSON</button>
+        <input id="filePath" type="text" placeholder="image_metadata_results.json" />
+        <button id="validateBtn" type="button">Validate</button>
+      </div>
+    </div>
+  </section>
 </div>
 
 <div id="sidebar-icon-dock" aria-label="Sidebar quick sections">
   <button type="button" class="sidebar-icon-dock-btn section-scan" data-section-target="scan-section" title="Scan" aria-label="Scan">&#128270;</button>
-  <button type="button" class="sidebar-icon-dock-btn section-index" data-section-target="index-section" title="Index" aria-label="Index">&#9881;</button>
-  <button type="button" class="sidebar-icon-dock-btn section-file" data-section-target="metadata-section" title="File" aria-label="File">&#128196;</button>
-  <button type="button" class="sidebar-icon-dock-btn section-albums" data-section-target="albums-section" title="Albums" aria-label="Albums">&#128193;</button>
-  <button type="button" class="sidebar-icon-dock-btn section-settings" data-section-target="settings-nav-section" title="Settings" aria-label="Settings">&#9881;</button>
+  <button type="button" class="sidebar-icon-dock-btn section-index" data-section-target="index-section" title="Index" aria-label="Index">&#128736;</button>
   <button type="button" class="sidebar-icon-dock-btn section-wizard" data-section-target="wizard-nav-section" title="Wizard" aria-label="Wizard">
     <img class="sidebar-icon-dock-img" src="./assets/wizard.png" alt="" />
   </button>
   <button type="button" class="sidebar-icon-dock-btn section-reels" data-section-target="reels-nav-section" title="Reels" aria-label="Reels">&#127909;</button>
-  <button type="button" class="sidebar-icon-dock-btn section-stitch" data-section-target="stitch-nav-section" title="Stitch" aria-label="Stitch">ST</button>
+  <button type="button" class="sidebar-icon-dock-btn section-stitch" data-section-target="stitch-nav-section" title="Stitch" aria-label="Stitch">&#129525;</button>
+  <button type="button" class="sidebar-icon-dock-btn section-albums" data-section-target="albums-section" title="Albums" aria-label="Albums">&#128193;</button>
   <button type="button" class="sidebar-icon-dock-btn section-faces" data-section-target="faces-nav-section" title="Faces" aria-label="Faces">&#128100;</button>
+  <button type="button" class="sidebar-icon-dock-btn section-settings" data-section-target="settings-nav-section" title="Settings" aria-label="Settings">&#9881;</button>
+  <button type="button" class="sidebar-icon-dock-btn section-file" data-section-target="metadata-section" title="File" aria-label="File">&#128196;</button>
 </div>

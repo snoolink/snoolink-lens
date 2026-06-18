@@ -1,0 +1,49 @@
+:root {
+  /* Snoolink brand palette sampled from snoolink.com */
+  --sn-bg-950: #111827;
+  --sn-bg-900: #1f2937;
+  --sn-bg-800: #374151;
+  --sn-surface: rgba(17, 24, 39, 0.88);
+  --sn-surface-soft: rgba(31, 41, 55, 0.72);
+
+  --sn-text: #ffffff;
+  --sn-text-secondary: #e5e7eb;
+  --sn-text-muted: #9ca3af;
+
+  --sn-primary: #5d1ef4;
+  --sn-primary-2: #8b5cf6;
+  --sn-accent: #a855f7;
+  --sn-hot: #ec4899;
+
+  --sn-success: #22c55e;
+  --sn-warning: #facc15;
+  --sn-danger: #ef4444;
+
+  --sn-border: rgba(139, 92, 246, 0.34);
+  --sn-border-strong: rgba(168, 85, 247, 0.52);
+
+  /* App-wide semantic aliases */
+  --bg-0: var(--sn-bg-950);
+  --bg-1: var(--sn-bg-900);
+  --bg-2: var(--sn-bg-800);
+  --panel: var(--sn-surface);
+  --panel-soft: var(--sn-surface-soft);
+  --line: var(--sn-border);
+  --line-strong: var(--sn-border-strong);
+  --text: var(--sn-text);
+  --text-secondary: var(--sn-text-secondary);
+  --muted: var(--sn-text-muted);
+  --accent: var(--sn-primary-2);
+  --accent-2: var(--sn-accent);
+  --accent-3: var(--sn-hot);
+  --good: var(--sn-success);
+  --warn: var(--sn-warning);
+
+  --color-background-primary: rgba(17, 24, 39, 0.88);
+  --color-background-secondary: rgba(31, 41, 55, 0.84);
+  --color-text-primary: #f9fafb;
+  --color-text-secondary: #d1d5db;
+  --color-border-primary: rgba(168, 85, 247, 0.6);
+  --color-border-secondary: rgba(139, 92, 246, 0.48);
+  --color-border-tertiary: rgba(139, 92, 246, 0.28);
+}

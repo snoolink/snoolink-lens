@@ -2864,6 +2864,14 @@ async function loadIndexingStageLookup() {
   return payload;
 }
 
+async function loadSuccessfulLocalIndexLookup() {
+  const lookup = await loadIndexingStageLookup();
+  return {
+    byPath: lookup?.localByPath instanceof Set ? lookup.localByPath : new Set(),
+    byId: lookup?.localById instanceof Set ? lookup.localById : new Set(),
+  };
+}
+
 async function readUserSettings() {
   const defaults = {
     enabledFilters: [
@@ -5866,33 +5874,64 @@ ipcMain.handle("backup-app-data", async (event) => {
     const backedUpFiles = [];
     const missingFiles = [];
     const skippedRequiredFiles = [];
+    const manifest = {
+      generated_at: new Date().toISOString(),
+      source_data_dir: DATA_DIR_PATH,
+      backup_dir_name: backupDirName,
+      backup_dir_path: backupDirPath,
+      files: [],
+    };
 
     for (const spec of specs) {
-      if (!(await pathExists(localFilePath))) {
-        return { byPath, byId };
+      const sourcePath = spec.sourcePath;
+      const fileName = String(spec.fileName || "").trim();
+      const isRequired = Boolean(spec.required);
+
+      if (!(await pathExists(sourcePath))) {
+        missingFiles.push({
+          key: spec.key,
+          fileName,
+          sourcePath,
+          required: isRequired,
+          reason: "not_found",
+        });
+        if (isRequired) {
+          skippedRequiredFiles.push(fileName || spec.key);
+        }
+        continue;
       }
 
       try {
-        const payload = JSON.parse(await fs.readFile(localFilePath, "utf-8"));
-        const rows = Array.isArray(payload?.results) ? payload.results : [];
+        const targetPath = path.join(backupDirPath, fileName || path.basename(sourcePath));
+        await fs.copyFile(sourcePath, targetPath);
+        const stat = await fs.stat(targetPath);
 
-        for (const row of rows) {
-          if (String(row?.status || "") !== "ok") {
-            continue;
-          }
-
-          const rowPath = String(row?.path || "").trim();
-          const rowId = Number(row?.id);
-          if (rowPath) {
-            byPath.add(rowPath);
-          }
-          if (Number.isFinite(rowId)) {
-            byId.add(rowId);
-          }
+        backedUpFiles.push({
+          key: spec.key,
+          fileName: fileName || path.basename(sourcePath),
+          sourcePath,
+          targetPath,
+          size_bytes: Number(stat.size) || 0,
+        });
+        manifest.files.push({
+          key: spec.key,
+          file_name: fileName || path.basename(sourcePath),
+          source_path: sourcePath,
+          target_path: targetPath,
+          size_bytes: Number(stat.size) || 0,
+          required: isRequired,
+        });
+      } catch (error) {
+        missingFiles.push({
+          key: spec.key,
+          fileName,
+          sourcePath,
+          required: isRequired,
+          reason: String(error?.message || error),
+        });
+        if (isRequired) {
+          skippedRequiredFiles.push(fileName || spec.key);
         }
-        return { byPath, byId };
-      } catch {
-        return { byPath, byId };
       }
     }
     await fs.writeFile(

@@ -8,9 +8,9 @@
 
 #settings-screen .settings-card {
   background:
-    linear-gradient(155deg, rgba(12, 18, 28, 0.84), rgba(15, 20, 33, 0.84)),
-    radial-gradient(circle at 96% 2%, rgba(106, 187, 255, 0.18), transparent 42%);
-  border: 1px solid rgba(132, 172, 243, 0.25);
+    linear-gradient(155deg, rgba(17, 24, 39, 0.9), rgba(31, 41, 55, 0.86)),
+    radial-gradient(circle at 96% 2%, rgba(139, 92, 246, 0.18), transparent 42%);
+  border: 1px solid var(--sn-border, rgba(139, 92, 246, 0.34));
   border-radius: 18px;
   box-shadow: 0 26px 70px rgba(0, 0, 0, 0.35);
   flex: 0 1 1180px;
@@ -21,7 +21,7 @@
 }
 
 #settings-sidebar:not(.collapsed) ~ #main-content #settings-screen {
-  justify-content: flex-start;
+  justify-content: center;
   padding-left: 14px;
   padding-right: 14px;
   box-sizing: border-box;
@@ -32,16 +32,12 @@
   flex: 1 1 auto;
   max-width: 100%;
   width: 100%;
-  margin-left: 0;
-  margin-right: 0;
-}
-
-#settings-sidebar:not(.collapsed) ~ #main-content #settings-screen .settings-grid {
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  margin-left: auto;
+  margin-right: auto;
 }
 
 #settings-sidebar.collapsed ~ #main-content #settings-screen {
-  justify-content: flex-start;
+  justify-content: center;
   padding-left: 14px;
   padding-right: 14px;
   box-sizing: border-box;
@@ -52,33 +48,18 @@
   flex: 1 1 auto;
   max-width: 1180px;
   width: 100%;
-}
-
-#settings-sidebar.collapsed ~ #main-content #settings-screen .settings-grid {
-  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
-}
-
-@media (max-width: 1100px) {
-  #settings-sidebar:not(.collapsed) ~ #main-content #settings-screen .settings-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-}
-
-@media (max-width: 900px) {
-  #settings-sidebar:not(.collapsed) ~ #main-content #settings-screen .settings-grid,
-  #settings-sidebar.collapsed ~ #main-content #settings-screen .settings-grid {
-    grid-template-columns: 1fr;
-  }
+  margin-left: auto;
+  margin-right: auto;
 }
 
 #settings-screen .settings-header {
-  border-bottom: 1px dashed rgba(146, 177, 234, 0.35);
+  border-bottom: 1px dashed var(--sn-border, rgba(139, 92, 246, 0.34));
   margin-bottom: 1rem;
   padding-bottom: 0.85rem;
 }
 
 #settings-screen .settings-header h2 {
-  color: #f0f5ff;
+  color: var(--sn-text, #ffffff);
   font-family: "Trebuchet MS", "Avenir Next", "Segoe UI", sans-serif;
   font-size: 1.25rem;
   font-weight: 700;
@@ -86,62 +67,157 @@
 }
 
 #settings-screen .settings-header p {
-  color: rgba(214, 229, 255, 0.8);
+  color: var(--sn-text-secondary, #e5e7eb);
   font-size: 0.82rem;
 }
 
 #settings-screen .settings-grid {
-  gap: 14px;
-  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+  display: grid;
+  align-items: start;
+  gap: 16px;
+  grid-template-columns: 1fr;
+  margin-left: auto;
+  margin-right: auto;
+  max-width: 980px;
+  width: 100%;
+}
+
+#settings-screen .settings-block--filters {
+  grid-column: 1 / -1;
+}
+
+#settings-screen .settings-block--user {
+  grid-column: 1 / -1;
+}
+
+#settings-screen .settings-block--cloud {
+  grid-column: 1 / -1;
+}
+
+#settings-screen .settings-block--experience {
+  grid-column: 1 / -1;
+}
+
+#settings-screen .settings-block--face {
+  grid-column: 1 / -1;
 }
 
 #settings-screen .settings-block {
   background:
-    linear-gradient(180deg, rgba(21, 29, 44, 0.78), rgba(16, 23, 37, 0.75));
-  border: 1px solid rgba(123, 162, 231, 0.22);
+    linear-gradient(180deg, rgba(17, 24, 39, 0.82), rgba(31, 41, 55, 0.78));
+  border: 1px solid var(--sn-border, rgba(139, 92, 246, 0.34));
   border-radius: 14px;
-  padding: 0.95rem 1rem;
+  padding: 1rem 1.1rem;
+  position: relative;
+}
+
+#settings-screen .settings-block::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  border-top-left-radius: 14px;
+  border-top-right-radius: 14px;
+  background: linear-gradient(90deg, var(--sn-primary, #5d1ef4), var(--sn-accent, #a855f7));
+}
+
+#settings-screen .settings-block--filters::before {
+  background: linear-gradient(90deg, var(--sn-primary, #5d1ef4), var(--sn-primary-2, #8b5cf6));
+}
+
+#settings-screen .settings-block--user::before {
+  background: linear-gradient(90deg, var(--sn-primary-2, #8b5cf6), var(--sn-accent, #a855f7));
+}
+
+#settings-screen .settings-block--cloud::before {
+  background: linear-gradient(90deg, var(--sn-primary, #5d1ef4), var(--sn-accent, #a855f7));
+}
+
+#settings-screen .settings-block--experience::before {
+  background: linear-gradient(90deg, var(--sn-primary-2, #8b5cf6), var(--sn-hot, #ec4899));
+}
+
+#settings-screen .settings-block--face::before {
+  background: linear-gradient(90deg, var(--sn-accent, #a855f7), var(--sn-hot, #ec4899));
 }
 
 #settings-screen .settings-block h3 {
-  color: rgba(214, 229, 255, 0.87);
+  color: var(--sn-text-secondary, #e5e7eb);
   font-size: 0.72rem;
   letter-spacing: 0.08em;
+  margin: 0 0 12px;
 }
 
 #settings-screen .settings-field {
+  display: flex;
+  flex-direction: column;
   gap: 6px;
+  margin-bottom: 10px;
+}
+
+#settings-screen .settings-field-grid {
+  display: grid;
+  gap: 10px;
+}
+
+#settings-screen .settings-field-grid--two {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+#settings-screen .settings-field--full {
+  grid-column: 1 / -1;
+}
+
+#settings-screen .settings-toggle-grid {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: 1fr;
+  margin-top: 2px;
 }
 
 #settings-screen .settings-field label {
-  color: rgba(212, 227, 252, 0.82);
+  color: var(--sn-text-secondary, #e5e7eb);
   font-size: 0.76rem;
 }
 
 #settings-screen .settings-field input,
 #settings-screen .settings-field select {
-  background: rgba(8, 13, 23, 0.74);
-  border: 1px solid rgba(118, 155, 221, 0.38);
+  background: rgba(17, 24, 39, 0.82);
+  border: 1px solid var(--sn-border, rgba(139, 92, 246, 0.34));
+  box-sizing: border-box;
   border-radius: 10px;
-  color: #e7f0ff;
-  min-height: 34px;
+  color: var(--sn-text, #ffffff);
+  height: 36px;
   padding: 0 10px;
+  width: 100%;
+}
+
+#settings-screen .settings-field--full input,
+#settings-screen .settings-field--full select {
+  max-width: 620px;
 }
 
 #settings-screen .settings-field input:focus,
 #settings-screen .settings-field select:focus {
-  border-color: rgba(142, 188, 255, 0.66);
-  box-shadow: 0 0 0 3px rgba(102, 170, 255, 0.2);
+  border-color: var(--sn-border-strong, rgba(168, 85, 247, 0.52));
+  box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.2);
 }
 
 #settings-screen .settings-field-checkbox label {
   align-items: center;
+  background: rgba(31, 41, 55, 0.45);
+  border: 1px solid var(--sn-border, rgba(139, 92, 246, 0.34));
+  border-radius: 9px;
   display: flex;
   gap: 8px;
+  min-height: 36px;
+  padding: 6px 9px;
 }
 
 #settings-screen .settings-field-checkbox input[type="checkbox"] {
-  accent-color: #7fb2ff;
+  accent-color: var(--sn-primary-2, #8b5cf6);
   height: 15px;
   width: 15px;
 }
@@ -149,11 +225,12 @@
 #settings-screen .settings-inline-actions {
   align-items: center;
   display: flex;
+  flex-wrap: wrap;
   gap: 8px;
 }
 
 #settings-screen .settings-help-text {
-  color: rgba(176, 202, 242, 0.88);
+  color: var(--sn-text-muted, #9ca3af);
   display: block;
   font-size: 0.72rem;
 }
@@ -166,38 +243,66 @@
 
 #settings-screen .settings-chk-list label {
   align-items: center;
-  background: rgba(14, 21, 34, 0.54);
-  border: 1px solid rgba(121, 156, 227, 0.24);
+  background: rgba(31, 41, 55, 0.45);
+  border: 1px solid var(--sn-border, rgba(139, 92, 246, 0.34));
   border-radius: 9px;
-  color: #deebff;
+  color: var(--sn-text-secondary, #e5e7eb);
   display: flex;
   font-size: 0.78rem;
   gap: 8px;
   padding: 7px 8px;
 }
 
+@media (max-width: 1300px) {
+  #settings-screen .settings-block--filters,
+  #settings-screen .settings-block--user,
+  #settings-screen .settings-block--cloud,
+  #settings-screen .settings-block--experience,
+  #settings-screen .settings-block--face {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (max-width: 950px) {
+  #settings-screen .settings-grid {
+    grid-template-columns: 1fr;
+  }
+
+  #settings-screen .settings-block--filters,
+  #settings-screen .settings-block--user,
+  #settings-screen .settings-block--cloud,
+  #settings-screen .settings-block--experience,
+  #settings-screen .settings-block--face {
+    grid-column: 1 / -1;
+  }
+
+  #settings-screen .settings-field-grid--two {
+    grid-template-columns: 1fr;
+  }
+}
+
 #settings-screen .settings-actions {
-  border-top-color: rgba(138, 171, 237, 0.3);
+  border-top: 1px solid var(--sn-border, rgba(139, 92, 246, 0.34));
   margin-top: 1rem;
   padding-top: 1rem;
 }
 
 #settings-screen .settings-btn {
-  border: 1px solid rgba(129, 167, 234, 0.45);
+  border: 1px solid var(--sn-border-strong, rgba(168, 85, 247, 0.52));
   border-radius: 11px;
-  color: #e4efff;
+  color: var(--sn-text-secondary, #e5e7eb);
   min-height: 34px;
   padding: 0 14px;
 }
 
 #settings-screen .settings-btn:hover {
-  background: rgba(116, 157, 233, 0.2);
+  background: rgba(139, 92, 246, 0.2);
 }
 
 #settings-screen .settings-btn--primary {
-  background: linear-gradient(135deg, #6bc5ff, #6e8fff);
+  background: linear-gradient(135deg, var(--sn-primary, #5d1ef4), var(--sn-accent, #a855f7));
   border-color: transparent;
-  color: #081122;
+  color: #ffffff;
 }
 
 #settings-screen .settings-btn--primary:hover {

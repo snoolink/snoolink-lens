@@ -5,8 +5,8 @@
   </div>
 
   <div class="settings-grid">
-    <div class="settings-block">
-      <h3>Visible filters</h3>
+    <div class="settings-block settings-block--filters">
+      <h3>VISIBLE FILTERS</h3>
       <div class="settings-chk-list" id="userFilterPicker"></div>
       <div class="settings-field">
         <label for="settingsMinMatchScore">Min. match score</label>
@@ -14,145 +14,155 @@
       </div>
     </div>
 
-    <div class="settings-block">
-      <h3>User</h3>
-      <div class="settings-field">
-        <label for="settingsUserName">User name</label>
-        <input id="settingsUserName" type="text" placeholder="Enter user name" />
-      </div>
-      <div class="settings-field">
-        <label for="settingsUserPassword">Password</label>
-        <input id="settingsUserPassword" type="password" placeholder="Enter password" />
-      </div>
-    </div>
-
-    <div class="settings-block">
-      <h3>Cloud runtime</h3>
-      <div class="settings-field">
-        <label for="settingsAwsRegion">AWS region</label>
-        <input id="settingsAwsRegion" type="text" placeholder="us-east-1" />
-      </div>
-      <div class="settings-field">
-        <label for="settingsAwsKey">Access key</label>
-        <input id="settingsAwsKey" type="password" placeholder="AWS access key" />
-      </div>
-      <div class="settings-field">
-        <label for="settingsAwsSecret">Secret key</label>
-        <input id="settingsAwsSecret" type="password" placeholder="AWS secret key" />
-      </div>
-      <div class="settings-field">
-        <label for="settingsBedrockModel">Bedrock vision model</label>
-        <input id="settingsBedrockModel" type="text" placeholder="qwen.qwen3-vl-235b-a22b" />
-      </div>
-      <div class="settings-field">
-        <label for="settingsTwelveLabsApiKey">TwelveLabs API key</label>
-        <input id="settingsTwelveLabsApiKey" type="password" placeholder="tlk_..." />
+    <div class="settings-block settings-block--user">
+      <h3>USER</h3>
+      <div class="settings-field-grid settings-field-grid--two">
+        <div class="settings-field">
+          <label for="settingsUserName">User name</label>
+          <input id="settingsUserName" type="text" placeholder="Enter user name" />
+        </div>
+        <div class="settings-field">
+          <label for="settingsUserPassword">Password</label>
+          <input id="settingsUserPassword" type="password" placeholder="Enter password" />
+        </div>
       </div>
     </div>
 
-    <div class="settings-block">
-      <h3>Experience</h3>
-      <div class="settings-field">
-        <label for="settingsUiTheme">Theme mood</label>
-        <select id="settingsUiTheme">
-          <option value="aurora">Aurora (default)</option>
-          <option value="ocean">Ocean</option>
-          <option value="ember">Ember</option>
-        </select>
-      </div>
-      <div class="settings-field">
-        <label for="settingsResultsDensity">Gallery density</label>
-        <select id="settingsResultsDensity">
-          <option value="compact">Compact</option>
-          <option value="comfortable">Comfortable</option>
-          <option value="cinematic">Cinematic</option>
-        </select>
-      </div>
-      <div class="settings-field settings-field-checkbox">
-        <label>
-          <input id="settingsAutoExpandFilters" type="checkbox" />
-          Auto-expand filters on Home
-        </label>
-      </div>
-      <div class="settings-field settings-field-checkbox">
-        <label>
-          <input id="settingsAutoCloseSidebarOnSettingsNav" type="checkbox" />
-          Auto-close sidebar after opening Settings page
-        </label>
-      </div>
-      <div class="settings-field settings-field-checkbox">
-        <label>
-          <input id="settingsGalleryVideoAutoplay" type="checkbox" />
-          Autoplay videos in gallery
-        </label>
-      </div>
-      <div class="settings-field settings-field-checkbox">
-        <label>
-          <input id="settingsEnableTooltips" type="checkbox" />
-          Enable tooltips
-        </label>
-      </div>
-      <div class="settings-field settings-field-checkbox">
-        <label>
-          <input id="settingsCacheTranscodedMovPreview" type="checkbox" />
-          Cache transcoded compatible previews (MOV)
-        </label>
-      </div>
-      <div class="settings-field settings-field-checkbox">
-        <label>
-          <input id="settingsCacheTranscodedHeicPreview" type="checkbox" />
-          Cache transcoded compatible previews (HEIC)
-        </label>
-      </div>
-      <div class="settings-field settings-field-checkbox">
-        <label>
-          <input id="settingsCacheTranscodedHeifPreview" type="checkbox" />
-          Cache transcoded compatible previews (HEIF)
-        </label>
-      </div>
-      <div class="settings-field">
-        <label for="settingsVideoSearchResultMode">Video search results</label>
-        <select id="settingsVideoSearchResultMode">
-          <option value="full_video">Return full video</option>
-          <option value="matching_timeframes">Return matching timeframes (clip-like)</option>
-        </select>
+    <div class="settings-block settings-block--cloud">
+      <h3>CLOUD RUNTIME</h3>
+      <div class="settings-field-grid settings-field-grid--two">
+        <div class="settings-field">
+          <label for="settingsAwsRegion">AWS region</label>
+          <input id="settingsAwsRegion" type="text" placeholder="us-east-1" />
+        </div>
+        <div class="settings-field">
+          <label for="settingsBedrockModel">Bedrock vision model</label>
+          <input id="settingsBedrockModel" type="text" placeholder="qwen.qwen3-vl-235b-a22b" />
+        </div>
+        <div class="settings-field">
+          <label for="settingsAwsKey">Access key</label>
+          <input id="settingsAwsKey" type="password" placeholder="AWS access key" />
+        </div>
+        <div class="settings-field">
+          <label for="settingsAwsSecret">Secret key</label>
+          <input id="settingsAwsSecret" type="password" placeholder="AWS secret key" />
+        </div>
+        <div class="settings-field settings-field--full">
+          <label for="settingsTwelveLabsApiKey">TwelveLabs API key</label>
+          <input id="settingsTwelveLabsApiKey" type="password" placeholder="tlk_..." />
+        </div>
       </div>
     </div>
 
-    <div class="settings-block">
-      <h3>Local Face Indexing</h3>
+    <div class="settings-block settings-block--experience">
+      <h3>EXPERIENCE</h3>
+      <div class="settings-field-grid settings-field-grid--two">
+        <div class="settings-field">
+          <label for="settingsUiTheme">Theme mood</label>
+          <select id="settingsUiTheme">
+            <option value="aurora">Aurora (default)</option>
+            <option value="ocean">Ocean</option>
+            <option value="ember">Ember</option>
+          </select>
+        </div>
+        <div class="settings-field">
+          <label for="settingsResultsDensity">Gallery density</label>
+          <select id="settingsResultsDensity">
+            <option value="compact">Compact</option>
+            <option value="comfortable">Comfortable</option>
+            <option value="cinematic">Cinematic</option>
+          </select>
+        </div>
+        <div class="settings-field settings-field--full">
+          <label for="settingsVideoSearchResultMode">Video search results</label>
+          <select id="settingsVideoSearchResultMode">
+            <option value="full_video">Return full video</option>
+            <option value="matching_timeframes">Return matching timeframes (clip-like)</option>
+          </select>
+        </div>
+      </div>
+      <div class="settings-toggle-grid">
+        <div class="settings-field settings-field-checkbox">
+          <label>
+            <input id="settingsAutoExpandFilters" type="checkbox" />
+            Auto-expand filters on Home
+          </label>
+        </div>
+        <div class="settings-field settings-field-checkbox">
+          <label>
+            <input id="settingsAutoCloseSidebarOnSettingsNav" type="checkbox" />
+            Auto-close sidebar after opening Settings page
+          </label>
+        </div>
+        <div class="settings-field settings-field-checkbox">
+          <label>
+            <input id="settingsGalleryVideoAutoplay" type="checkbox" />
+            Autoplay videos in gallery
+          </label>
+        </div>
+        <div class="settings-field settings-field-checkbox">
+          <label>
+            <input id="settingsEnableTooltips" type="checkbox" />
+            Enable tooltips
+          </label>
+        </div>
+        <div class="settings-field settings-field-checkbox">
+          <label>
+            <input id="settingsCacheTranscodedMovPreview" type="checkbox" />
+            Cache transcoded compatible previews (MOV)
+          </label>
+        </div>
+        <div class="settings-field settings-field-checkbox">
+          <label>
+            <input id="settingsCacheTranscodedHeicPreview" type="checkbox" />
+            Cache transcoded compatible previews (HEIC)
+          </label>
+        </div>
+        <div class="settings-field settings-field-checkbox">
+          <label>
+            <input id="settingsCacheTranscodedHeifPreview" type="checkbox" />
+            Cache transcoded compatible previews (HEIF)
+          </label>
+        </div>
+      </div>
+    </div>
+
+    <div class="settings-block settings-block--face">
+      <h3>LOCAL FACE INDEXING</h3>
       <div class="settings-field settings-field-checkbox">
         <label>
           <input id="settingsEnableFaceIndexing" type="checkbox" />
           Enable local face indexing during local indexing
         </label>
       </div>
-      <div class="settings-field">
-        <label for="settingsFaceModelVersion">Face model version</label>
-        <input id="settingsFaceModelVersion" type="text" placeholder="face-api-ssd-v1" />
-        <small class="settings-help-text">Use face-api-ssd-v1 for higher accuracy, face-api-tiny-v1 for speed.</small>
-      </div>
-      <div class="settings-field">
-        <label for="settingsFaceMinConfidence">Min detection confidence</label>
-        <input id="settingsFaceMinConfidence" type="number" min="0" max="1" step="0.01" value="0.6" />
-      </div>
-      <div class="settings-field">
-        <label for="settingsFaceMinQuality">Min face quality score</label>
-        <input id="settingsFaceMinQuality" type="number" min="0" max="1" step="0.01" value="0.45" />
-      </div>
-      <div class="settings-field">
-        <label for="settingsFaceClusterDistanceThreshold">Cluster distance threshold</label>
-        <input id="settingsFaceClusterDistanceThreshold" type="number" min="0.05" max="1" step="0.01" value="0.2" />
-      </div>
-      <div class="settings-field">
-        <label for="settingsFaceClusterSelect">Detected people (cluster)</label>
-        <select id="settingsFaceClusterSelect">
-          <option value="">No face clusters yet</option>
-        </select>
-      </div>
-      <div class="settings-field">
-        <label for="settingsFaceClusterLabel">Person label</label>
-        <input id="settingsFaceClusterLabel" type="text" placeholder="e.g. john, client-a" />
+      <div class="settings-field-grid settings-field-grid--two">
+        <div class="settings-field settings-field--full">
+          <label for="settingsFaceModelVersion">Face model version</label>
+          <input id="settingsFaceModelVersion" type="text" placeholder="face-api-ssd-v1" />
+          <small class="settings-help-text">Use face-api-ssd-v1 for higher accuracy, face-api-tiny-v1 for speed.</small>
+        </div>
+        <div class="settings-field">
+          <label for="settingsFaceMinConfidence">Min detection confidence</label>
+          <input id="settingsFaceMinConfidence" type="number" min="0" max="1" step="0.01" value="0.6" />
+        </div>
+        <div class="settings-field">
+          <label for="settingsFaceMinQuality">Min face quality score</label>
+          <input id="settingsFaceMinQuality" type="number" min="0" max="1" step="0.01" value="0.45" />
+        </div>
+        <div class="settings-field settings-field--full">
+          <label for="settingsFaceClusterDistanceThreshold">Cluster distance threshold</label>
+          <input id="settingsFaceClusterDistanceThreshold" type="number" min="0.05" max="1" step="0.01" value="0.2" />
+        </div>
+        <div class="settings-field">
+          <label for="settingsFaceClusterSelect">Detected people (cluster)</label>
+          <select id="settingsFaceClusterSelect">
+            <option value="">No face clusters yet</option>
+          </select>
+        </div>
+        <div class="settings-field">
+          <label for="settingsFaceClusterLabel">Person label</label>
+          <input id="settingsFaceClusterLabel" type="text" placeholder="e.g. john, client-a" />
+        </div>
       </div>
       <div class="settings-field settings-inline-actions">
         <button class="settings-btn" id="settingsSaveFaceClusterLabelBtn" type="button">Save person label</button>

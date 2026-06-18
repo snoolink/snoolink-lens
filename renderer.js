@@ -1800,6 +1800,13 @@ function hasActiveGalleryFilters(filters) {
 
 function initializeSidebarSectionToggles() {
   const sections = Array.from(document.querySelectorAll("#sidebar-content .settings-section"));
+  const directNavSectionActionButtonIds = new Map([
+    ["settings-nav-section", "openAppSettingsLink"],
+    ["wizard-nav-section", "openWizardWorkspaceBtn"],
+    ["reels-nav-section", "openReelAnalyzerBtn"],
+    ["stitch-nav-section", "openStitchWorkspaceBtn"],
+    ["faces-nav-section", "openFacesWorkspaceBtn"],
+  ]);
 
   function setSectionExpanded(section, expanded) {
     section.classList.toggle("collapsed", !expanded);
@@ -1817,6 +1824,7 @@ function initializeSidebarSectionToggles() {
 
   for (const section of sections) {
     if (section.querySelector(":scope > .settings-section-header")) {
+      setSectionExpanded(section, false);
       continue;
     }
 
@@ -1829,19 +1837,29 @@ function initializeSidebarSectionToggles() {
     header.className = "settings-section-header";
     header.setAttribute("role", "button");
     header.setAttribute("tabindex", "0");
-    header.setAttribute("aria-expanded", "true");
-
-    const toggleBtn = document.createElement("button");
-    toggleBtn.className = "section-toggle-btn";
-    toggleBtn.type = "button";
-    toggleBtn.textContent = "▾";
-    toggleBtn.setAttribute("aria-label", `Toggle ${heading.textContent || "section"}`);
+    header.setAttribute("aria-expanded", "false");
 
     const body = document.createElement("div");
     body.className = "settings-section-body";
 
+    const directActionButtonId = directNavSectionActionButtonIds.get(section.id);
+    const directActionButton = directActionButtonId
+      ? document.getElementById(directActionButtonId)
+      : null;
+
     header.appendChild(heading);
-    header.appendChild(toggleBtn);
+    if (!directActionButton) {
+      const toggleBtn = document.createElement("button");
+      toggleBtn.className = "section-toggle-btn";
+      toggleBtn.type = "button";
+      toggleBtn.textContent = "▾";
+      toggleBtn.setAttribute("aria-label", `Toggle ${heading.textContent || "section"}`);
+      toggleBtn.addEventListener("click", (event) => {
+        event.stopPropagation();
+        toggleSection();
+      });
+      header.appendChild(toggleBtn);
+    }
     section.insertBefore(header, section.firstChild);
 
     const remainingChildren = Array.from(section.children).filter(
@@ -1864,10 +1882,27 @@ function initializeSidebarSectionToggles() {
       setSectionExpanded(section, false);
     }
 
-    toggleBtn.addEventListener("click", (event) => {
-      event.stopPropagation();
-      toggleSection();
-    });
+    if (directActionButton) {
+      section.classList.add("settings-section-direct-nav", "collapsed");
+      header.setAttribute("aria-expanded", "false");
+      header.setAttribute("aria-label", `Open ${heading.textContent || "section"}`);
+
+      const openDirectSection = () => {
+        directActionButton.click();
+      };
+
+      header.addEventListener("click", () => {
+        openDirectSection();
+      });
+
+      header.addEventListener("keydown", (event) => {
+        if (event.key === "Enter" || event.key === " ") {
+          event.preventDefault();
+          openDirectSection();
+        }
+      });
+      continue;
+    }
 
     header.addEventListener("click", () => {
       toggleSection();
@@ -1879,6 +1914,8 @@ function initializeSidebarSectionToggles() {
         toggleSection();
       }
     });
+
+    setSectionExpanded(section, false);
   }
 
   // Initialize ARIA states from current collapsed classes.
@@ -4822,7 +4859,7 @@ if (sidebarMidToggleBtn) {
   });
 }
 
-document.addEventListener("click", (event) => {
+function handleOutsideSidebarInteraction(event) {
   if (!settingsSidebar || settingsSidebar.classList.contains("collapsed")) {
     return;
   }
@@ -4844,7 +4881,27 @@ document.addEventListener("click", (event) => {
   }
 
   closeSidebar();
-});
+}
+
+// Capture pointer events early so outside-close still works when inner controls stop propagation.
+document.addEventListener("pointerdown", handleOutsideSidebarInteraction, true);
+document.addEventListener("click", handleOutsideSidebarInteraction);
+
+function closeSidebarIfOpen() {
+  if (!settingsSidebar || settingsSidebar.classList.contains("collapsed")) {
+    return;
+  }
+  closeSidebar();
+}
+
+const outsideSidebarIframes = [wizardSearchFrame, reelAnalyzerFrame, stitchFrame].filter(
+  (frame) => frame instanceof HTMLIFrameElement,
+);
+
+for (const frame of outsideSidebarIframes) {
+  frame.addEventListener("pointerdown", closeSidebarIfOpen, true);
+  frame.addEventListener("focus", closeSidebarIfOpen, true);
+}
 
 const sidebarIconDockButtons = Array.from(document.querySelectorAll("#sidebar-icon-dock [data-section-target]"));
 for (const dockButton of sidebarIconDockButtons) {

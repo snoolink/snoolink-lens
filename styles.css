@@ -27,8 +27,8 @@ html::-webkit-scrollbar-thumb {
 }
 
 body {
-  background-color: #1e1e1e;
-  color: #ccc;
+  background-color: var(--bg-0, #111827);
+  color: var(--text-secondary, #e5e7eb);
   font-family: "Segoe UI", "Rubik", system-ui, sans-serif;
   font-weight: 400;
   line-height: 1.5;
@@ -58,26 +58,26 @@ select {
 
 select option,
 select optgroup {
-  background-color: #141b2a;
-  color: #e7eeff;
+  background-color: var(--color-background-primary, #111827);
+  color: var(--color-text-primary, #f9fafb);
 }
 
 select option:checked {
-  background-color: #315f9f !important;
-  color: #f5f9ff !important;
+  background-color: var(--sn-primary, #5d1ef4) !important;
+  color: var(--sn-text, #ffffff) !important;
 }
 
 select option:hover,
 select option:focus,
 select option:active {
-  background-color: #254a7f !important;
-  color: #f5f9ff !important;
+  background-color: var(--sn-primary-2, #8b5cf6) !important;
+  color: var(--sn-text, #ffffff) !important;
 }
 
 /* Multi-select listbox selected rows */
 select[multiple] option:checked {
-  background-color: #3a6bb0 !important;
-  color: #f8fbff !important;
+  background-color: var(--sn-accent, #a855f7) !important;
+  color: var(--sn-text, #ffffff) !important;
 }
 
 /* ── App Shell ───────────────────────────────── */
@@ -388,7 +388,7 @@ select[multiple] option:checked {
 .sidebar-nav-icon {
   align-items: center;
   display: inline-flex;
-  font-size: 1rem;
+  font-size: 5rem;
   height: 20px;
   justify-content: center;
   width: 20px;
@@ -460,21 +460,27 @@ select[multiple] option:checked {
 }
 
 .section-toggle-btn {
-  background: rgba(130, 164, 255, 0.14);
-  border: 1px solid rgba(141, 175, 255, 0.32);
+  align-items: center;
+  background: rgba(93, 30, 244, 0.28);
+  border: 1px solid rgba(168, 85, 247, 0.72);
   border-radius: 999px;
-  color: #dce8ff;
-  font-size: 0.72rem;
+  color: #ffffff;
+  display: inline-flex;
+  font-size: 1rem;
   font-weight: 700;
-  height: 26px;
-  min-width: 26px;
+  height: 32px;
+  justify-content: center;
+  line-height: 1;
+  min-width: 32px;
   padding: 0;
+  text-shadow: 0 0 8px rgba(168, 85, 247, 0.5);
+  transition: background 140ms ease, border-color 140ms ease, transform 140ms ease;
 }
 
 .section-toggle-btn:hover,
 .section-toggle-btn:focus-visible {
-  background: rgba(130, 164, 255, 0.26);
-  border-color: rgba(174, 198, 255, 0.52);
+  background: rgba(139, 92, 246, 0.4);
+  border-color: rgba(192, 132, 252, 0.85);
 }
 
 .settings-section.collapsed .settings-section-body {
@@ -483,6 +489,20 @@ select[multiple] option:checked {
 
 .settings-section.collapsed .section-toggle-btn {
   transform: rotate(-90deg);
+}
+
+.settings-section.settings-section-direct-nav .settings-section-body {
+  display: none;
+}
+
+.settings-section.settings-section-direct-nav .settings-section-header::after {
+  content: "Open";
+  color: rgba(202, 220, 255, 0.8);
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  margin-left: auto;
+  text-transform: uppercase;
 }
 
 .settings-checkbox-list {
