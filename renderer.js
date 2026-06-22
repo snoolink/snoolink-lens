@@ -1644,6 +1644,58 @@ function clampSearchText(value, maxChars) {
   return `${text.slice(0, Math.max(0, maxChars - 1))}…`;
 }
 
+function normalizeUiTextForComparison(value) {
+  return String(value || "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
+}
+
+function isLikelyDuplicateTitleAndDescription(title, description) {
+  const normalizedTitle = normalizeUiTextForComparison(title);
+  const normalizedDescription = normalizeUiTextForComparison(description);
+
+  if (!normalizedTitle || !normalizedDescription) {
+    return false;
+  }
+
+  return (
+    normalizedTitle === normalizedDescription
+    || normalizedDescription.includes(normalizedTitle)
+    || normalizedTitle.includes(normalizedDescription)
+  );
+}
+
+function isLikelyPathOrLocationDescription(description, fullPath) {
+  const rawDescription = String(description || "").trim();
+  if (!rawDescription) {
+    return false;
+  }
+
+  const normalizedDescription = normalizeUiTextForComparison(rawDescription);
+  const normalizedPath = normalizeUiTextForComparison(fullPath);
+  const pathDir = String(fullPath || "").replace(/[\\/][^\\/]*$/, "");
+  const normalizedDir = normalizeUiTextForComparison(pathDir);
+
+  if (/^(image|video)\s+from\s+/i.test(rawDescription)) {
+    return true;
+  }
+
+  if (rawDescription.includes("\\") || rawDescription.includes("/") || /^https?:\/\//i.test(rawDescription)) {
+    return true;
+  }
+
+  if (normalizedPath && normalizedDescription && (normalizedPath.includes(normalizedDescription) || normalizedDescription.includes(normalizedPath))) {
+    return true;
+  }
+
+  if (normalizedDir && normalizedDescription && (normalizedDir.includes(normalizedDescription) || normalizedDescription.includes(normalizedDir))) {
+    return true;
+  }
+
+  return false;
+}
+
 function toCompactSearchResultRow(row) {
   const input = row && typeof row === "object" ? row : {};
   const metadata = input?.metadata && typeof input.metadata === "object" ? input.metadata : {};
@@ -3256,9 +3308,19 @@ function renderResults(results, options = {}) {
     const clipStartSeconds = Number(row?.clip_start_seconds);
     const clipEndSeconds = Number(row?.clip_end_seconds);
 
-    node.querySelector(".title").textContent = title;
+    const titleEl = node.querySelector(".title");
+    const hideGalleryTitle = isWelcome
+      ? true
+      : isLikelyDuplicateTitleAndDescription(title, desc);
+    titleEl.textContent = hideGalleryTitle ? "" : title;
+    titleEl.style.display = hideGalleryTitle ? "none" : "";
     node.querySelector(".score").textContent = isWelcome ? "Library" : `Score: ${Number(row.score || 0).toFixed(3)}`;
-    node.querySelector(".desc").textContent = desc;
+
+    const descEl = node.querySelector(".desc");
+    const hidePathLikeDescription = isLikelyPathOrLocationDescription(desc, imagePath);
+    descEl.textContent = hidePathLikeDescription ? "" : desc;
+    descEl.style.display = hidePathLikeDescription ? "none" : "";
+
     node.querySelector(".tags").textContent = tags ? `Tags: ${tags}` : "";
     node.querySelector(".objects").textContent = objects ? `Objects: ${objects}` : "";
     node.querySelector(".path").textContent = row.path || row.image_path || "";

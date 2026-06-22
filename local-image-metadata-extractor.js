@@ -288,6 +288,27 @@ function exifOrientationSwapsDimensions(orientation) {
 }
 
 /**
+ * Resolve display dimensions after applying EXIF orientation swap rules.
+ * @param {number|null} width - Encoded width.
+ * @param {number|null} height - Encoded height.
+ * @param {number|null} orientation - EXIF orientation value.
+ * @returns {{width:number,height:number}} Display width/height.
+ */
+function getDisplayDimensionsFromOrientation(width, height, orientation) {
+  const w = Number(width || 0);
+  const h = Number(height || 0);
+  if (!Number.isFinite(w) || w <= 0 || !Number.isFinite(h) || h <= 0) {
+    return { width: 0, height: 0 };
+  }
+
+  if (exifOrientationSwapsDimensions(orientation)) {
+    return { width: h, height: w };
+  }
+
+  return { width: w, height: h };
+}
+
+/**
  * Apply EXIF-based fallback for core image_info fields when decoder metadata is unavailable.
  * @param {object} imageInfo - Extracted image_info payload.
  * @param {object|null} exif - Extracted EXIF payload.
@@ -305,11 +326,22 @@ function applyExifImageInfoFallback(imageInfo, exif, filePath) {
   const exifWidthRaw = parseExifNumber(exif?.dimensions?.width);
   const exifHeightRaw = parseExifNumber(exif?.dimensions?.height);
   const hasExifDimensions = Number.isFinite(exifWidthRaw) && exifWidthRaw > 0 && Number.isFinite(exifHeightRaw) && exifHeightRaw > 0;
+  const exifDisplay = getDisplayDimensionsFromOrientation(exifWidthRaw, exifHeightRaw, exifOrientation);
+  const hasExifDisplayDimensions = Number.isFinite(exifDisplay.width) && exifDisplay.width > 0 && Number.isFinite(exifDisplay.height) && exifDisplay.height > 0;
 
-  if (!hasDimensions && hasExifDimensions) {
-    const swap = exifOrientationSwapsDimensions(exifOrientation);
-    next.width = swap ? exifHeightRaw : exifWidthRaw;
-    next.height = swap ? exifWidthRaw : exifHeightRaw;
+  if (!hasDimensions && hasExifDisplayDimensions) {
+    next.width = exifDisplay.width;
+    next.height = exifDisplay.height;
+  } else if (hasDimensions && hasExifDimensions && hasExifDisplayDimensions) {
+    const closeToRaw = Math.abs(currentWidth - exifWidthRaw) <= 1 && Math.abs(currentHeight - exifHeightRaw) <= 1;
+    const closeToDisplay = Math.abs(currentWidth - exifDisplay.width) <= 1 && Math.abs(currentHeight - exifDisplay.height) <= 1;
+
+    // If decoder dimensions match encoded EXIF dimensions for a rotated image,
+    // normalize to display dimensions to keep filtering/orientation accurate.
+    if (!closeToDisplay && closeToRaw && exifOrientationSwapsDimensions(exifOrientation)) {
+      next.width = exifDisplay.width;
+      next.height = exifDisplay.height;
+    }
   }
 
   const width = Number(next.width || 0);
@@ -621,11 +653,30 @@ async function extractImageInfo(filePath) {
     const metadata = await image.metadata();
     const stats = await image.stats();
 
-    // Use auto-oriented dimensions when available so EXIF rotation is respected cross-platform.
-    const width = Number(metadata?.autoOrient?.width || metadata.width || 0) || null;
-    const height = Number(metadata?.autoOrient?.height || metadata.height || 0) || null;
-    const aspectRatio = width / height;
-    const totalPixels = width * height;
+    const autoOrientWidth = Number(metadata?.autoOrient?.width || 0);
+    const autoOrientHeight = Number(metadata?.autoOrient?.height || 0);
+    const hasAutoOrientDimensions =
+      Number.isFinite(autoOrientWidth) && autoOrientWidth > 0 &&
+      Number.isFinite(autoOrientHeight) && autoOrientHeight > 0;
+
+    let width = null;
+    let height = null;
+
+    // Prefer auto-oriented dimensions; otherwise derive display dimensions from orientation tag.
+    if (hasAutoOrientDimensions) {
+      width = autoOrientWidth;
+      height = autoOrientHeight;
+    } else {
+      const encodedWidth = Number(metadata?.width || 0);
+      const encodedHeight = Number(metadata?.height || 0);
+      const orientationTag = parseExifNumber(metadata?.orientation);
+      const display = getDisplayDimensionsFromOrientation(encodedWidth, encodedHeight, orientationTag);
+      width = display.width > 0 ? display.width : null;
+      height = display.height > 0 ? display.height : null;
+    }
+
+    const aspectRatio = Number.isFinite(width) && width > 0 && Number.isFinite(height) && height > 0 ? width / height : null;
+    const totalPixels = Number.isFinite(width) && Number.isFinite(height) ? width * height : null;
     const orientation = classifyOrientationFromAspectRatio(aspectRatio);
     const sizeCategory = categorizeImageSizeByPixels(totalPixels);
     const megapixels = calculateMegapixels(width, height);
@@ -633,7 +684,7 @@ async function extractImageInfo(filePath) {
     return {
       width,
       height,
-      aspect_ratio: Math.round(aspectRatio * 100) / 100,
+      aspect_ratio: Number.isFinite(aspectRatio) ? Math.round(aspectRatio * 100) / 100 : null,
       aspect_ratio_string: getAspectRatioString(aspectRatio),
       orientation,
       format: metadata.format,
