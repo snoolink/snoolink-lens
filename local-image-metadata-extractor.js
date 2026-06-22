@@ -278,6 +278,42 @@ function parseExifNumber(value) {
 }
 
 /**
+ * Parse EXIF orientation from numeric or translated string values.
+ * @param {unknown} value - Raw EXIF orientation value.
+ * @returns {number|null} EXIF orientation integer (1-8) or null.
+ */
+function parseExifOrientation(value) {
+  const numeric = parseExifNumber(value);
+  if (Number.isFinite(numeric) && numeric >= 1 && numeric <= 8) {
+    return numeric;
+  }
+
+  const raw = Array.isArray(value) ? value[0] : value;
+  const text = String(raw || "").trim().toLowerCase();
+  if (!text) {
+    return null;
+  }
+
+  const orientationMap = {
+    "horizontal (normal)": 1,
+    "normal": 1,
+    "mirror horizontal": 2,
+    "mirrored horizontal": 2,
+    "rotate 180": 3,
+    "mirror vertical": 4,
+    "mirrored vertical": 4,
+    "mirror horizontal and rotate 270 cw": 5,
+    "mirrored horizontal then rotated 270 cw": 5,
+    "rotate 90 cw": 6,
+    "mirror horizontal and rotate 90 cw": 7,
+    "mirrored horizontal then rotated 90 cw": 7,
+    "rotate 270 cw": 8,
+  };
+
+  return orientationMap[text] ?? null;
+}
+
+/**
  * Determine whether EXIF orientation implies display dimension swap.
  * @param {number|null} orientation - EXIF orientation value.
  * @returns {boolean} True when width/height should be swapped.
@@ -322,16 +358,19 @@ function applyExifImageInfoFallback(imageInfo, exif, filePath) {
   const currentHeight = Number(next.height || 0);
   const hasDimensions = Number.isFinite(currentWidth) && currentWidth > 0 && Number.isFinite(currentHeight) && currentHeight > 0;
 
-  const exifOrientation = parseExifNumber(exif?.orientation);
+  const exifOrientation = parseExifOrientation(exif?.orientation);
   const exifWidthRaw = parseExifNumber(exif?.dimensions?.width);
   const exifHeightRaw = parseExifNumber(exif?.dimensions?.height);
   const hasExifDimensions = Number.isFinite(exifWidthRaw) && exifWidthRaw > 0 && Number.isFinite(exifHeightRaw) && exifHeightRaw > 0;
   const exifDisplay = getDisplayDimensionsFromOrientation(exifWidthRaw, exifHeightRaw, exifOrientation);
   const hasExifDisplayDimensions = Number.isFinite(exifDisplay.width) && exifDisplay.width > 0 && Number.isFinite(exifDisplay.height) && exifDisplay.height > 0;
 
+  let dimensionsAdjusted = false;
+
   if (!hasDimensions && hasExifDisplayDimensions) {
     next.width = exifDisplay.width;
     next.height = exifDisplay.height;
+    dimensionsAdjusted = true;
   } else if (hasDimensions && hasExifDimensions && hasExifDisplayDimensions) {
     const closeToRaw = Math.abs(currentWidth - exifWidthRaw) <= 1 && Math.abs(currentHeight - exifHeightRaw) <= 1;
     const closeToDisplay = Math.abs(currentWidth - exifDisplay.width) <= 1 && Math.abs(currentHeight - exifDisplay.height) <= 1;
@@ -341,6 +380,7 @@ function applyExifImageInfoFallback(imageInfo, exif, filePath) {
     if (!closeToDisplay && closeToRaw && exifOrientationSwapsDimensions(exifOrientation)) {
       next.width = exifDisplay.width;
       next.height = exifDisplay.height;
+      dimensionsAdjusted = true;
     }
   }
 
@@ -350,19 +390,19 @@ function applyExifImageInfoFallback(imageInfo, exif, filePath) {
 
   if (validDimensions) {
     const aspectRatio = width / height;
-    if (!Number.isFinite(Number(next.aspect_ratio))) {
+    if (dimensionsAdjusted || !Number.isFinite(Number(next.aspect_ratio))) {
       next.aspect_ratio = Math.round(aspectRatio * 100) / 100;
     }
-    if (!String(next.aspect_ratio_string || "").trim() || String(next.aspect_ratio_string || "").toLowerCase() === "custom") {
+    if (dimensionsAdjusted || !String(next.aspect_ratio_string || "").trim() || String(next.aspect_ratio_string || "").toLowerCase() === "custom") {
       next.aspect_ratio_string = getAspectRatioString(aspectRatio);
     }
-    if (!String(next.orientation || "").trim() || String(next.orientation || "").toLowerCase() === "unknown") {
+    if (dimensionsAdjusted || !String(next.orientation || "").trim() || String(next.orientation || "").toLowerCase() === "unknown") {
       next.orientation = classifyOrientationFromAspectRatio(aspectRatio);
     }
-    if (!Number.isFinite(Number(next.megapixels))) {
+    if (dimensionsAdjusted || !Number.isFinite(Number(next.megapixels))) {
       next.megapixels = calculateMegapixels(width, height);
     }
-    if (!String(next.size_category || "").trim() || String(next.size_category || "").toLowerCase() === "unknown") {
+    if (dimensionsAdjusted || !String(next.size_category || "").trim() || String(next.size_category || "").toLowerCase() === "unknown") {
       next.size_category = categorizeImageSizeByPixels(width * height);
     }
 
@@ -629,9 +669,12 @@ function inferIsWallpaper(width, height) {
 function buildImageFilteringData(imageInfo) {
   const width = Number(imageInfo?.width || 0);
   const height = Number(imageInfo?.height || 0);
-  const megapixels = Number(imageInfo?.megapixels);
+  const storedMegapixels = Number(imageInfo?.megapixels);
+  const megapixels = Number.isFinite(storedMegapixels) && storedMegapixels > 0
+    ? storedMegapixels
+    : calculateMegapixels(width, height);
   const resolutionMegapixels =
-    Number.isFinite(width) && width > 0 && Number.isFinite(height) && height > 0 && Number.isFinite(megapixels)
+    Number.isFinite(width) && width > 0 && Number.isFinite(height) && height > 0 && Number.isFinite(megapixels) && megapixels > 0
       ? `${Math.round(width)}x${Math.round(height)} (~${megapixels.toFixed(2)}mp)`
       : "";
 
