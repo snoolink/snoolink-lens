@@ -337,6 +337,49 @@ body {
   font-size: 0.72rem;
 }
 
+.clip-start-wrap {
+  display: grid;
+  gap: 4px;
+  margin-top: 2px;
+}
+
+.clip-start-label {
+  color: var(--text-secondary);
+  font-family: var(--font-mono);
+  font-size: 0.64rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.clip-start-controls {
+  align-items: center;
+  display: grid;
+  gap: 6px;
+  grid-template-columns: 1fr 70px;
+}
+
+.clip-start-range {
+  width: 100%;
+}
+
+.clip-start-input {
+  background: rgba(12, 22, 36, 0.92);
+  border: 1px solid rgba(100, 150, 240, 0.26);
+  border-radius: 8px;
+  color: var(--text);
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  min-height: 28px;
+  padding: 2px 6px;
+}
+
+.clip-start-hint {
+  color: var(--muted);
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
+  margin: 0;
+}
+
 .queue-remove-btn {
   background: rgba(255, 122, 90, 0.1);
   border: 1px solid rgba(255, 122, 90, 0.26);
@@ -346,6 +389,23 @@ body {
   font-weight: 700;
   min-height: 28px;
   padding: 0 10px;
+}
+
+@media (max-width: 640px) {
+  .selection-row {
+    grid-template-columns: 18px 64px 1fr;
+    min-height: 96px;
+  }
+
+  .queue-remove-btn {
+    grid-column: 3;
+    justify-self: end;
+    margin-top: 2px;
+  }
+
+  .clip-start-controls {
+    grid-template-columns: 1fr 64px;
+  }
 }
 
 .selection-empty {

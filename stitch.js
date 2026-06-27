@@ -64,6 +64,7 @@ const STITCH_SELECTION_SNAPSHOT_KEY = "snoolink.stitch.selection.v1";
 const TOOLTIP_SETTINGS_KEY = "snoolink.tooltips.enabled.v1";
 const MIN_SECONDS_PER_VIDEO = 0.1;
 const MAX_SECONDS_PER_VIDEO = 60;
+const MAX_CLIP_START_FALLBACK_SECONDS = 600;
 const SECONDS_PRECISION = 1;
 let tooltipSystemController = null;
 
@@ -84,6 +85,14 @@ const STITCH_TOOLTIP_TEXT = {
 
 function randomRequestId() {
   return `${Date.now()}-${Math.random().toString(16).slice(2, 10)}`;
+}
+
+function escapeSelectorValue(value) {
+  const raw = String(value || "");
+  if (typeof CSS !== "undefined" && typeof CSS.escape === "function") {
+    return CSS.escape(raw);
+  }
+  return raw.replace(/([\\"'\[\]#.:?+*^$|(){}])/g, "\\$1");
 }
 
 function clampNumber(value, min, max, fallback) {
@@ -119,6 +128,145 @@ function getSecondsPerVideo() {
     2,
     SECONDS_PRECISION,
   );
+}
+
+function getItemDurationSeconds(item) {
+  const itemPath = String(item?.path || "").trim();
+  const cached = mediaDurationCache.get(itemPath);
+  if (Number.isFinite(cached) && cached > 0) {
+    return cached;
+  }
+
+  const parsed = Number(item?.duration_seconds);
+  if (Number.isFinite(parsed) && parsed > 0) {
+    return parsed;
+  }
+
+  return null;
+}
+
+function getClipStartMaxSeconds(item, clipSeconds = getSecondsPerVideo()) {
+  const duration = getItemDurationSeconds(item);
+  if (!Number.isFinite(duration) || duration <= 0) {
+    return MAX_CLIP_START_FALLBACK_SECONDS;
+  }
+  return Math.max(0, duration - Math.max(0.1, Number(clipSeconds) || 0));
+}
+
+function normalizeClipStartSeconds(item, value, clipSeconds = getSecondsPerVideo()) {
+  const maxStart = getClipStartMaxSeconds(item, clipSeconds);
+  return clampDecimal(value, 0, maxStart, 0, SECONDS_PRECISION);
+}
+
+function getClipStartSeconds(item) {
+  return normalizeClipStartSeconds(item, item?.clip_start_seconds);
+}
+
+function enforceClipStartBoundsAcrossSelection() {
+  const clipSeconds = getSecondsPerVideo();
+  for (const item of state.selectedItems) {
+    item.clip_start_seconds = normalizeClipStartSeconds(item, item?.clip_start_seconds, clipSeconds);
+  }
+}
+
+function clearGeneratedOutputForConfigurationChange(message) {
+  if (!state.outputBlobUrl && !state.nativeOutputPath) {
+    return;
+  }
+
+  if (state.outputBlobUrl) {
+    URL.revokeObjectURL(state.outputBlobUrl);
+  }
+  state.outputBlobUrl = "";
+  state.outputFileName = "";
+  state.nativeOutputPath = "";
+  outputPathLabel.textContent = "";
+  clearGeneratedPreview();
+  setProgress(0, String(message || "Configuration changed. Generate again."), "idle");
+}
+
+function updateClipStartHintText(item, hintEl) {
+  if (!hintEl) {
+    return;
+  }
+
+  const clipSeconds = getSecondsPerVideo();
+  const startSeconds = getClipStartSeconds(item);
+  const endSeconds = startSeconds + clipSeconds;
+  const duration = getItemDurationSeconds(item);
+
+  if (Number.isFinite(duration) && duration > 0) {
+    hintEl.textContent = `Clip window: ${formatSeconds(startSeconds)}s -> ${formatSeconds(endSeconds)}s / ${formatDuration(Math.round(duration))}`;
+    return;
+  }
+
+  hintEl.textContent = `Clip window: ${formatSeconds(startSeconds)}s -> ${formatSeconds(endSeconds)}s`;
+}
+
+function getSelectionItemKey(item) {
+  const explicitKey = String(item?.selection_key || item?.selectionKey || "").trim();
+  if (explicitKey) {
+    return explicitKey;
+  }
+
+  const itemPath = String(item?.path || item?.image_path || "").trim();
+  const clipMode = String(item?.clip_mode || item?.clipMode || "").trim().toLowerCase();
+  const clipStart = Number(item?.clip_start_seconds ?? item?.clipStartSeconds);
+  const clipEnd = Number(item?.clip_end_seconds ?? item?.clipEndSeconds);
+
+  if (
+    clipMode === "matching_timeframe"
+    && Number.isFinite(clipStart)
+    && Number.isFinite(clipEnd)
+  ) {
+    return `${itemPath}#clip:${clipStart.toFixed(3)}-${clipEnd.toFixed(3)}`;
+  }
+
+  return itemPath;
+}
+
+function updateClipStartControlsForPath(itemKey) {
+  const key = String(itemKey || "").trim();
+  if (!key) {
+    return;
+  }
+
+  const item = state.selectedItems.find((row) => getSelectionItemKey(row) === key);
+  if (!item) {
+    return;
+  }
+
+  const row = selectedVideosList.querySelector(`.selection-row[data-selection-key="${escapeSelectorValue(key)}"]`);
+  if (!row) {
+    return;
+  }
+
+  const rangeEl = row.querySelector(".clip-start-range");
+  const inputEl = row.querySelector(".clip-start-input");
+  const hintEl = row.querySelector(".clip-start-hint");
+  if (!rangeEl || !inputEl) {
+    return;
+  }
+
+  const maxStart = getClipStartMaxSeconds(item);
+  item.clip_start_seconds = normalizeClipStartSeconds(item, item?.clip_start_seconds);
+  const value = formatSeconds(item.clip_start_seconds);
+
+  rangeEl.max = formatSeconds(maxStart);
+  rangeEl.value = value;
+  rangeEl.disabled = state.generating;
+
+  inputEl.max = formatSeconds(maxStart);
+  inputEl.value = value;
+  inputEl.disabled = state.generating;
+
+  updateClipStartHintText(item, hintEl);
+}
+
+function updateClipStartControlsForAllRows() {
+  for (const item of state.selectedItems) {
+    updateClipStartControlsForPath(getSelectionItemKey(item));
+  }
 }
 
 function buildStitchFileName() {
@@ -300,21 +448,11 @@ function removeQueueItemAt(index) {
     return;
   }
   const removed = state.selectedItems[numericIndex];
-  const removedPath = String(removed?.path || "");
+  const removedKey = getSelectionItemKey(removed);
   state.selectedItems.splice(numericIndex, 1);
-  state.clipWarnings.delete(removedPath);
+  state.clipWarnings.delete(removedKey);
 
-  if (state.outputBlobUrl || state.nativeOutputPath) {
-    if (state.outputBlobUrl) {
-      URL.revokeObjectURL(state.outputBlobUrl);
-    }
-    state.outputBlobUrl = "";
-    state.outputFileName = "";
-    state.nativeOutputPath = "";
-    outputPathLabel.textContent = "";
-    clearGeneratedPreview();
-    setProgress(0, "Queue changed. Generate again to update output.", "idle");
-  }
+  clearGeneratedOutputForConfigurationChange("Queue changed. Generate again to update output.");
 
   renderSelectedList();
   updateSummaryAndActions();
@@ -333,17 +471,7 @@ function reorderQueue(fromIndex, toIndex) {
   const [moved] = state.selectedItems.splice(from, 1);
   state.selectedItems.splice(to, 0, moved);
 
-  if (state.outputBlobUrl || state.nativeOutputPath) {
-    if (state.outputBlobUrl) {
-      URL.revokeObjectURL(state.outputBlobUrl);
-    }
-    state.outputBlobUrl = "";
-    state.outputFileName = "";
-    state.nativeOutputPath = "";
-    outputPathLabel.textContent = "";
-    clearGeneratedPreview();
-    setProgress(0, "Queue order changed. Generate again to apply sequence.", "idle");
-  }
+  clearGeneratedOutputForConfigurationChange("Queue order changed. Generate again to apply sequence.");
 
   renderSelectedList();
   updateSummaryAndActions();
@@ -363,6 +491,7 @@ function renderQueueItemDuration(item, el) {
   const parsed = Number(item?.duration_seconds);
   if (Number.isFinite(parsed) && parsed > 0) {
     mediaDurationCache.set(itemPath, parsed);
+    updateClipStartControlsForAllRows();
     el.textContent = `Source: ${formatDuration(Math.round(parsed))}`;
     return;
   }
@@ -386,6 +515,7 @@ function renderQueueItemDuration(item, el) {
     const seconds = Number(probe.duration);
     if (Number.isFinite(seconds) && seconds > 0) {
       mediaDurationCache.set(itemPath, seconds);
+      updateClipStartControlsForAllRows();
       el.textContent = `Source: ${formatDuration(Math.round(seconds))}`;
     } else {
       el.textContent = "Source: unknown";
@@ -415,6 +545,8 @@ function renderSelectedList() {
     row.className = "selection-row";
     row.draggable = true;
     row.dataset.index = String(index);
+    row.dataset.path = String(item?.path || "").trim();
+    row.dataset.selectionKey = getSelectionItemKey(item);
 
     row.addEventListener("dragstart", (event) => {
       state.dragIndex = index;
@@ -493,7 +625,7 @@ function renderSelectedList() {
       thumbWrap.appendChild(placeholder);
     }
 
-    const warningMessage = state.clipWarnings.get(String(item?.path || "").trim());
+    const warningMessage = state.clipWarnings.get(getSelectionItemKey(item));
     if (warningMessage) {
       const badge = document.createElement("span");
       badge.className = "queue-warning-badge";
@@ -514,8 +646,63 @@ function renderSelectedList() {
     duration.className = "queue-duration";
     renderQueueItemDuration(item, duration);
 
+    const clipStartWrap = document.createElement("div");
+    clipStartWrap.className = "clip-start-wrap";
+
+    const clipStartLabel = document.createElement("span");
+    clipStartLabel.className = "clip-start-label";
+    clipStartLabel.textContent = "Start Time";
+
+    const clipStartControls = document.createElement("div");
+    clipStartControls.className = "clip-start-controls";
+
+    const clipStartRange = document.createElement("input");
+    clipStartRange.type = "range";
+    clipStartRange.className = "clip-start-range";
+    clipStartRange.min = "0";
+    clipStartRange.step = String(1 / (10 ** SECONDS_PRECISION));
+
+    const clipStartInput = document.createElement("input");
+    clipStartInput.type = "number";
+    clipStartInput.className = "clip-start-input";
+    clipStartInput.min = "0";
+    clipStartInput.step = String(1 / (10 ** SECONDS_PRECISION));
+
+    const clipStartHint = document.createElement("p");
+    clipStartHint.className = "clip-start-hint";
+
+    const applyClipStartValue = (nextValue) => {
+      const previousValue = getClipStartSeconds(item);
+      const normalized = normalizeClipStartSeconds(item, nextValue);
+      item.clip_start_seconds = normalized;
+      const valueText = formatSeconds(normalized);
+      clipStartRange.value = valueText;
+      clipStartInput.value = valueText;
+      updateClipStartHintText(item, clipStartHint);
+
+      if (Math.abs(normalized - previousValue) > 0.0001) {
+        clearGeneratedOutputForConfigurationChange("Clip timeframe changed. Generate again to apply updates.");
+        updateSummaryAndActions();
+      }
+    };
+
+    clipStartRange.addEventListener("input", () => {
+      applyClipStartValue(clipStartRange.value);
+    });
+
+    clipStartInput.addEventListener("input", () => {
+      applyClipStartValue(clipStartInput.value);
+    });
+
+    clipStartControls.appendChild(clipStartRange);
+    clipStartControls.appendChild(clipStartInput);
+    clipStartWrap.appendChild(clipStartLabel);
+    clipStartWrap.appendChild(clipStartControls);
+    clipStartWrap.appendChild(clipStartHint);
+
     meta.appendChild(title);
     meta.appendChild(duration);
+    meta.appendChild(clipStartWrap);
 
     const removeBtn = document.createElement("button");
     removeBtn.type = "button";
@@ -531,6 +718,8 @@ function renderSelectedList() {
     row.appendChild(meta);
     row.appendChild(removeBtn);
     selectedVideosList.appendChild(row);
+
+    updateClipStartControlsForPath(getSelectionItemKey(item));
   });
 
   if (!state.listDnDBound) {
@@ -583,32 +772,72 @@ function updateSummaryAndActions() {
   if (muteAllClipsInput) {
     muteAllClipsInput.disabled = state.generating;
   }
+  const clipStartRanges = selectedVideosList.querySelectorAll(".clip-start-range");
+  for (const input of clipStartRanges) {
+    input.disabled = state.generating;
+  }
+  const clipStartInputs = selectedVideosList.querySelectorAll(".clip-start-input");
+  for (const input of clipStartInputs) {
+    input.disabled = state.generating;
+  }
 }
 
 function syncNumericControls() {
+  enforceClipStartBoundsAcrossSelection();
   const safeSeconds = getSecondsPerVideo();
   secondsPerVideoInput.value = formatSeconds(safeSeconds);
   secondsPerVideoRange.value = formatSeconds(safeSeconds);
+  updateClipStartControlsForAllRows();
   updateSummaryAndActions();
 }
 
 function normalizeItems(items) {
   const list = Array.isArray(items) ? items : [];
-  const byPath = new Map();
+  const byKey = new Map();
   for (const item of list) {
     const path = String(item?.path || item?.image_path || "").trim();
     if (!path) {
       continue;
     }
-    byPath.set(path, {
+    const clipMode = String(item?.clip_mode || item?.clipMode || "").trim().toLowerCase();
+    const clipStartSeconds = clampDecimal(
+      item?.clip_start_seconds ?? item?.clipStartSeconds,
+      0,
+      MAX_CLIP_START_FALLBACK_SECONDS,
+      0,
+      SECONDS_PRECISION,
+    );
+    const clipEndRaw = Number(item?.clip_end_seconds ?? item?.clipEndSeconds);
+    const clipEndSeconds = Number.isFinite(clipEndRaw)
+      ? clampDecimal(
+        clipEndRaw,
+        0,
+        MAX_CLIP_START_FALLBACK_SECONDS + Math.max(0.1, Number(item?.seconds_per_video || item?.secondsPerVideo || 0) || 0),
+        clipEndRaw,
+        SECONDS_PRECISION,
+      )
+      : null;
+
+    const normalizedItem = {
       path,
       title: String(item?.title || "Untitled video"),
       media_type: "video",
       preview_src: String(item?.preview_src || ""),
       duration_seconds: Number(item?.duration_seconds || item?.duration || 0) || 0,
+      clip_mode: clipMode === "matching_timeframe" ? "matching_timeframe" : "full_video",
+      clip_start_seconds: clipStartSeconds,
+      clip_end_seconds: clipEndSeconds,
+    };
+    const selectionKey = getSelectionItemKey(normalizedItem);
+    if (!selectionKey) {
+      continue;
+    }
+    byKey.set(selectionKey, {
+      ...normalizedItem,
+      selection_key: selectionKey,
     });
   }
-  return Array.from(byPath.values());
+  return Array.from(byKey.values());
 }
 
 function readSelectionSnapshotFromStorage() {
@@ -743,6 +972,10 @@ async function requestFileBytesFromParent(sourcePath, timeoutMs = 8000) {
 }
 
 async function loadSelection() {
+  const previousBySelectionKey = new Map(
+    state.selectedItems.map((item) => [getSelectionItemKey(item), item]),
+  );
+
   let items = await requestSelectionFromParent();
   if (items.length === 0) {
     items = readSelectionSnapshotFromParent();
@@ -751,7 +984,17 @@ async function loadSelection() {
     items = readSelectionSnapshotFromStorage();
   }
 
-  state.selectedItems = items;
+  state.selectedItems = items.map((item) => {
+    const previous = previousBySelectionKey.get(getSelectionItemKey(item));
+    if (!previous) {
+      return item;
+    }
+    return {
+      ...item,
+      clip_start_seconds: Number(previous?.clip_start_seconds || 0),
+    };
+  });
+  enforceClipStartBoundsAcrossSelection();
   state.nativeOutputPath = "";
 
   renderSelectedList();
@@ -890,11 +1133,11 @@ async function loadItemBytes(item) {
 }
 
 function markClipWarning(item, message) {
-  const itemPath = String(item?.path || "").trim();
-  if (!itemPath) {
+  const itemKey = getSelectionItemKey(item);
+  if (!itemKey) {
     return;
   }
-  state.clipWarnings.set(itemPath, String(message || "Unreadable clip"));
+  state.clipWarnings.set(itemKey, String(message || "Unreadable clip"));
 }
 
 async function generateStitch() {
@@ -1015,7 +1258,7 @@ async function generateStitch() {
 
       const clipArgs = [
         "-i", inputName,
-        "-ss", "0",
+        "-ss", String(getClipStartSeconds(item)),
         "-t", String(seconds),
         "-vf", normalizedVideoFilter,
         "-r", String(stitchFps),

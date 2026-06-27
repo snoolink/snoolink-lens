@@ -1994,7 +1994,7 @@ function parseStitchResolution(value) {
 
 function sanitizeStitchSelectionItems(items) {
   const list = Array.isArray(items) ? items : [];
-  const byPath = new Map();
+  const bySelectionKey = new Map();
   for (const item of list) {
     const itemPath = String(item?.path || item?.image_path || "").trim();
     if (!itemPath) {
@@ -2004,14 +2004,31 @@ function sanitizeStitchSelectionItems(items) {
     if (mediaType !== "video") {
       continue;
     }
-    byPath.set(itemPath, {
+    const clipMode = String(item?.clip_mode || item?.clipMode || "").trim().toLowerCase();
+    const clipStartSeconds = Math.max(0, Number((item?.clip_start_seconds ?? item?.clipStartSeconds ?? 0)) || 0);
+    const clipEndRaw = Number(item?.clip_end_seconds ?? item?.clipEndSeconds);
+    const clipEndSeconds = Number.isFinite(clipEndRaw) ? Math.max(0, clipEndRaw) : null;
+    const explicitSelectionKey = String(item?.selection_key || item?.selectionKey || "").trim();
+    const selectionKey = explicitSelectionKey
+      || (
+        clipMode === "matching_timeframe" && Number.isFinite(clipEndSeconds)
+          ? `${itemPath}#clip:${clipStartSeconds.toFixed(3)}-${clipEndSeconds.toFixed(3)}`
+          : itemPath
+      );
+
+    bySelectionKey.set(selectionKey, {
       path: itemPath,
       media_type: "video",
       title: String(item?.title || item?.metadata?.title || path.basename(itemPath) || "Untitled video"),
       preview_src: String(item?.preview_src || ""),
+      duration_seconds: Number(item?.duration_seconds || item?.duration || 0) || 0,
+      clip_mode: clipMode === "matching_timeframe" ? "matching_timeframe" : "full_video",
+      clip_start_seconds: clipStartSeconds,
+      clip_end_seconds: clipEndSeconds,
+      selection_key: selectionKey,
     });
   }
-  return Array.from(byPath.values());
+  return Array.from(bySelectionKey.values());
 }
 
 function escapeConcatListPath(filePath) {
@@ -2062,6 +2079,14 @@ async function generateStitchVideo(payload = {}) {
     for (let i = 0; i < verifiedItems.length; i += 1) {
       const item = verifiedItems[i];
       const clipPath = path.join(tempDir, `clip-${String(i + 1).padStart(3, "0")}.mp4`);
+      const sourceDurationSeconds = Number(item?.duration_seconds || 0);
+      const requestedStartSeconds = Math.max(0, Number(item?.clip_start_seconds || 0));
+      const maxStartSeconds = Number.isFinite(sourceDurationSeconds) && sourceDurationSeconds > 0
+        ? Math.max(0, sourceDurationSeconds - secondsPerVideo)
+        : Number.POSITIVE_INFINITY;
+      const clipStartSeconds = Number.isFinite(maxStartSeconds)
+        ? Math.min(requestedStartSeconds, maxStartSeconds)
+        : requestedStartSeconds;
       const filter = [
         `scale=${resolution.width}:${resolution.height}:force_original_aspect_ratio=increase:flags=bicubic`,
         `crop=${resolution.width}:${resolution.height}`,
@@ -2078,6 +2103,8 @@ async function generateStitchVideo(payload = {}) {
         "-1",
         "-i",
         item.path,
+        "-ss",
+        String(clipStartSeconds),
         "-t",
         String(secondsPerVideo),
         "-vf",

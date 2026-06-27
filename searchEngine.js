@@ -7,7 +7,7 @@ const inMemoryIndex = new Map();
 const jsonPayloadCache = new Map();
 const validationCache = new Map();
 const DEFAULT_FRAME_INTERVAL_SECONDS = 1;
-const DERIVED_INDEX_CACHE_VERSION = 1;
+const DERIVED_INDEX_CACHE_VERSION = 2;
 const DERIVED_INDEX_SHARD_SIZE = 1000;
 const DERIVED_INDEX_DIR_NAME = ".snoolink-search-cache";
 const MAX_SAFE_TOPK = 200;
@@ -16,6 +16,11 @@ const MAX_COMPACT_DOC_TEXT_CHARS = 2400;
 const MAX_COMPACT_TAGS = 24;
 const MAX_COMPACT_CANDIDATE_POOL = 4000;
 const COMPACT_BATCH_MIN_SCORE = 0.001;
+const MAX_COMPACT_VIDEO_FRAMES = 140;
+const MAX_COMPACT_FRAME_TEXT_CHARS = 420;
+const MAX_TIMEFRAME_CLIPS_PER_VIDEO = 12;
+const MAX_TIMEFRAME_CLIP_POOL = 2500;
+const MAX_TIMEFRAME_SOURCE_ITEMS = 800;
 
 async function resolveMetadataPath(filePath) {
   const rawPath = String(filePath || "").trim();
@@ -265,6 +270,10 @@ function safeNumber(value) {
 }
 
 function getVideoAnalysisPayload(item) {
+  const compactVideo = item?.metadata?.video_analysis_compact;
+  if (compactVideo && typeof compactVideo === "object") {
+    return compactVideo;
+  }
   const rawVideo = item?.raw?.video_analysis;
   if (rawVideo && typeof rawVideo === "object") {
     return rawVideo;
@@ -278,6 +287,7 @@ function getVideoAnalysisPayload(item) {
 
 function buildFrameText(frame) {
   const parts = [
+    String(frame?.text || ""),
     String(frame?.description || ""),
     ...(Array.isArray(frame?.sceneTags) ? frame.sceneTags : []),
     ...(Array.isArray(frame?.scene_tags) ? frame.scene_tags : []),
@@ -290,6 +300,45 @@ function buildFrameText(frame) {
     String(frame?.ocr_text || ""),
   ];
   return parts.map((value) => String(value || "").trim()).filter(Boolean).join(" ");
+}
+
+function downsampleFrameCandidates(candidates, maxFrames = MAX_COMPACT_VIDEO_FRAMES) {
+  const rows = Array.isArray(candidates) ? candidates : [];
+  if (rows.length <= maxFrames) {
+    return rows;
+  }
+
+  const sampled = [];
+  const denominator = Math.max(1, maxFrames - 1);
+  for (let i = 0; i < maxFrames; i += 1) {
+    const index = Math.round((i * (rows.length - 1)) / denominator);
+    sampled.push(rows[index]);
+  }
+  return sampled;
+}
+
+function buildCompactVideoAnalysis(item) {
+  const mediaType = String(item?.metadata?.media_type || getMediaTypeFromPath(item?.path || "", "image")).toLowerCase();
+  if (mediaType !== "video") {
+    return null;
+  }
+
+  const videoAnalysis = getVideoAnalysisPayload(item);
+  const durationSeconds = safeNumber(videoAnalysis?.duration_seconds);
+  const frameIntervalSeconds = normalizeFrameIntervalSeconds(videoAnalysis?.frame_interval_seconds, durationSeconds);
+  const frameCandidates = downsampleFrameCandidates(collectVideoFrameCandidates(item), MAX_COMPACT_VIDEO_FRAMES)
+    .map((frame) => ({
+      second: Number(Number(frame?.second || 0).toFixed(3)),
+      text: clampCompactText(frame?.text, MAX_COMPACT_FRAME_TEXT_CHARS),
+      description: clampCompactText(frame?.description, 200),
+    }))
+    .filter((frame) => Number.isFinite(frame.second) && frame.second >= 0 && frame.text);
+
+  return {
+    duration_seconds: durationSeconds,
+    frame_interval_seconds: frameIntervalSeconds,
+    frames: frameCandidates,
+  };
 }
 
 function collectVideoFrameCandidates(item) {
@@ -393,6 +442,32 @@ function scoreFrameMatch(frameText, expandedTokens, queryTrigrams, expandedTrigr
   const phrase = phraseCoverageScore(requiredPhrases, text);
 
   return (lexical * 0.62) + (fuzzy * 0.28) + (phrase * 0.1);
+}
+
+function toScoreNumber(value) {
+  const score = Number(value);
+  return Number.isFinite(score) ? score : 0;
+}
+
+function limitClipWindowsPerVideo(clipsByWindow, perVideoLimit) {
+  const rows = clipsByWindow instanceof Map ? Array.from(clipsByWindow.values()) : [];
+  if (rows.length <= perVideoLimit) {
+    return rows;
+  }
+  rows.sort((a, b) => toScoreNumber(b?.score) - toScoreNumber(a?.score));
+  return rows.slice(0, perVideoLimit);
+}
+
+function appendClipCandidatesWithCap(pool, nextRows, poolLimit) {
+  if (!Array.isArray(pool) || !Array.isArray(nextRows) || nextRows.length === 0) {
+    return;
+  }
+
+  pool.push(...nextRows);
+  if (pool.length > poolLimit) {
+    pool.sort((a, b) => toScoreNumber(b?.score) - toScoreNumber(a?.score));
+    pool.length = poolLimit;
+  }
 }
 
 function extractCloudTagCandidates(item) {
@@ -603,6 +678,7 @@ function clampCompactText(value, maxChars = MAX_COMPACT_DOC_TEXT_CHARS) {
 
 function toCompactCacheRow(item, docText) {
   const metadata = item?.metadata && typeof item.metadata === "object" ? item.metadata : {};
+  const compactVideoAnalysis = buildCompactVideoAnalysis(item);
   return {
     id: item?.id ?? null,
     path: String(item?.path || ""),
@@ -616,6 +692,7 @@ function toCompactCacheRow(item, docText) {
       objects: Array.isArray(metadata?.objects)
         ? metadata.objects.slice(0, MAX_COMPACT_TAGS).map((value) => clampCompactText(value, 80)).filter(Boolean)
         : [],
+      video_analysis_compact: compactVideoAnalysis,
     },
     doc: clampCompactText(docText, MAX_COMPACT_DOC_TEXT_CHARS),
   };
@@ -1538,8 +1615,7 @@ function applyFilters(items, filters) {
 }
 
 function shouldUseCompactIndex(payload) {
-  const videoResultMode = normalizeVideoResultMode(payload?.videoResultMode);
-  return videoResultMode !== "matching_timeframes";
+  return true;
 }
 
 // --- Public API ---
@@ -1595,11 +1671,138 @@ export async function runSemanticSearch(payload) {
     if (indexMode === "compact") {
       const { resolvedPath, stats } = await resolveMetadataPath(filePath);
       const sourceFingerprint = getSourceFingerprint(stats);
-      return runCompactBatchedSearch(payload, {
+      const compactResult = await runCompactBatchedSearch(payload, {
         resolvedPath,
         stats,
         sourceFingerprint,
       });
+
+      if (!compactResult?.ok || videoResultMode !== "matching_timeframes" || !query) {
+        return compactResult;
+      }
+
+      const expandedQuery = String(compactResult?.queryExpansion?.expanded || query);
+      const expandedTokens = tokenize(expandedQuery);
+      const queryTrigrams = buildCharNgrams(query, 3);
+      const expandedTrigrams = buildCharNgrams(expandedQuery, 3);
+      const requiredPhrases = compactResult?.queryExpansion?.intent?.required_phrases;
+      const scoredRows = Array.isArray(compactResult?.results) ? compactResult.results : [];
+      const perVideoClipLimit = Math.max(1, Math.min(MAX_TIMEFRAME_CLIPS_PER_VIDEO, topK));
+      const clipCandidatePoolLimit = Math.max(topK * 12, Math.min(MAX_TIMEFRAME_CLIP_POOL, topK * 40));
+
+      const clipCandidates = [];
+      for (const scoredItem of scoredRows) {
+        const itemMediaType = String(
+          scoredItem?.metadata?.media_type || getMediaTypeFromPath(scoredItem?.path || "", "image"),
+        ).toLowerCase();
+
+        if (itemMediaType !== "video") {
+          appendClipCandidatesWithCap(
+            clipCandidates,
+            [{ ...scoredItem, clip_mode: "full_video" }],
+            clipCandidatePoolLimit,
+          );
+          continue;
+        }
+
+        const sourceItem = {
+          path: scoredItem?.path,
+          metadata: scoredItem?.metadata,
+          raw: null,
+        };
+
+        const videoAnalysis = getVideoAnalysisPayload(sourceItem);
+        const frameIntervalSeconds = Number(videoAnalysis?.frame_interval_seconds || 2);
+        const durationSeconds = Number(videoAnalysis?.duration_seconds);
+        const frameCandidates = collectVideoFrameCandidates(sourceItem);
+
+        if (frameCandidates.length === 0) {
+          appendClipCandidatesWithCap(
+            clipCandidates,
+            [{ ...scoredItem, clip_mode: "full_video" }],
+            clipCandidatePoolLimit,
+          );
+          continue;
+        }
+
+        const clipsByWindow = new Map();
+        let bestFrame = null;
+        let bestFrameScore = 0;
+        for (const frame of frameCandidates) {
+          const frameScore = scoreFrameMatch(
+            frame.text,
+            expandedTokens,
+            queryTrigrams,
+            expandedTrigrams,
+            requiredPhrases,
+          );
+
+          if (!bestFrame || frameScore > bestFrameScore) {
+            bestFrame = frame;
+            bestFrameScore = frameScore;
+          }
+
+          if (frameScore < 0.12) {
+            continue;
+          }
+
+          const clipWindow = buildTimeframeWindow(frame.second, frameIntervalSeconds, durationSeconds);
+          const clipScore = Math.min(1, (Number(scoredItem.score) * 0.6) + (frameScore * 0.4) + 0.04);
+
+          const clipKey = `${clipWindow.start}:${clipWindow.end}`;
+          const nextClip = {
+            ...scoredItem,
+            score: clipScore,
+            clip_mode: "matching_timeframe",
+            clip_start_seconds: clipWindow.start,
+            clip_end_seconds: clipWindow.end,
+            clip_match_second: Number(frame.second.toFixed(3)),
+            clip_match_text: frame.description || "",
+            preview_src: `${toPreviewSrc(scoredItem.path)}#t=${clipWindow.start},${clipWindow.end}`,
+          };
+
+          const existing = clipsByWindow.get(clipKey);
+          if (!existing || Number(nextClip.score) > Number(existing.score || 0)) {
+            clipsByWindow.set(clipKey, nextClip);
+          }
+        }
+
+        if (clipsByWindow.size === 0 && bestFrame) {
+          const clipWindow = buildTimeframeWindow(bestFrame.second, frameIntervalSeconds, durationSeconds);
+          const fallbackClipScore = Math.min(1, (Number(scoredItem.score) * 0.72) + (bestFrameScore * 0.28));
+          const fallbackClipKey = `${clipWindow.start}:${clipWindow.end}`;
+          clipsByWindow.set(fallbackClipKey, {
+            ...scoredItem,
+            score: fallbackClipScore,
+            clip_mode: "matching_timeframe",
+            clip_start_seconds: clipWindow.start,
+            clip_end_seconds: clipWindow.end,
+            clip_match_second: Number(bestFrame.second.toFixed(3)),
+            clip_match_text: bestFrame.description || "",
+            preview_src: `${toPreviewSrc(scoredItem.path)}#t=${clipWindow.start},${clipWindow.end}`,
+          });
+        }
+
+        appendClipCandidatesWithCap(
+          clipCandidates,
+          limitClipWindowsPerVideo(clipsByWindow, perVideoClipLimit),
+          clipCandidatePoolLimit,
+        );
+      }
+
+      clipCandidates.sort((a, b) => toScoreNumber(b?.score) - toScoreNumber(a?.score));
+
+      const normalizedResults = (clipCandidates.length > 0 ? clipCandidates : scoredRows)
+        .slice(0, topK)
+        .map((row) => ({
+          ...row,
+          clip_mode: row?.clip_mode || "full_video",
+        }));
+
+      return {
+        ...compactResult,
+        results: normalizedResults,
+      };
     }
 
     const {
@@ -1727,21 +1930,37 @@ export async function runSemanticSearch(payload) {
     scored.sort((a, b) => b.score - a.score);
 
     if (videoResultMode === "matching_timeframes") {
+      const perVideoClipLimit = Math.max(1, Math.min(MAX_TIMEFRAME_CLIPS_PER_VIDEO, topK));
+      const clipCandidatePoolLimit = Math.max(topK * 12, Math.min(MAX_TIMEFRAME_CLIP_POOL, topK * 40));
+      const timeframeSourceLimit = Math.min(
+        scored.length,
+        Math.max(topK * 8, 400),
+        MAX_TIMEFRAME_SOURCE_ITEMS,
+      );
+      const scoredForTimeframes = scored.slice(0, timeframeSourceLimit);
       const clipCandidates = [];
 
-      for (const scoredItem of scored) {
+      for (const scoredItem of scoredForTimeframes) {
         const itemMediaType = String(
           scoredItem?.metadata?.media_type || getMediaTypeFromPath(scoredItem?.path || "", "image"),
         ).toLowerCase();
 
         if (itemMediaType !== "video") {
-          clipCandidates.push({ ...scoredItem, clip_mode: "full_video" });
+          appendClipCandidatesWithCap(
+            clipCandidates,
+            [{ ...scoredItem, clip_mode: "full_video" }],
+            clipCandidatePoolLimit,
+          );
           continue;
         }
 
         const sourceItem = itemLookupByPath.get(String(scoredItem.path || ""));
         if (!sourceItem) {
-          clipCandidates.push({ ...scoredItem, clip_mode: "full_video" });
+          appendClipCandidatesWithCap(
+            clipCandidates,
+            [{ ...scoredItem, clip_mode: "full_video" }],
+            clipCandidatePoolLimit,
+          );
           continue;
         }
 
@@ -1751,11 +1970,17 @@ export async function runSemanticSearch(payload) {
         const frameCandidates = collectVideoFrameCandidates(sourceItem);
 
         if (frameCandidates.length === 0) {
-          clipCandidates.push({ ...scoredItem, clip_mode: "full_video" });
+          appendClipCandidatesWithCap(
+            clipCandidates,
+            [{ ...scoredItem, clip_mode: "full_video" }],
+            clipCandidatePoolLimit,
+          );
           continue;
         }
 
         const clipsByWindow = new Map();
+        let bestFrame = null;
+        let bestFrameScore = 0;
         for (const frame of frameCandidates) {
           const frameScore = scoreFrameMatch(
             frame.text,
@@ -1764,6 +1989,11 @@ export async function runSemanticSearch(payload) {
             expandedTrigrams,
             expanded?.intent?.required_phrases,
           );
+
+          if (!bestFrame || frameScore > bestFrameScore) {
+            bestFrame = frame;
+            bestFrameScore = frameScore;
+          }
 
           if (frameScore < 0.12) {
             continue;
@@ -1790,10 +2020,30 @@ export async function runSemanticSearch(payload) {
           }
         }
 
-        clipCandidates.push(...clipsByWindow.values());
+        if (clipsByWindow.size === 0 && bestFrame) {
+          const clipWindow = buildTimeframeWindow(bestFrame.second, frameIntervalSeconds, durationSeconds);
+          const fallbackClipScore = Math.min(1, (Number(scoredItem.score) * 0.72) + (bestFrameScore * 0.28));
+          const fallbackClipKey = `${clipWindow.start}:${clipWindow.end}`;
+          clipsByWindow.set(fallbackClipKey, {
+            ...scoredItem,
+            score: fallbackClipScore,
+            clip_mode: "matching_timeframe",
+            clip_start_seconds: clipWindow.start,
+            clip_end_seconds: clipWindow.end,
+            clip_match_second: Number(bestFrame.second.toFixed(3)),
+            clip_match_text: bestFrame.description || "",
+            preview_src: `${toPreviewSrc(scoredItem.path)}#t=${clipWindow.start},${clipWindow.end}`,
+          });
+        }
+
+        appendClipCandidatesWithCap(
+          clipCandidates,
+          limitClipWindowsPerVideo(clipsByWindow, perVideoClipLimit),
+          clipCandidatePoolLimit,
+        );
       }
 
-      clipCandidates.sort((a, b) => Number(b.score || 0) - Number(a.score || 0));
+      clipCandidates.sort((a, b) => toScoreNumber(b?.score) - toScoreNumber(a?.score));
 
       const normalizedResults = (clipCandidates.length > 0 ? clipCandidates : scored)
         .slice(0, topK)

@@ -280,6 +280,7 @@ const CARD_MEDIA_ROOT_MARGIN = "1400px 0px 1400px 0px";
 const CARD_MEDIA_SWEEP_DEBOUNCE_MS = 120;
 let previewRows = [];
 let activePreviewPath = "";
+let activePreviewRowKey = "";
 let pendingSingleCloudIndexPath = "";
 let bulkDownloadInProgress = false;
 const cardMediaState = new WeakMap();
@@ -549,6 +550,10 @@ function refreshStitchModeCardDecorations() {
   for (const card of cards) {
     const mediaType = String(card?.dataset?.mediaType || "");
     const imagePath = String(card?.dataset?.imagePath || "").trim();
+    const selectionKey = String(card?.dataset?.stitchSelectionKey || card?.dataset?.resultRowKey || imagePath).trim();
+    const clipMode = String(card?.dataset?.clipMode || "").trim();
+    const clipStartSeconds = Number(card?.dataset?.clipStartSeconds);
+    const clipEndSeconds = Number(card?.dataset?.clipEndSeconds);
     const isVideo = mediaType === "video";
     const stitchCheckbox = card.querySelector(".result-stitch-checkbox");
 
@@ -560,7 +565,7 @@ function refreshStitchModeCardDecorations() {
       continue;
     }
 
-    if (!isVideo || !imagePath) {
+    if (!isVideo || !imagePath || !selectionKey) {
       card.classList.add("stitch-disabled");
       if (stitchCheckbox) {
         stitchCheckbox.remove();
@@ -574,7 +579,7 @@ function refreshStitchModeCardDecorations() {
       input.type = "checkbox";
       input.className = "result-stitch-checkbox";
       input.title = "Select for Stitch";
-      input.checked = stitchModeState.selectedVideos.has(imagePath);
+      input.checked = stitchModeState.selectedVideos.has(selectionKey);
       input.addEventListener("click", (event) => {
         event.stopPropagation();
       });
@@ -582,15 +587,18 @@ function refreshStitchModeCardDecorations() {
         if (input.checked) {
           const stitchTitle = String(card.dataset.stitchTitle || card.querySelector(".title")?.textContent || "Untitled video");
           const stitchPreviewSrc = String(card.dataset.stitchPreviewSrc || "");
-          stitchModeState.selectedVideos.set(imagePath, {
+          stitchModeState.selectedVideos.set(selectionKey, {
             path: imagePath,
             media_type: "video",
             title: stitchTitle,
             preview_src: stitchPreviewSrc,
+            clip_mode: clipMode || null,
+            clip_start_seconds: Number.isFinite(clipStartSeconds) ? clipStartSeconds : null,
+            clip_end_seconds: Number.isFinite(clipEndSeconds) ? clipEndSeconds : null,
           });
           card.classList.add("stitch-selected");
         } else {
-          stitchModeState.selectedVideos.delete(imagePath);
+          stitchModeState.selectedVideos.delete(selectionKey);
           card.classList.remove("stitch-selected");
         }
         updateStitchModeUi();
@@ -598,10 +606,10 @@ function refreshStitchModeCardDecorations() {
       });
       card.appendChild(input);
     } else {
-      stitchCheckbox.checked = stitchModeState.selectedVideos.has(imagePath);
+      stitchCheckbox.checked = stitchModeState.selectedVideos.has(selectionKey);
     }
 
-    card.classList.toggle("stitch-selected", stitchModeState.selectedVideos.has(imagePath));
+    card.classList.toggle("stitch-selected", stitchModeState.selectedVideos.has(selectionKey));
   }
 }
 
@@ -708,11 +716,15 @@ async function hydrateStitchSelectionFromBackend() {
     if (!itemPath) {
       continue;
     }
-    stitchModeState.selectedVideos.set(itemPath, {
+    const selectionKey = getResultRowKey(item);
+    stitchModeState.selectedVideos.set(selectionKey, {
       path: itemPath,
       media_type: "video",
       title: String(item?.title || "Untitled video"),
       preview_src: String(item?.preview_src || ""),
+      clip_mode: item?.clip_mode || null,
+      clip_start_seconds: item?.clip_start_seconds,
+      clip_end_seconds: item?.clip_end_seconds,
     });
   }
   persistStitchSelectionSnapshot(getStitchSelectionItems());
@@ -1408,6 +1420,8 @@ function setFiltersExpanded(expanded) {
 function clearResults() {
   releaseAllResultCardMedia();
   resultsEl.innerHTML = "";
+  activePreviewPath = "";
+  activePreviewRowKey = "";
   selectedImagePaths.clear();
   updateAlbumActionButtons();
   searchAligner.classList.remove("searching");
@@ -1729,6 +1743,23 @@ function toCompactSearchResultRow(row) {
       media_type: String(metadata?.media_type || input?.media_type || "").trim(),
     },
   };
+}
+
+function getResultRowKey(row) {
+  const itemPath = String(row?.path || row?.image_path || "").trim();
+  const clipMode = String(row?.clip_mode || "").trim();
+  const clipStart = Number(row?.clip_start_seconds);
+  const clipEnd = Number(row?.clip_end_seconds);
+
+  if (
+    clipMode === "matching_timeframe"
+    && Number.isFinite(clipStart)
+    && Number.isFinite(clipEnd)
+  ) {
+    return `${itemPath}#clip:${clipStart.toFixed(3)}-${clipEnd.toFixed(3)}`;
+  }
+
+  return itemPath || String(row?.id || "").trim();
 }
 
 function disableSearchResultsWindowing() {
@@ -3165,6 +3196,7 @@ const imagePreviewPanel = createImagePreviewPanel({
     if (result?.ok) {
       previewRows = previewRows.filter((row) => String(row?.path || row?.image_path || "") !== imagePath);
       activePreviewPath = "";
+      activePreviewRowKey = "";
       await refreshResultsForCurrentControls();
     }
     return result;
@@ -3256,7 +3288,11 @@ const imagePreviewPanel = createImagePreviewPanel({
       return;
     }
 
-    const currentIndex = previewRows.findIndex((row) => String(row?.path || row?.image_path || "") === activePreviewPath);
+    const currentIndexByKey = activePreviewRowKey
+      ? previewRows.findIndex((row) => getResultRowKey(row) === activePreviewRowKey)
+      : -1;
+    const currentIndexByPath = previewRows.findIndex((row) => String(row?.path || row?.image_path || "") === activePreviewPath);
+    const currentIndex = currentIndexByKey >= 0 ? currentIndexByKey : currentIndexByPath;
     const fallbackIndex = currentIndex >= 0 ? currentIndex : 0;
     const delta = direction === "prev" ? -1 : 1;
     const nextIndex = Math.max(0, Math.min(previewRows.length - 1, fallbackIndex + delta));
@@ -3265,6 +3301,7 @@ const imagePreviewPanel = createImagePreviewPanel({
       return;
     }
     activePreviewPath = String(nextRow?.path || nextRow?.image_path || "");
+    activePreviewRowKey = getResultRowKey(nextRow);
     void imagePreviewPanel.openForRow(nextRow, previewRows.length);
   },
   setStatus,
@@ -3307,12 +3344,16 @@ function renderResults(results, options = {}) {
     const isTimeframeClip = String(row?.clip_mode || "") === "matching_timeframe";
     const clipStartSeconds = Number(row?.clip_start_seconds);
     const clipEndSeconds = Number(row?.clip_end_seconds);
+    const clipWindowLabel = isTimeframeClip && Number.isFinite(clipStartSeconds) && Number.isFinite(clipEndSeconds)
+      ? `${formatSecondsLabel(clipStartSeconds)}-${formatSecondsLabel(clipEndSeconds)}`
+      : "";
+    const displayTitle = clipWindowLabel ? `${title} [${clipWindowLabel}]` : title;
 
     const titleEl = node.querySelector(".title");
     const hideGalleryTitle = isWelcome
       ? true
-      : isLikelyDuplicateTitleAndDescription(title, desc);
-    titleEl.textContent = hideGalleryTitle ? "" : title;
+      : isLikelyDuplicateTitleAndDescription(displayTitle, desc);
+    titleEl.textContent = hideGalleryTitle ? "" : displayTitle;
     titleEl.style.display = hideGalleryTitle ? "none" : "";
     node.querySelector(".score").textContent = isWelcome ? "Library" : `Score: ${Number(row.score || 0).toFixed(3)}`;
 
@@ -3325,14 +3366,18 @@ function renderResults(results, options = {}) {
     node.querySelector(".objects").textContent = objects ? `Objects: ${objects}` : "";
     node.querySelector(".path").textContent = row.path || row.image_path || "";
 
-    if (mediaType === "video" && imagePath && stitchModeState.selectedVideos.has(imagePath)) {
-      const existingItem = stitchModeState.selectedVideos.get(imagePath) || {};
-      stitchModeState.selectedVideos.set(imagePath, {
+    const stitchSelectionKey = getResultRowKey(row);
+    if (mediaType === "video" && imagePath && stitchSelectionKey && stitchModeState.selectedVideos.has(stitchSelectionKey)) {
+      const existingItem = stitchModeState.selectedVideos.get(stitchSelectionKey) || {};
+      stitchModeState.selectedVideos.set(stitchSelectionKey, {
         ...existingItem,
         path: imagePath,
         media_type: "video",
-        title: String(title || existingItem.title || "Untitled video"),
+        title: String(displayTitle || existingItem.title || "Untitled video"),
         preview_src: String(row.preview_src || existingItem.preview_src || ""),
+        clip_mode: row?.clip_mode || existingItem.clip_mode || null,
+        clip_start_seconds: Number.isFinite(clipStartSeconds) ? clipStartSeconds : existingItem.clip_start_seconds,
+        clip_end_seconds: Number.isFinite(clipEndSeconds) ? clipEndSeconds : existingItem.clip_end_seconds,
       });
     }
 
@@ -3373,13 +3418,16 @@ function renderResults(results, options = {}) {
 
     card.tabIndex = 0;
     card.setAttribute("role", "button");
-    card.setAttribute("aria-label", `Open ${mediaType} preview for ${title}`);
+    card.setAttribute("aria-label", `Open ${mediaType} preview for ${displayTitle}`);
     card.draggable = Boolean(imagePath);
-    card.dataset.stitchTitle = String(title || "Untitled video");
+    card.dataset.stitchTitle = String(displayTitle || "Untitled video");
     card.dataset.stitchPreviewSrc = String(row.preview_src || "");
+    card.dataset.stitchSelectionKey = stitchSelectionKey;
+    card.dataset.clipMode = String(row?.clip_mode || "");
     if (imagePath) {
       card.dataset.imagePath = imagePath;
     }
+    card.dataset.resultRowKey = getResultRowKey(row);
 
     const selectCheckbox = document.createElement("input");
     selectCheckbox.type = "checkbox";
@@ -3412,7 +3460,7 @@ function renderResults(results, options = {}) {
     downloadBtn.type = "button";
     downloadBtn.className = "result-download-btn";
     downloadBtn.title = "Download original file";
-    downloadBtn.setAttribute("aria-label", `Download ${title}`);
+    downloadBtn.setAttribute("aria-label", `Download ${displayTitle}`);
     downloadBtn.innerHTML = `
       <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
         <path d="M12 3v10" />
@@ -3434,7 +3482,7 @@ function renderResults(results, options = {}) {
     cloudIndexBtn.type = "button";
     cloudIndexBtn.className = "result-cloud-index-btn";
     cloudIndexBtn.title = "Cloud index this item";
-    cloudIndexBtn.setAttribute("aria-label", `Cloud index ${title}`);
+    cloudIndexBtn.setAttribute("aria-label", `Cloud index ${displayTitle}`);
     cloudIndexBtn.innerHTML = `
       <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
         <path d="M7 18h9a4 4 0 0 0 0-8 5 5 0 0 0-9.5-1.5A3.5 3.5 0 0 0 7 18z" />
@@ -3454,12 +3502,14 @@ function renderResults(results, options = {}) {
 
     card.addEventListener("click", () => {
       activePreviewPath = imagePath;
+      activePreviewRowKey = getResultRowKey(row);
       void imagePreviewPanel.openForRow(row, previewRows.length);
     });
     card.addEventListener("keydown", (event) => {
       if (event.key === "Enter" || event.key === " ") {
         event.preventDefault();
         activePreviewPath = imagePath;
+        activePreviewRowKey = getResultRowKey(row);
         void imagePreviewPanel.openForRow(row, previewRows.length);
       }
     });
@@ -3501,20 +3551,31 @@ function renderResults(results, options = {}) {
     const overflow = Math.max(0, cards.length - maxRenderedCards);
     if (overflow > 0) {
       const prunedPaths = new Set();
+      const prunedRowKeys = new Set();
       for (let i = 0; i < overflow; i += 1) {
         const card = cards[i];
         const imagePath = String(card?.dataset?.imagePath || "").trim();
+        const rowKey = String(card?.dataset?.resultRowKey || "").trim();
         if (imagePath) {
           prunedPaths.add(imagePath);
+        }
+        if (rowKey) {
+          prunedRowKeys.add(rowKey);
         }
         releaseResultCardMedia(card);
         cardMediaObserver?.unobserve(card);
         card.remove();
       }
 
-      if (prunedPaths.size > 0) {
+      if (prunedPaths.size > 0 || prunedRowKeys.size > 0) {
         if (managePreviewRows) {
-          previewRows = previewRows.filter((row) => !prunedPaths.has(String(row?.path || row?.image_path || "").trim()));
+          previewRows = previewRows.filter((row) => {
+            const rowKey = getResultRowKey(row);
+            if (rowKey && prunedRowKeys.has(rowKey)) {
+              return false;
+            }
+            return !prunedPaths.has(String(row?.path || row?.image_path || "").trim());
+          });
         }
         for (const imagePath of prunedPaths) {
           selectedImagePaths.delete(imagePath);
@@ -3849,7 +3910,7 @@ async function runWizardCombinedClipSearch(queries, label = "Wizard clips") {
   const topKValue = Math.max(1, Math.min(200, Number(topKInput.value || 20)));
   const minScore = Number(userSettingsState.minMatchScore || 0.001);
   const baseFilters = buildFiltersPayload();
-  const mergedRowsByPath = new Map();
+  const mergedRowsByKey = new Map();
   let successfulQueries = 0;
 
   for (let i = 0; i < cleanedQueries.length; i += 1) {
@@ -3881,18 +3942,18 @@ async function runWizardCombinedClipSearch(queries, label = "Wizard clips") {
     const rows = Array.isArray(result.results) ? result.results : [];
     for (const row of rows) {
       const compact = toCompactSearchResultRow(row);
-      const key = String(compact.path || compact.image_path || compact.id || "").trim();
+      const key = getResultRowKey(compact);
       if (!key) {
         continue;
       }
-      const existing = mergedRowsByPath.get(key);
+      const existing = mergedRowsByKey.get(key);
       if (!existing || Number(compact.score || 0) > Number(existing.score || 0)) {
-        mergedRowsByPath.set(key, compact);
+        mergedRowsByKey.set(key, compact);
       }
     }
   }
 
-  const mergedRows = Array.from(mergedRowsByPath.values())
+  const mergedRows = Array.from(mergedRowsByKey.values())
     .sort((a, b) => Number(b.score || 0) - Number(a.score || 0))
     .slice(0, SEARCH_RESULTS_MAX_STORED_ROWS);
 
@@ -4121,6 +4182,14 @@ if (reloadUserSettingsBtn) {
   reloadUserSettingsBtn.addEventListener("click", async () => {
     await syncHomepageFiltersFromSavedSettings();
     setStatus("Settings reloaded.");
+  });
+}
+
+if (settingsVideoSearchResultModeSelect) {
+  settingsVideoSearchResultModeSelect.addEventListener("change", () => {
+    userSettingsState.videoSearchResultMode = normalizeVideoSearchResultMode(
+      settingsVideoSearchResultModeSelect.value,
+    );
   });
 }
 
