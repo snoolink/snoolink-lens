@@ -1,0 +1,3671 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Snoolink Kinetic Typography Studio - Dashboard App</title>
+<meta name="description" content="Dashboard app for creating kinetic typography videos. Configure styles, layouts, timing, overlays, and export social-ready MP4 from your browser.">
+<link rel="canonical" href="https://snoolink.com/kinetic-typography-generator.html">
+<meta name="robots" content="index, follow">
+<meta name="theme-color" content="#5D1EF4">
+<meta name="msapplication-TileColor" content="#5D1EF4">
+<meta property="og:title" content="Snoolink Kinetic Typography Studio">
+<meta property="og:description" content="Dashboard app with style presets, phrase-aware motion graphics, and MP4 export.">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://snoolink.com/kinetic-typography-generator.html">
+<meta property="og:image" content="https://snoolink.com/assets/social-preview.png">
+<meta property="og:site_name" content="snoolink">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:site" content="@snoolink">
+<meta name="twitter:title" content="Snoolink Kinetic Typography Studio">
+<meta name="twitter:description" content="Create and export kinetic typography videos in the dashboard app.">
+<meta name="twitter:image" content="https://snoolink.com/assets/social-preview.png">
+<link rel="icon" type="image/png" href="assets/favicon.ico">
+<link rel="manifest" href="/manifest.json">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Space+Grotesk:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/lottie-web/5.12.2/lottie.min.js"></script>
+<script type="module" src="https://unpkg.com/@dotlottie/player-component@2.7.12/dist/dotlottie-player.mjs"></script>
+<script src="https://unpkg.com/@ffmpeg/ffmpeg@0.11.6/dist/ffmpeg.min.js"></script>
+<script type="application/ld+json">
+{"@context":"https://schema.org","@type":"WebApplication","name":"Snoolink Kinetic Typography Generator","url":"https://snoolink.com/kinetic-typography-generator.html","applicationCategory":"MultimediaApplication","operatingSystem":"Web Browser","publisher":{"@type":"Organization","name":"snoolink","url":"https://snoolink.com/"}}
+</script>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#0C0C0E;--surface:#141416;--surface2:#1C1C1F;
+  --border:#252528;--border2:#333337;
+  --accent:#5D1EF4;--adim:rgba(93,30,244,0.16);--ahov:#7C4DFF;
+  --text:#F0F0F2;--text2:#888899;--text3:#505060;
+  --r:10px;--rs:6px;
+}
+html,body{height:100%;overflow:hidden;background:var(--bg);}
+body{width:100%;min-height:100dvh;font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);display:flex;flex-direction:column;}
+
+/* ── NAV ── */
+nav{display:flex;align-items:center;justify-content:space-between;padding:0 16px;height:52px;border-bottom:1px solid var(--border);background:var(--surface);flex-shrink:0;z-index:200;}
+.nav-logo{font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:15px;color:var(--text);text-decoration:none;display:flex;align-items:center;gap:6px;}
+.logo-spark{color:var(--accent);}
+.nav-right{display:flex;align-items:center;gap:8px;}
+.credits-chip{display:flex;align-items:center;gap:5px;background:var(--adim);border:1px solid rgba(93,30,244,0.35);border-radius:20px;padding:3px 10px;font-size:11.5px;font-weight:600;color:var(--accent);}
+.btn-up{background:var(--accent);color:#fff;border:none;border-radius:var(--rs);padding:5px 12px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;}
+.btn-up:hover{background:var(--ahov);}
+.avatar{width:28px;height:28px;border-radius:50%;background:linear-gradient(135deg,#5D1EF4,#7C3AED);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;cursor:pointer;}
+.nav-cta{display:inline-flex;align-items:center;gap:8px;background:linear-gradient(135deg,#5D1EF4,#6D28D9);color:#fff;text-decoration:none;border:1px solid rgba(255,255,255,0.14);border-radius:999px;padding:8px 14px;font-size:12.5px;font-weight:700;letter-spacing:0.01em;box-shadow:0 8px 20px rgba(93,30,244,0.35);transition:transform 0.14s ease,box-shadow 0.14s ease,filter 0.14s ease;white-space:nowrap;}
+.nav-cta:hover{transform:translateY(-1px);box-shadow:0 10px 24px rgba(93,30,244,0.45);filter:brightness(1.04);}
+.nav-cta:active{transform:translateY(0);}
+.nav-cta svg{flex-shrink:0;}
+/* mobile hamburger */
+.ham-btn{display:none;background:none;border:none;color:var(--text2);cursor:pointer;padding:4px;}
+@media(max-width:768px){
+  .ham-btn{display:flex;align-items:center;}
+  .credits-chip{display:none;}
+  .nav-cta{padding:7px 11px;font-size:11.5px;gap:6px;}
+}
+
+/* ── APP LAYOUT ── */
+.app{display:flex;flex:1;min-height:0;overflow:hidden;position:relative;}
+
+/* ── SIDEBAR ── */
+.sidebar{width:25%;flex-shrink:0;background:var(--surface);border-right:1px solid var(--border);overflow-y:auto;overflow-x:hidden;display:block;transition:transform 0.25s ease;z-index:150;}
+.sidebar::-webkit-scrollbar{width:3px;}
+.sidebar::-webkit-scrollbar-thumb{background:var(--border2);border-radius:2px;}
+@media(max-width:768px){
+  .sidebar{position:absolute;top:0;left:0;height:100%;transform:translateX(-100%);width:min(300px,88vw);}
+  .sidebar.open{transform:translateX(0);box-shadow:8px 0 32px rgba(0,0,0,0.6);}
+}
+.sidebar-overlay{display:none;position:absolute;inset:0;background:rgba(0,0,0,0.5);z-index:140;}
+@media(max-width:768px){.sidebar-overlay.show{display:block;}}
+
+.s-section{padding:16px 18px;border-bottom:1px solid var(--border);}
+.s-label{font-size:12px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;color:var(--text3);margin-bottom:11px;}
+.s-head-btn{width:100%;display:flex;align-items:center;justify-content:space-between;background:transparent;border:none;color:var(--text3);font-size:12px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;padding:0;cursor:pointer;font-family:inherit;}
+.s-head-btn:hover{color:var(--text2);}
+.s-caret{font-size:13px;line-height:1;transition:transform 0.18s ease;color:var(--text2);}
+.s-section.collapsed .s-caret{transform:rotate(-90deg);}
+.s-content{margin-top:11px;}
+.s-section.collapsed .s-content{display:none;}
+
+/* Script */
+.script-section{
+  position:relative;
+  border:1px solid rgba(93,30,244,0.2);
+  border-radius:12px;
+  margin:12px 12px 10px;
+  padding:16px 16px 14px;
+  background:
+    radial-gradient(120% 120% at 100% 0%, rgba(93,30,244,0.12) 0%, rgba(93,30,244,0) 55%),
+    linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0));
+  box-shadow:0 8px 20px rgba(0,0,0,0.22);
+  transition:border-color .2s ease, box-shadow .2s ease, transform .2s ease;
+}
+.script-section:focus-within{
+  border-color:rgba(93,30,244,0.45);
+  box-shadow:0 10px 26px rgba(0,0,0,0.3), 0 0 0 1px rgba(93,30,244,0.28) inset;
+  transform:translateY(-1px);
+}
+.script-section .s-head-btn{color:#A9A6BC;}
+.script-section .s-head-btn:hover{color:#D1CFF0;}
+.script-box{width:100%;background:rgba(12,12,14,0.46);border:1px solid rgba(255,255,255,0.08);border-radius:var(--r);color:var(--text);font-family:'Inter',sans-serif;font-size:15px;line-height:1.7;padding:14px 15px;resize:vertical;min-height:176px;max-height:320px;outline:none;transition:border-color .18s,box-shadow .18s,background-color .18s;}
+.script-box:focus{border-color:var(--accent);background:rgba(12,12,14,0.65);box-shadow:0 0 0 3px rgba(93,30,244,0.18);}
+.script-box::placeholder{color:var(--text3);}
+.script-meta{display:flex;justify-content:space-between;align-items:center;margin-top:9px;font-size:12.5px;color:#9E9BB2;}
+.script-meta span{padding:2px 8px;border-radius:999px;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.06);}
+
+/* Grid pickers */
+.style-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;}
+.style-card{border:2px solid var(--border);border-radius:8px;overflow:hidden;cursor:pointer;transition:border-color 0.15s,transform 0.1s;}
+.style-card:hover{border-color:var(--border2);transform:scale(1.02);}
+.style-card.sel{border-color:var(--accent);}
+.sc-preview{aspect-ratio:16/9;display:flex;align-items:center;justify-content:center;font-weight:900;font-size:13.5px;overflow:hidden;}
+.sc-name{padding:6px 8px;font-size:12px;font-weight:500;color:var(--text2);background:var(--surface2);display:flex;align-items:center;gap:8px;min-width:0;}
+.style-card.sel .sc-name{color:#fff;}
+.style-variants{display:flex;gap:5px;align-items:center;margin-left:auto;flex-shrink:0;}
+.style-vdot{width:11px;height:11px;border-radius:50%;border:1px solid rgba(255,255,255,0.35);cursor:pointer;opacity:.75;transition:transform .1s,opacity .1s,border-color .1s;}
+.style-vdot:hover{transform:scale(1.15);opacity:1;}
+.style-vdot.sel{opacity:1;border-color:#fff;box-shadow:0 0 0 1px rgba(0,0,0,0.45) inset;}
+
+.layout-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:7px;}
+.layout-card{border:2px solid var(--border);border-radius:8px;padding:9px 6px;cursor:pointer;text-align:center;transition:border-color 0.15s;background:var(--surface2);}
+.layout-card:hover{border-color:var(--border2);}
+.layout-card.sel{border-color:var(--accent);background:var(--adim);}
+.layout-icon{font-size:18px;margin-bottom:4px;}
+.layout-name{font-size:11px;color:var(--text2);font-weight:600;}
+.layout-card.sel .layout-name{color:#fff;}
+
+/* Ratio picker */
+.ratio-row{display:flex;gap:7px;}
+.ratio-chip{flex:1;padding:8px 0;text-align:center;border:1px solid var(--border);border-radius:var(--rs);font-size:12.5px;color:var(--text2);cursor:pointer;background:var(--surface2);transition:all 0.12s;font-family:inherit;font-weight:500;}
+.ratio-chip:hover{border-color:var(--border2);color:var(--text);}
+.ratio-chip.sel{background:var(--adim);border-color:rgba(93,30,244,0.45);color:#fff;font-weight:700;}
+
+/* Anim chips */
+.anim-row{display:flex;flex-wrap:wrap;gap:6px;}
+.anim-chip{padding:6px 11px;border-radius:20px;border:1px solid var(--border);background:var(--surface2);font-size:12px;color:var(--text2);cursor:pointer;transition:all 0.12s;font-family:inherit;}
+.anim-chip:hover{border-color:var(--border2);color:var(--text);}
+.anim-chip.sel{background:var(--adim);border-color:rgba(93,30,244,0.45);color:#fff;font-weight:600;}
+
+/* Timing */
+.timing-row{display:flex;gap:7px;}
+.timing-chip{flex:1;padding:7px 0;text-align:center;border:1px solid var(--border);border-radius:var(--rs);font-size:12px;color:var(--text2);cursor:pointer;background:var(--surface2);transition:all 0.12s;font-family:inherit;}
+.timing-chip:hover{border-color:var(--border2);color:var(--text);}
+.timing-chip.sel{background:var(--adim);border-color:rgba(93,30,244,0.45);color:#fff;font-weight:600;}
+
+/* Controls */
+.ctrl-row{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;}
+.ctrl-row:last-child{margin-bottom:0;}
+.ctrl-lbl{font-size:13px;color:var(--text2);}
+.ctrl-right{display:flex;align-items:center;gap:9px;}
+input[type=range]{appearance:none;-webkit-appearance:none;width:170px;height:4px;background:var(--border2);border-radius:2px;outline:none;cursor:pointer;}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;height:14px;background:var(--accent);border-radius:50%;}
+.ctrl-val{font-size:12px;color:var(--text2);min-width:38px;text-align:right;}
+.color-row{display:flex;gap:5px;flex-wrap:wrap;}
+.swatch{width:24px;height:24px;border-radius:50%;cursor:pointer;border:2px solid transparent;transition:transform 0.1s;}
+.swatch:hover{transform:scale(1.2);}
+.swatch.sel{border-color:rgba(255,255,255,0.75);}
+.toggle{width:38px;height:20px;background:var(--border2);border-radius:10px;position:relative;cursor:pointer;transition:background 0.2s;border:none;flex-shrink:0;}
+.toggle.on{background:var(--accent);}
+.toggle::after{content:'';position:absolute;width:14px;height:14px;background:#fff;border-radius:50%;top:3px;left:3px;transition:left 0.2s;}
+.toggle.on::after{left:21px;}
+
+/* Generate */
+.btn-gen{width:100%;background:var(--accent);color:#fff;border:none;border-radius:var(--r);padding:14px;font-size:16px;font-weight:700;font-family:'Space Grotesk',sans-serif;cursor:pointer;transition:background 0.15s,transform 0.1s;display:flex;align-items:center;justify-content:center;gap:9px;}
+.btn-gen:hover{background:var(--ahov);transform:translateY(-1px);}
+.btn-gen.busy{background:#3f22a6;pointer-events:none;}
+
+/* ── RIGHT PANEL ── */
+.right{flex:1;display:flex;flex-direction:column;overflow:hidden;min-width:0;}
+.preview-bar{display:flex;align-items:center;justify-content:space-between;padding:10px 16px;border-bottom:1px solid var(--border);background:var(--surface);flex-shrink:0;gap:8px;position:sticky;top:0;z-index:30;}
+.pb-left{display:flex;align-items:center;gap:10px;min-width:0;}
+.pb-title{font-size:12.5px;font-weight:600;color:var(--text2);}
+.ratio-badge{font-size:10px;font-weight:700;padding:2px 7px;border-radius:4px;background:var(--surface2);color:var(--text3);border:1px solid var(--border);}
+.pb-actions{display:flex;gap:6px;flex-shrink:0;}
+.preview-gen{
+  width:auto;
+  padding:11px 16px;
+  border-radius:10px;
+  font-size:13px;
+  font-weight:800;
+  letter-spacing:.01em;
+  white-space:nowrap;
+  flex-shrink:0;
+  min-height:40px;
+  background:linear-gradient(135deg,#6B2CF6,#5D1EF4 55%,#7C4DFF);
+  box-shadow:0 8px 20px rgba(93,30,244,0.35), inset 0 0 0 1px rgba(255,255,255,0.14);
+}
+.preview-gen:hover{
+  transform:translateY(-1px) scale(1.01);
+  box-shadow:0 12px 26px rgba(93,30,244,0.45), inset 0 0 0 1px rgba(255,255,255,0.18);
+  filter:brightness(1.04);
+}
+.preview-gen:active{
+  transform:translateY(0) scale(0.99);
+  box-shadow:0 6px 14px rgba(93,30,244,0.35), inset 0 0 0 1px rgba(255,255,255,0.12);
+}
+.preview-gen:focus-visible{outline:2px solid #A78BFA;outline-offset:2px;}
+.btn-ghost{background:var(--surface2);border:1px solid var(--border);color:var(--text2);padding:5px 11px;border-radius:var(--rs);font-size:12px;cursor:pointer;font-family:inherit;transition:all 0.12s;white-space:nowrap;}
+.btn-ghost:hover{color:var(--text);border-color:var(--border2);}
+.btn-dl{background:var(--accent);border:none;color:#fff;padding:5px 13px;border-radius:var(--rs);font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;transition:background 0.12s;display:flex;align-items:center;gap:5px;white-space:nowrap;}
+.btn-dl:hover{background:var(--ahov);}
+.btn-dl:disabled{background:#3f22a6;pointer-events:none;}
+@media(max-width:768px){
+  .preview-gen{padding:10px 13px;font-size:12px;min-height:38px;}
+}
+
+/* ── CANVAS AREA ── */
+.canvas-area{flex:1;display:flex;align-items:center;justify-content:center;padding:20px;background:#060607;position:relative;overflow:hidden;min-height:0;}
+.canvas-wrap{position:relative;border-radius:10px;overflow:hidden;box-shadow:0 0 0 1px var(--border),0 20px 60px rgba(0,0,0,0.85);flex-shrink:0;}
+canvas{display:block;}
+
+/* Word timeline strip */
+.word-timeline{position:absolute;bottom:28px;left:50%;transform:translateX(-50%);display:flex;gap:4px;align-items:center;max-width:94%;flex-wrap:nowrap;overflow:hidden;pointer-events:none;}
+.wt-word{font-size:9.5px;font-weight:600;padding:2px 6px;border-radius:4px;white-space:nowrap;background:rgba(255,255,255,0.05);color:rgba(255,255,255,0.18);border:1px solid transparent;transition:all 0.15s;}
+.wt-word.active{background:var(--adim);color:#fff;border-color:rgba(93,30,244,0.45);}
+.wt-word.done{color:rgba(255,255,255,0.36);}
+
+/* Playbar */
+.playbar{display:flex;align-items:center;gap:10px;padding:10px 16px;border-top:1px solid var(--border);background:var(--surface);flex-shrink:0;}
+.play-btn{width:32px;height:32px;border-radius:50%;background:var(--accent);border:none;display:flex;align-items:center;justify-content:center;cursor:pointer;transition:background 0.12s;flex-shrink:0;}
+.play-btn:hover{background:var(--ahov);}
+.progress-track{flex:1;height:4px;background:var(--border2);border-radius:2px;cursor:pointer;position:relative;}
+.progress-fill{height:100%;background:var(--accent);border-radius:2px;width:0%;pointer-events:none;}
+.progress-thumb{position:absolute;top:50%;transform:translate(-50%,-50%);width:12px;height:12px;background:var(--accent);border-radius:50%;pointer-events:none;left:0%;}
+.time-lbl{font-size:11.5px;color:var(--text3);min-width:76px;text-align:right;}
+
+/* Export modal */
+.modal-bg{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:500;align-items:center;justify-content:center;}
+.modal-bg.show{display:flex;}
+.modal{background:var(--surface);border:1px solid var(--border2);border-radius:14px;padding:24px;width:min(380px,92vw);box-shadow:0 24px 64px rgba(0,0,0,0.7);}
+.modal h3{font-size:16px;font-weight:700;margin-bottom:6px;}
+.modal p{font-size:13px;color:var(--text2);margin-bottom:20px;line-height:1.5;}
+.modal-btns{display:flex;flex-direction:column;gap:8px;}
+.modal-btn{padding:11px 16px;border-radius:var(--r);font-size:13.5px;font-weight:600;cursor:pointer;font-family:inherit;border:none;transition:all 0.15s;display:flex;align-items:center;justify-content:center;gap:8px;}
+.modal-btn.primary{background:var(--accent);color:#fff;}
+.modal-btn.primary:hover{background:var(--ahov);}
+.modal-btn.secondary{background:var(--surface2);color:var(--text);border:1px solid var(--border2);}
+.modal-btn.secondary:hover{border-color:var(--border);color:var(--text);}
+.modal-btn.cancel{background:transparent;color:var(--text2);}
+.modal-btn.cancel:hover{color:var(--text);}
+.dl-progress{margin-top:14px;display:none;}
+.dl-bar-wrap{height:6px;background:var(--border2);border-radius:3px;overflow:hidden;margin-bottom:6px;}
+.dl-bar{height:100%;background:var(--accent);border-radius:3px;width:0%;transition:width 0.1s;}
+.dl-status{font-size:12px;color:var(--text2);text-align:center;}
+
+/* Toast */
+.toast{position:fixed;top:18px;left:50%;background:var(--surface2);border:1px solid var(--border2);border-radius:var(--r);padding:10px 15px;font-size:12.5px;box-shadow:0 8px 32px rgba(0,0,0,0.5);transform:translate(-50%,-60px);opacity:0;transition:all 0.3s cubic-bezier(0.34,1.56,0.64,1);z-index:999;display:flex;align-items:center;gap:8px;max-width:300px;}
+.toast.show{transform:translate(-50%,0);opacity:1;}
+.toast-dot{width:6px;height:6px;border-radius:50%;background:#22c55e;flex-shrink:0;}
+.toast-dot.err{background:#ef4444;}
+
+button:focus-visible,.style-card:focus-visible,.layout-card:focus-visible,.swatch:focus-visible,.toggle:focus-visible,textarea:focus-visible,input:focus-visible{outline:2px solid var(--accent);outline-offset:2px;}
+
+@keyframes spin{to{transform:rotate(360deg);}}
+</style>
+</head>
+<body>
+
+<nav>
+  <div style="display:flex;align-items:center;gap:10px;">
+    <button class="ham-btn" onclick="toggleSidebar()" aria-label="Menu">
+      <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M3 5h14M3 10h14M3 15h14" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+    </button>
+    <a class="nav-logo" href="#">Snoolink Kinetic Typography</a>
+  </div>
+  <div class="nav-right">
+    <a class="nav-cta" href="kinetic-typography.html" aria-label="View guide and examples">
+      <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true"><path d="M2 1.8h8v8.4H2zM4 3.8h4M4 5.8h4M4 7.8h2" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      Guide & Examples
+    </a>
+  </div>
+</nav>
+
+<div class="app">
+  <div class="sidebar-overlay" id="sidebarOverlay" onclick="toggleSidebar()"></div>
+
+  <!-- ── SIDEBAR ── -->
+  <aside class="sidebar" id="sidebar">
+
+    <div class="s-section script-section">
+      <div class="s-label">Script</div>
+      <textarea class="script-box" id="scriptInput" placeholder="Type your script…">Meet Snoolink, your social media content management platform that helps you organize, manage, and automate your content workflow — so you can focus on what matters most.</textarea>
+      <div class="script-meta">
+        <span id="wordCount">24 words</span>
+        <span id="charCount">167 / 500</span>
+      </div>
+    </div>
+
+    <div class="s-section">
+      <div class="s-label">Visual Style</div>
+      <div class="style-grid">
+        <div class="style-card sel" data-style="neon" onclick="selStyle(this)">
+          <div class="sc-preview" style="background:#000;color:#0FF;text-shadow:0 0 12px #0FF;font-family:'Space Grotesk',sans-serif">NEON</div>
+          <div class="sc-name">Neon Glow</div>
+        </div>
+        <div class="style-card" data-style="cinematic" onclick="selStyle(this)">
+          <div class="sc-preview" style="background:#0d0d0d;color:#e8d5b0;font-family:Georgia,serif;font-style:italic;letter-spacing:3px;font-size:11px">CINE</div>
+          <div class="sc-name">Cinematic</div>
+        </div>
+        <div class="style-card" data-style="minimal" onclick="selStyle(this)">
+          <div class="sc-preview" style="background:#f7f7f7;color:#111;font-family:'Space Grotesk',sans-serif;font-size:14px">MIN</div>
+          <div class="sc-name">Minimal</div>
+        </div>
+        <div class="style-card" data-style="graffiti" onclick="selStyle(this)">
+          <div class="sc-preview" style="background:#150a28;color:#FF2D78;font-family:Impact,sans-serif;font-size:14px;text-shadow:3px 3px 0 #7C00FF">GRAF</div>
+          <div class="sc-name">Graffiti</div>
+        </div>
+        <div class="style-card" data-style="hype" onclick="selStyle(this)">
+          <div class="sc-preview" style="background:#FF6321;color:#fff;font-family:'Space Grotesk',sans-serif;font-size:15px;font-weight:900">HYPE</div>
+          <div class="sc-name">Hype</div>
+        </div>
+        <div class="style-card" data-style="paper" onclick="selStyle(this)">
+          <div class="sc-preview" style="background:#F5EDD8;color:#2C1810;font-family:'Courier New',monospace;font-size:9px">type_</div>
+          <div class="sc-name">Paper</div>
+        </div>
+        <div class="style-card" data-style="editorial" onclick="selStyle(this)">
+          <div class="sc-preview" style="background:#E6D3B5;color:#111;font-family:'Space Grotesk',sans-serif;font-size:12px;font-weight:800;letter-spacing:.2px">editorial</div>
+          <div class="sc-name">Editorial Poster</div>
+        </div>
+        <div class="style-card" data-style="pulse" onclick="selStyle(this)">
+          <div class="sc-preview" style="background:#0C0E14;color:#FF2E63;font-family:Impact,sans-serif;font-size:15px;letter-spacing:.7px">PULSE</div>
+          <div class="sc-name">Beat Sync</div>
+        </div>
+        <div class="style-card" data-style="serene" onclick="selStyle(this)">
+          <div class="sc-preview" style="background:#e9f0ff;color:#3558a9;font-family:Georgia,serif;font-size:13px;font-style:italic">fluid</div>
+          <div class="sc-name">Fluid Organic</div>
+        </div>
+        <div class="style-card" data-style="blueprint" onclick="selStyle(this)">
+          <div class="sc-preview" style="background:#0B1E31;color:#7DE2FF;font-family:'Courier New',monospace;font-size:11px;letter-spacing:1px">GRID_SYS</div>
+          <div class="sc-name">Structural Info</div>
+        </div>
+        <div class="style-card" data-style="noir" onclick="selStyle(this)">
+          <div class="sc-preview" style="background:#070707;color:#F3E6C4;font-family:Georgia,serif;font-size:12px;letter-spacing:2px">TITLE</div>
+          <div class="sc-name">Cinematic Noir</div>
+        </div>
+        <div class="style-card" data-style="lyric" onclick="selStyle(this)">
+          <div class="sc-preview" style="background:#131329;color:#8DE4FF;font-family:'Space Grotesk',sans-serif;font-size:12px;font-weight:700">♪ lyric</div>
+          <div class="sc-name">Lyric Stage</div>
+        </div>
+        <div class="style-card" data-style="retro3d" onclick="selStyle(this)">
+          <div class="sc-preview" style="background:#101319;color:#F7D06D;font-family:Impact,sans-serif;font-size:13px;text-shadow:2px 2px 0 #F24E1E,4px 4px 0 #4C6FFF">retro</div>
+          <div class="sc-name">Retro 3D</div>
+        </div>
+        <div class="style-card" data-style="uihero" onclick="selStyle(this)">
+          <div class="sc-preview" style="background:#0E1726;color:#BDE0FF;font-family:'Space Grotesk',sans-serif;font-size:12px">ui.hero</div>
+          <div class="sc-name">Web Hero</div>
+        </div>
+        <div class="style-card" data-style="mono" onclick="selStyle(this)">
+          <div class="sc-preview" style="background:#EFEFEF;color:#111;font-family:'Courier New',monospace;font-size:11px;letter-spacing:1px">MONO</div>
+          <div class="sc-name">Monochrome</div>
+        </div>
+        <div class="style-card" data-style="quotes" onclick="selStyle(this)">
+          <div class="sc-preview" style="background:#000;color:#F2F2F2;font-family:Impact,'Arial Black',sans-serif;font-size:12px;letter-spacing:.2px;text-shadow:2px 2px 0 #4a4a4a">QUOTE</div>
+          <div class="sc-name">Quotes</div>
+        </div>
+        <div class="style-card" data-style="newspaper" onclick="selStyle(this)">
+          <div class="sc-preview" style="background:linear-gradient(180deg,#efe5c9 0%,#e2d6b3 100%);color:#171319;font-family:Impact,'Arial Black',sans-serif;font-size:12px;letter-spacing:.8px;box-shadow:inset 0 0 0 1px rgba(23,19,25,0.12)">NEWS</div>
+          <div class="sc-name">Newspaper</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="s-section">
+      <div class="s-label">Graphics</div>
+      <div class="ctrl-row" style="margin-top:2px;">
+        <span class="ctrl-lbl">Motion graphics 🎭</span>
+        <button class="toggle on" id="toggleMotion" onclick="this.classList.toggle('on');if(generated)drawAtTime(progress*totalDurMs);"></button>
+      </div>
+      <div class="ctrl-row">
+        <span class="ctrl-lbl">Lottie search ✨</span>
+        <button class="toggle" id="toggleLottie" onclick="toggleLottieMode(this)"></button>
+      </div>
+      <div id="lottieStatusRow" class="ctrl-row" style="display:none;margin-top:-4px;">
+        <span class="ctrl-lbl" id="lottieStatus" style="font-size:10.5px;color:var(--text3);font-style:italic;line-height:1.4;">Enable &amp; hit Generate to fetch Lottie animations per line</span>
+      </div>
+      <div class="ctrl-row" style="margin-top:4px;">
+        <span class="ctrl-lbl">unDraw illustrations 🖼</span>
+        <button class="toggle" id="toggleUndraw" onclick="toggleUndrawMode(this)"></button>
+      </div>
+      <div id="undrawStatusRow" class="ctrl-row" style="display:none;margin-top:-4px;">
+        <span class="ctrl-lbl" id="undrawStatus" style="font-size:10.5px;color:var(--text3);font-style:italic;line-height:1.4;">Enable &amp; hit Generate to fetch illustrations</span>
+      </div>
+      <div class="ctrl-row" style="margin-top:4px;">
+        <span class="ctrl-lbl">Pixabay photos 📷</span>
+        <button class="toggle" id="togglePixabay" onclick="togglePixabayMode(this)"></button>
+      </div>
+      <div id="pixabayStatusRow" class="ctrl-row" style="display:none;margin-top:-4px;">
+        <span class="ctrl-lbl" id="pixabayStatus" style="font-size:10.5px;color:var(--text3);font-style:italic;line-height:1.4;">Add API key and hit Generate to fetch photos</span>
+      </div>
+      <div class="ctrl-row" style="margin-top:4px;">
+        <span class="ctrl-lbl">Emoji search 😀</span>
+        <button class="toggle" id="toggleEmoji" onclick="toggleEmojiMode(this)"></button>
+      </div>
+      <div id="emojiStatusRow" class="ctrl-row" style="display:none;margin-top:-4px;">
+        <span class="ctrl-lbl" id="emojiStatus" style="font-size:10.5px;color:var(--text3);font-style:italic;line-height:1.4;">Enable &amp; hit Generate to fetch emojis by keyword</span>
+      </div>
+      <div class="ctrl-row">
+        <span class="ctrl-lbl">Graphic size</span>
+        <div class="ctrl-right">
+          <input type="range" min="20" max="120" value="56" id="graphicSize" oninput="updateCtrl(this,'gsVal','p')">
+          <span class="ctrl-val" id="gsVal">56p</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="s-section">
+      <div class="s-label">Canvas Ratio</div>
+      <div class="ratio-row">
+        <button class="ratio-chip sel" data-ratio="16:9" onclick="selRatio(this)">16∶9</button>
+        <button class="ratio-chip" data-ratio="9:16" onclick="selRatio(this)">9∶16</button>
+        <button class="ratio-chip" data-ratio="1:1" onclick="selRatio(this)">1∶1</button>
+        <button class="ratio-chip" data-ratio="4:5" onclick="selRatio(this)">4∶5</button>
+        <button class="ratio-chip" data-ratio="21:9" onclick="selRatio(this)">21∶9</button>
+        <button class="ratio-chip" data-ratio="3:2" onclick="selRatio(this)">3∶2</button>
+      </div>
+    </div>
+
+    <div class="s-section">
+      <div class="s-label">Layout Mode</div>
+      <div class="layout-grid">
+        <div class="layout-card sel" data-layout="center" onclick="selLayout(this)">
+          <div class="layout-icon">⊞</div><div class="layout-name">Center</div>
+        </div>
+        <div class="layout-card" data-layout="scattered" onclick="selLayout(this)">
+          <div class="layout-icon">✦</div><div class="layout-name">Scattered</div>
+        </div>
+        <div class="layout-card" data-layout="diagonal" onclick="selLayout(this)">
+          <div class="layout-icon">⟋</div><div class="layout-name">Diagonal</div>
+        </div>
+        <div class="layout-card" data-layout="corners" onclick="selLayout(this)">
+          <div class="layout-icon">⬛</div><div class="layout-name">Corners</div>
+        </div>
+        <div class="layout-card" data-layout="stack" onclick="selLayout(this)">
+          <div class="layout-icon">☰</div><div class="layout-name">Stacked</div>
+        </div>
+        <div class="layout-card" data-layout="burst" onclick="selLayout(this)">
+          <div class="layout-icon">💥</div><div class="layout-name">Burst</div>
+        </div>
+        <div class="layout-card" data-layout="comic" onclick="selLayout(this)">
+          <div class="layout-icon">🗯</div><div class="layout-name">Comic</div>
+        </div>
+        <div class="layout-card" data-layout="wave" onclick="selLayout(this)">
+          <div class="layout-icon">〰</div><div class="layout-name">Wave Arc</div>
+        </div>
+        <div class="layout-card" data-layout="grid" onclick="selLayout(this)">
+          <div class="layout-icon">▦</div><div class="layout-name">Grid</div>
+        </div>
+        <div class="layout-card" data-layout="poster" onclick="selLayout(this)">
+          <div class="layout-icon">🅣</div><div class="layout-name">Poster Hero</div>
+        </div>
+        <div class="layout-card" data-layout="beat" onclick="selLayout(this)">
+          <div class="layout-icon">⧉</div><div class="layout-name">Beat Stack</div>
+        </div>
+        <div class="layout-card" data-layout="organic" onclick="selLayout(this)">
+          <div class="layout-icon">∞</div><div class="layout-name">Organic Flow</div>
+        </div>
+        <div class="layout-card" data-layout="info" onclick="selLayout(this)">
+          <div class="layout-icon">⌗</div><div class="layout-name">Info Grid</div>
+        </div>
+        <div class="layout-card" data-layout="crawl" onclick="selLayout(this)">
+          <div class="layout-icon">⇡</div><div class="layout-name">Title Crawl</div>
+        </div>
+        <div class="layout-card" data-layout="lyrics" onclick="selLayout(this)">
+          <div class="layout-icon">♫</div><div class="layout-name">Lyric Split</div>
+        </div>
+        <div class="layout-card" data-layout="radial" onclick="selLayout(this)">
+          <div class="layout-icon">◉</div><div class="layout-name">Radial Ring</div>
+        </div>
+        <div class="layout-card" data-layout="marquee" onclick="selLayout(this)">
+          <div class="layout-icon">▤</div><div class="layout-name">Marquee Strip</div>
+        </div>
+        <div class="layout-card" data-layout="path" onclick="selLayout(this)">
+          <div class="layout-icon">⌒</div><div class="layout-name">Path Curve</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="s-section">
+      <div class="s-label">Word Entry Animation</div>
+      <div class="anim-row">
+        <button class="anim-chip sel" data-anim="mix" onclick="selAnim(this)">✦ Mix</button>
+        <button class="anim-chip" data-anim="pop" onclick="selAnim(this)">Pop</button>
+        <button class="anim-chip" data-anim="slam" onclick="selAnim(this)">Slam</button>
+        <button class="anim-chip" data-anim="rise" onclick="selAnim(this)">Rise</button>
+        <button class="anim-chip" data-anim="drop" onclick="selAnim(this)">Drop</button>
+        <button class="anim-chip" data-anim="slide" onclick="selAnim(this)">Slide R→L</button>
+        <button class="anim-chip" data-anim="slideLtr" onclick="selAnim(this)">Slide L→R</button>
+        <button class="anim-chip" data-anim="glitch" onclick="selAnim(this)">Glitch</button>
+        <button class="anim-chip" data-anim="flip" onclick="selAnim(this)">Flip</button>
+        <button class="anim-chip" data-anim="fade" onclick="selAnim(this)">Fade</button>
+        <button class="anim-chip" data-anim="stretch" onclick="selAnim(this)">Stretch</button>
+        <button class="anim-chip" data-anim="spin" onclick="selAnim(this)">Spin</button>
+        <button class="anim-chip" data-anim="zoom" onclick="selAnim(this)">Zoom</button>
+        <button class="anim-chip" data-anim="wave" onclick="selAnim(this)">Wave</button>
+        <button class="anim-chip" data-anim="typewriter" onclick="selAnim(this)">Type</button>
+        <button class="anim-chip" data-anim="bounce" onclick="selAnim(this)">Bounce</button>
+        <button class="anim-chip" data-anim="whip" onclick="selAnim(this)">Whip</button>
+        <button class="anim-chip" data-anim="swing" onclick="selAnim(this)">Swing</button>
+        <button class="anim-chip" data-anim="orbit" onclick="selAnim(this)">Orbit</button>
+        <button class="anim-chip" data-anim="elastic" onclick="selAnim(this)">Elastic</button>
+        <button class="anim-chip" data-anim="drift" onclick="selAnim(this)">Drift</button>
+        <button class="anim-chip" data-anim="shutter" onclick="selAnim(this)">Shutter</button>
+        <button class="anim-chip" data-anim="handwrite" onclick="selAnim(this)">Handwrite</button>
+        <button class="anim-chip" data-anim="jitter" onclick="selAnim(this)">Jitter</button>
+        <button class="anim-chip" data-anim="reveal" onclick="selAnim(this)">Reveal</button>
+        <button class="anim-chip" data-anim="spiral" onclick="selAnim(this)">Spiral</button>
+        <button class="anim-chip" data-anim="quote" onclick="selAnim(this)">Quote</button>
+      </div>
+    </div>
+
+    <div class="s-section">
+      <div class="s-label">Timing</div>
+      <div class="timing-row">
+        <button class="timing-chip" data-ms="700" onclick="selTiming(this)">Slow</button>
+        <button class="timing-chip sel" data-ms="450" onclick="selTiming(this)">Normal</button>
+        <button class="timing-chip" data-ms="270" onclick="selTiming(this)">Fast</button>
+        <button class="timing-chip" data-ms="150" onclick="selTiming(this)">Rapid</button>
+        <button class="timing-chip" data-ms="120" onclick="selTiming(this)">Beat 120</button>
+        <button class="timing-chip" data-ms="900" onclick="selTiming(this)">Ballad</button>
+      </div>
+    </div>
+
+    <div class="s-section">
+      <div class="s-label">Appearance</div>
+      <div class="ctrl-row">
+        <span class="ctrl-lbl">Base font size</span>
+        <div class="ctrl-right">
+          <input type="range" min="14" max="220" value="150" id="fontSize" oninput="updateCtrl(this,'fsVal','px')">
+          <span class="ctrl-val" id="fsVal">150px</span>
+        </div>
+      </div>
+      <div class="ctrl-row">
+        <span class="ctrl-lbl">Size variety</span>
+        <div class="ctrl-right">
+          <input type="range" min="0" max="100" value="60" id="sizeVar" oninput="updateCtrl(this,'svVal','%')">
+          <span class="ctrl-val" id="svVal">60%</span>
+        </div>
+      </div>
+      <div class="ctrl-row">
+        <span class="ctrl-lbl">Rotation</span>
+        <div class="ctrl-right">
+          <input type="range" min="0" max="45" value="12" id="rotRange" oninput="updateCtrl(this,'rrVal','°')">
+          <span class="ctrl-val" id="rrVal">12°</span>
+        </div>
+      </div>
+      <div class="ctrl-row">
+        <span class="ctrl-lbl">Layout spread</span>
+        <div class="ctrl-right">
+          <input type="range" min="50" max="170" value="100" id="spreadRange" oninput="updateCtrl(this,'spVal','%')">
+          <span class="ctrl-val" id="spVal">100%</span>
+        </div>
+      </div>
+      <div class="ctrl-row">
+        <span class="ctrl-lbl">Font mix</span>
+        <div class="ctrl-right">
+          <input type="range" min="0" max="100" value="80" id="fontMix" oninput="updateCtrl(this,'fmVal','%')">
+          <span class="ctrl-val" id="fmVal">80%</span>
+        </div>
+      </div>
+      <div class="ctrl-row" style="margin-top:9px;">
+        <span class="ctrl-lbl">Mixed fonts</span>
+        <button class="toggle on" id="toggleFontMix" onclick="this.classList.toggle('on');regenLayouts();"></button>
+      </div>
+      <div class="ctrl-row">
+        <span class="ctrl-lbl">Color accents</span>
+        <button class="toggle on" id="toggleAccents" onclick="this.classList.toggle('on');regenLayouts();"></button>
+      </div>
+    </div>
+
+    <div class="s-section">
+      <div id="searchKeywordsRow" class="ctrl-row" style="align-items:flex-start;margin-bottom:10px;">
+        <span class="ctrl-lbl" style="font-size:10.5px;color:var(--text3);line-height:1.45;max-width:100%;white-space:normal;">Search keywords: <span id="searchKeywordsText" style="color:var(--text2);font-style:italic;">—</span></span>
+      </div>
+    </div>
+
+  </aside><!-- /sidebar -->
+
+  <!-- ── RIGHT PANEL ── -->
+  <div class="right">
+    <div class="preview-bar">
+      <div class="pb-left">
+        <button class="btn-gen preview-gen" id="genBtn" onclick="generate()">
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M7 1L8.5 5.2L13 7L8.5 8.8L7 13L5.5 8.8L1 7L5.5 5.2L7 1Z" fill="white"/></svg>
+          Generate Video
+        </button>
+        <span class="pb-title">Kinetic Preview</span>
+        <span class="ratio-badge" id="ratioBadge">16:9</span>
+      </div>
+      <div class="pb-actions">
+        <button class="btn-ghost" onclick="toast('Link copied! 🔗')">Share</button>
+        <button class="btn-dl" id="dlBtn" onclick="openExportModal()">
+          <svg width="11" height="11" viewBox="0 0 11 11" fill="none"><path d="M5.5 1V7.5M5.5 7.5L3 5M5.5 7.5L8 5M1 9.5H10" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          Download
+        </button>
+      </div>
+    </div>
+
+    <div class="canvas-area" id="canvasArea">
+      <div class="canvas-wrap" id="canvasWrap">
+        <canvas id="cv"></canvas>
+        <div id="lottiLayer" style="position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;overflow:hidden;"></div>
+        <div id="lottieSearchLayer" style="position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;overflow:hidden;"></div>
+        <div id="undrawLayer" style="position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;overflow:hidden;"></div>
+        <div id="pixabayLayer" style="position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;overflow:hidden;"></div>
+      </div>
+      <div class="word-timeline" id="wordTimeline"></div>
+    </div>
+
+    <div class="playbar">
+      <button class="play-btn" id="playBtn" onclick="togglePlay()">
+        <svg id="playIco" width="12" height="12" viewBox="0 0 12 12" fill="white"><path d="M2.5 1.5L10.5 6L2.5 10.5V1.5Z"/></svg>
+      </button>
+      <div class="progress-track" onclick="seekClick(event)">
+        <div class="progress-fill" id="progFill"></div>
+        <div class="progress-thumb" id="progThumb"></div>
+      </div>
+      <span class="time-lbl" id="timeLbl">0:00 / 0:00</span>
+    </div>
+  </div>
+</div>
+
+<!-- Export Modal -->
+<div class="modal-bg" id="exportModal">
+  <div class="modal">
+    <h3>Download Video</h3>
+    <p>Choose your export format. MP4 is recommended for social media and is rendered directly in your browser.</p>
+    <div class="modal-btns">
+      <button class="modal-btn primary" onclick="startExport('mp4')">
+        <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M7 1V9.5M7 9.5L4 6.5M7 9.5L10 6.5M1 12H13" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        Download MP4 (Social Ready)
+      </button>
+      <button class="modal-btn secondary" onclick="startExport('webm')">Download WebM (Faster)</button>
+      <button class="modal-btn secondary" onclick="startExport('frames')">
+        🖼 Download Frame as PNG
+      </button>
+      <button class="modal-btn cancel" onclick="closeExportModal()">Cancel</button>
+    </div>
+    <div class="dl-progress" id="dlProgress">
+      <div class="dl-bar-wrap"><div class="dl-bar" id="dlBar"></div></div>
+      <div class="dl-status" id="dlStatus">Recording…</div>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toastEl"><div class="toast-dot" id="toastDot"></div><span id="toastMsg"></span></div>
+
+<script>
+// ═══════════════════════════════════════════
+//  STATE
+// ═══════════════════════════════════════════
+let cv, ctx, W, H;
+let phrases=[], wordMs=450, phraseGapMs=480;
+let currentStyle='neon', currentLayout='center', currentAnim='mix', currentRatio='16:9';
+let playing=false, raf=null, startStamp=null, progress=0, totalDurMs=0, generated=false;
+let ffmpegInstance=null;
+let isExporting=false;
+
+function downloadBlob(blob, filename){
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');
+  a.href=url;a.download=filename;a.click();
+  setTimeout(()=>URL.revokeObjectURL(url),5000);
+}
+
+async function ensureFfmpeg(){
+  if(ffmpegInstance) return ffmpegInstance;
+  if(!window.FFmpeg || !window.FFmpeg.createFFmpeg){
+    throw new Error('FFmpeg library failed to load.');
+  }
+  const { createFFmpeg } = window.FFmpeg;
+  ffmpegInstance=createFFmpeg({
+    log:false,
+    corePath:'https://unpkg.com/@ffmpeg/core@0.11.0/dist/ffmpeg-core.js'
+  });
+  await ffmpegInstance.load();
+  return ffmpegInstance;
+}
+
+async function transcodeWebmToMp4(webmBlob, statusEl, barEl){
+  const ff=await ensureFfmpeg();
+  statusEl.textContent='Converting WebM to MP4…';
+  barEl.style.width='96%';
+  const inputName='input.webm';
+  const outputName='output.mp4';
+  const webmData=new Uint8Array(await webmBlob.arrayBuffer());
+  try{ff.FS('unlink', inputName);}catch(e){}
+  try{ff.FS('unlink', outputName);}catch(e){}
+  ff.FS('writeFile', inputName, webmData);
+  let encoded=false;
+  try{
+    await ff.run(
+      '-i', inputName,
+      '-vf', 'scale=trunc(iw/2)*2:trunc(ih/2)*2,format=yuv420p',
+      '-c:v', 'libx264',
+      '-preset', 'veryfast',
+      '-movflags', '+faststart',
+      '-an',
+      outputName
+    );
+    encoded=true;
+  }catch(primaryErr){
+    // Some ffmpeg.wasm builds do not include libx264; fallback to native mpeg4 encoder.
+    await ff.run(
+      '-i', inputName,
+      '-vf', 'scale=trunc(iw/2)*2:trunc(ih/2)*2,format=yuv420p',
+      '-c:v', 'mpeg4',
+      '-q:v', '2',
+      '-movflags', '+faststart',
+      '-an',
+      outputName
+    );
+    encoded=true;
+  }
+  if(!encoded){
+    throw new Error('FFmpeg could not encode MP4.');
+  }
+  const mp4Data=ff.FS('readFile', outputName);
+  try{ff.FS('unlink', inputName);}catch(e){}
+  try{ff.FS('unlink', outputName);}catch(e){}
+  return new Blob([mp4Data.buffer],{type:'video/mp4'});
+}
+
+function getErrorText(err){
+  if(!err) return 'Unknown error';
+  if(typeof err==='string') return err;
+  return err.message || 'Unknown error';
+}
+
+// ═══════════════════════════════════════════
+//  STYLES
+// ═══════════════════════════════════════════
+const STYLES={
+  neon:     {bg:'#000000',fills:['#00FFFF','#FF00FF','#FFFFFF','#00FF88'],accent:'#FF00FF',shadowColor:'#00FFFF',shadowBlur:22,sOX:0,sOY:0},
+  cinematic:{bg:'#080808',fills:['#E8D5B0','#FFFFFF','#C8A96E'],         accent:'#FFFFFF', shadowColor:'#8B7355',shadowBlur:14,sOX:0,sOY:0},
+  minimal:  {bg:'#F7F7F7',fills:['#111111','#333333','#FF6321'],          accent:'#FF6321', shadowColor:'transparent',shadowBlur:0,sOX:0,sOY:0},
+  graffiti: {bg:'#150a28',fills:['#FF2D78','#FFD700','#00FFCC'],          accent:'#FFD700', shadowColor:'#7C00FF',shadowBlur:0,sOX:5,sOY:5},
+  hype:     {bg:'#FF6321',fills:['#FFFFFF','#FFE000','#111111'],          accent:'#FFE000', shadowColor:'rgba(0,0,0,0.5)',shadowBlur:0,sOX:3,sOY:3},
+  paper:    {bg:'#F5EDD8',fills:['#2C1810','#8B0000','#4A3728'],          accent:'#8B0000', shadowColor:'transparent',shadowBlur:0,sOX:0,sOY:0},
+  editorial:{bg:'#E6D3B5',fills:['#111111','#2A2A2A','#8B0000'],          accent:'#8B0000', shadowColor:'transparent',shadowBlur:0,sOX:0,sOY:0},
+  pulse:    {bg:'#0C0E14',fills:['#FF2E63','#08D9D6','#FFFFFF','#FCE38A'],accent:'#FF2E63', shadowColor:'#FF2E63',shadowBlur:12,sOX:0,sOY:0},
+  serene:   {bg:'#E9F0FF',fills:['#3558A9','#2C3E66','#5D8BF4','#1E2A4A'],accent:'#5D8BF4', shadowColor:'rgba(93,139,244,0.18)',shadowBlur:8,sOX:0,sOY:0},
+  blueprint:{bg:'#0B1E31',fills:['#7DE2FF','#D9F7FF','#57B6D9','#A8ECFF'],accent:'#57B6D9', shadowColor:'#49C8F2',shadowBlur:7,sOX:0,sOY:0},
+  noir:     {bg:'#070707',fills:['#F3E6C4','#D6C29A','#FFFFFF','#A78A59'],accent:'#D6C29A', shadowColor:'rgba(215,194,154,0.35)',shadowBlur:10,sOX:0,sOY:1},
+  lyric:    {bg:'#131329',fills:['#8DE4FF','#F8A8FF','#FFFFFF','#7B9CFF'],accent:'#F8A8FF', shadowColor:'rgba(141,228,255,0.3)',shadowBlur:11,sOX:0,sOY:0},
+  retro3d:  {bg:'#101319',fills:['#F7D06D','#F24E1E','#4C6FFF','#FFFFFF'],accent:'#F24E1E', shadowColor:'rgba(76,111,255,0.35)',shadowBlur:9,sOX:2,sOY:2},
+  uihero:   {bg:'#0E1726',fills:['#BDE0FF','#64B5FF','#FFFFFF','#90F7EC'],accent:'#64B5FF', shadowColor:'rgba(100,181,255,0.25)',shadowBlur:8,sOX:0,sOY:0},
+  mono:     {bg:'#EFEFEF',fills:['#111111','#4A4A4A','#767676','#222222'],accent:'#111111', shadowColor:'transparent',shadowBlur:0,sOX:0,sOY:0},
+  quotes:   {bg:'#000000',fills:['#F2F2F2','#D8D8D8','#FFFFFF','#CFCFCF'],accent:'#FFFFFF', shadowColor:'#4A4A4A',shadowBlur:0,sOX:2,sOY:2},
+  newspaper:{bg:'#E8DFC2',fills:['#171319','#26212A','#0E0B10','#3A313F'],accent:'#171319', shadowColor:'rgba(23,19,25,0.12)',shadowBlur:0,sOX:0,sOY:0},
+};
+
+const STYLE_VARIANTS={
+  neon:[
+    {id:'neon-night',bg:'#000000',fills:['#00FFFF','#FF00FF','#FFFFFF','#00FF88']},
+    {id:'neon-violet',bg:'#0D0D1A',fills:['#C4B5FD','#F0ABFC','#FFFFFF','#A7F3D0']},
+    {id:'neon-teal',bg:'#001A1A',fills:['#00F5D4','#7FFFD4','#FFFFFF','#00BBF9']},
+    {id:'neon-crimson',bg:'#1A000F',fills:['#FF4D8D','#FF9E00','#FFFFFF','#FF5C8A']}
+  ],
+  cinematic:[
+    {id:'cine-charcoal',bg:'#080808',fills:['#E8D5B0','#FFFFFF','#C8A96E']},
+    {id:'cine-plum',bg:'#1A1420',fills:['#F5E6C7','#EADBC8','#D9B77A']},
+    {id:'cine-navy',bg:'#0A1424',fills:['#F2E8D5','#D9E6F2','#C9A96E']},
+    {id:'cine-amber',bg:'#2A1B0C',fills:['#F4E3C3','#FFF8E8','#E0A13A']}
+  ],
+  minimal:[
+    {id:'min-paper',bg:'#F7F7F7',fills:['#111111','#333333','#FF6321']},
+    {id:'min-cool',bg:'#EEF1F6',fills:['#1F2937','#374151','#2563EB']},
+    {id:'min-sand',bg:'#F5EFE4',fills:['#1E1B16','#403A30','#D97706']},
+    {id:'min-mint',bg:'#EAF7F2',fills:['#102A23','#1F4F46','#10B981']}
+  ],
+  graffiti:[
+    {id:'graf-purple',bg:'#150a28',fills:['#FF2D78','#FFD700','#00FFCC']},
+    {id:'graf-ink',bg:'#0F1014',fills:['#FF4D6D','#FFD166','#4ECDC4']},
+    {id:'graf-green',bg:'#0A1A0A',fills:['#B8FF3B','#00E5FF','#FF5CA8']},
+    {id:'graf-rust',bg:'#2A130B',fills:['#FF7A00','#FFE066','#6EF3D6']}
+  ],
+  hype:[
+    {id:'hype-orange',bg:'#FF6321',fills:['#FFFFFF','#FFE000','#111111']},
+    {id:'hype-red',bg:'#E7472B',fills:['#FFFFFF','#FFE27A','#101010']},
+    {id:'hype-blue',bg:'#1D4ED8',fills:['#FFFFFF','#FDE047','#0B1220']},
+    {id:'hype-lime',bg:'#65A30D',fills:['#0F172A','#FFFFFF','#F97316']}
+  ],
+  paper:[
+    {id:'paper-cream',bg:'#F5EDD8',fills:['#2C1810','#8B0000','#4A3728']},
+    {id:'paper-ivory',bg:'#EFE3C8',fills:['#2F241A','#7D2A2A','#5B4634']},
+    {id:'paper-sage',bg:'#E5E9D8',fills:['#1F2A1F','#3D4B3D','#8B5E3C']},
+    {id:'paper-rose',bg:'#F0DDD8',fills:['#2B1C1A','#6E2A2A','#7A4A3A']}
+  ],
+  editorial:[
+    {id:'edit-tan',bg:'#E6D3B5',fills:['#111111','#2A2A2A','#8B0000']},
+    {id:'edit-warm',bg:'#DCC8A6',fills:['#171319','#2E2A2F','#7A1F1F']},
+    {id:'edit-slate',bg:'#DDE3EA',fills:['#101418','#2A3440','#B91C1C']},
+    {id:'edit-olive',bg:'#D9D9C4',fills:['#161A12','#303826','#8C3A1E']}
+  ],
+  pulse:[
+    {id:'pulse-deep',bg:'#0C0E14',fills:['#FF2E63','#08D9D6','#FFFFFF','#FCE38A']},
+    {id:'pulse-indigo',bg:'#0E1020',fills:['#FF5D8F','#67E8F9','#FFFFFF','#FDE68A']},
+    {id:'pulse-emerald',bg:'#05211A',fills:['#34D399','#A7F3D0','#FFFFFF','#FDE68A']},
+    {id:'pulse-burgundy',bg:'#2A0C18',fills:['#FB7185','#FBCFE8','#FFFFFF','#F59E0B']}
+  ],
+  serene:[
+    {id:'serene-sky',bg:'#E9F0FF',fills:['#3558A9','#2C3E66','#5D8BF4','#1E2A4A']},
+    {id:'serene-mint',bg:'#EAF8F2',fills:['#1E4F59','#2C6E7A','#34A0A4','#16323A']},
+    {id:'serene-lilac',bg:'#F1ECFF',fills:['#4A3F7A','#5E4FA2','#8B7EDB','#2B2450']},
+    {id:'serene-sand',bg:'#F6EEDD',fills:['#5B4A2E','#7A6540','#B08A57','#3A2E1D']}
+  ],
+  blueprint:[
+    {id:'blueprint-navy',bg:'#0B1E31',fills:['#7DE2FF','#D9F7FF','#57B6D9','#A8ECFF']},
+    {id:'blueprint-slate',bg:'#11263E',fills:['#8FDDF2','#E3F6FB','#64BCD9','#B4ECF7']},
+    {id:'blueprint-green',bg:'#0B2A2A',fills:['#8AF5E3','#E6FFFA','#4CC9B0','#BDF7EC']},
+    {id:'blueprint-purple',bg:'#1C1C3A',fills:['#A9D1FF','#EEF4FF','#7AA2F7','#C7DAFF']}
+  ],
+  noir:[
+    {id:'noir-black',bg:'#070707',fills:['#F3E6C4','#D6C29A','#FFFFFF','#A78A59']},
+    {id:'noir-smoke',bg:'#121212',fills:['#F1E5C7','#D9C6A0','#FDFDFD','#B49A70']},
+    {id:'noir-navy',bg:'#0B1320',fills:['#EFE3C8','#D6C7A8','#FFFFFF','#8BA3C7']},
+    {id:'noir-wine',bg:'#1B0C12',fills:['#F3E6C4','#E6C9B8','#FFFFFF','#C18F6A']}
+  ],
+  lyric:[
+    {id:'lyric-night',bg:'#131329',fills:['#8DE4FF','#F8A8FF','#FFFFFF','#7B9CFF']},
+    {id:'lyric-berry',bg:'#1A1533',fills:['#A5E9FF','#F9B7FF','#FFFFFF','#9AAEFF']},
+    {id:'lyric-ocean',bg:'#0B1D35',fills:['#7DD3FC','#C4B5FD','#FFFFFF','#38BDF8']},
+    {id:'lyric-sunset',bg:'#32162A',fills:['#FDBA74','#F9A8D4','#FFFFFF','#F472B6']}
+  ],
+  retro3d:[
+    {id:'retro-midnight',bg:'#101319',fills:['#F7D06D','#F24E1E','#4C6FFF','#FFFFFF']},
+    {id:'retro-denim',bg:'#1A1F2A',fills:['#FFD56A','#FF6A3D','#6E86FF','#FFFFFF']},
+    {id:'retro-teal',bg:'#0E2B2F',fills:['#FDE68A','#FB7185','#22D3EE','#FFFFFF']},
+    {id:'retro-plum',bg:'#2A1730',fills:['#FCD34D','#FB923C','#60A5FA','#FFFFFF']}
+  ],
+  uihero:[
+    {id:'uihero-dark',bg:'#0E1726',fills:['#BDE0FF','#64B5FF','#FFFFFF','#90F7EC']},
+    {id:'uihero-mid',bg:'#15243A',fills:['#C7E6FF','#78C2FF','#FFFFFF','#A4F9EE']},
+    {id:'uihero-indigo',bg:'#1F2350',fills:['#D6DCFF','#8EA2FF','#FFFFFF','#A7F3D0']},
+    {id:'uihero-emerald',bg:'#14302B',fills:['#C8FFF1','#5EEAD4','#FFFFFF','#93C5FD']}
+  ],
+  mono:[
+    {id:'mono-light',bg:'#EFEFEF',fills:['#111111','#4A4A4A','#767676','#222222']},
+    {id:'mono-dark',bg:'#1A1A1A',fills:['#F5F5F5','#D4D4D4','#B8B8B8','#FFFFFF']},
+    {id:'mono-blue',bg:'#DCE4F2',fills:['#0F172A','#334155','#475569','#1E293B']},
+    {id:'mono-sepia',bg:'#E8DFD1',fills:['#1F1A16','#4A3F35','#6B5E52','#2A241F']}
+  ],
+  quotes:[
+    {id:'quotes-black',bg:'#000000',fills:['#F2F2F2','#D8D8D8','#FFFFFF','#CFCFCF']},
+    {id:'quotes-charcoal',bg:'#121212',fills:['#F6F6F6','#E2E2E2','#FFFFFF','#D2D2D2']},
+    {id:'quotes-navy',bg:'#111827',fills:['#E5E7EB','#CBD5E1','#FFFFFF','#93C5FD']},
+    {id:'quotes-forest',bg:'#0F1F1A',fills:['#E7F7EF','#BFE7D1','#FFFFFF','#7DD3A7']}
+  ],
+  newspaper:[
+    {id:'news-cream',bg:'#E8DFC2',fills:['#171319','#26212A','#0E0B10','#3A313F']},
+    {id:'news-sepia',bg:'#DCCFAA',fills:['#1A141B','#2D2530','#120D14','#463A46']},
+    {id:'news-slate',bg:'#D6D9DC',fills:['#12151A','#2A2F36','#0D1014','#3D454F']},
+    {id:'news-sage',bg:'#D8D9C8',fills:['#161913','#2E3427','#10130D','#424B3A']}
+  ]
+};
+
+const styleVariantSelection={};
+
+function getActiveStyleConfig(styleKey=currentStyle){
+  const base=STYLES[styleKey]||STYLES.neon;
+  const variants=STYLE_VARIANTS[styleKey]||[];
+  if(!variants.length) return base;
+  const selectedId=styleVariantSelection[styleKey]||variants[0].id;
+  const variant=variants.find(v=>v.id===selectedId)||variants[0];
+  return {
+    ...base,
+    bg:variant.bg||base.bg,
+    fills:Array.isArray(variant.fills)&&variant.fills.length?variant.fills:base.fills
+  };
+}
+
+// ═══════════════════════════════════════════
+//  FONTS
+// ═══════════════════════════════════════════
+const FONTS=[
+  {id:'heavy',   f:sz=>`900 ${sz}px "Space Grotesk",sans-serif`},
+  {id:'wide',    f:sz=>`900 ${sz}px Impact,sans-serif`},
+  {id:'italic',  f:sz=>`italic 700 ${sz*.9}px Georgia,serif`},
+  {id:'light',   f:sz=>`300 ${sz*1.05}px "Space Grotesk",sans-serif`},
+  {id:'serif',   f:sz=>`800 ${sz*.95}px Georgia,serif`},
+  {id:'mono',    f:sz=>`700 ${sz*.7}px "Courier New",monospace`},
+  {id:'condensed',f:sz=>`900 ${sz*1.1}px Impact,sans-serif`},
+];
+
+// ═══════════════════════════════════════════
+//  ANIMATIONS
+// ═══════════════════════════════════════════
+const ANIMS={
+  pop(t)       {let s=t<.3?(t/.3)*1.35:t<.45?1.35-((t-.3)/.15)*.35:1;return{alpha:Math.min(1,t*7),sx:s,sy:s};},
+  slam(t)      {const slide=Math.min(H,W)*.35;let oy=t<.2?-(1-(t/.2)**2)*slide:t<.35?-Math.sin(((t-.2)/.15)*Math.PI)*12:0;return{alpha:Math.min(1,t*9),sx:1,sy:1,oy};},
+  rise(t)      {const slide=Math.min(H,W)*.25;const e=t<.5?2*t*t:-1+(4-2*t)*t;return{alpha:Math.min(1,t*3.5),sx:1,sy:1,oy:(1-e)*slide};},
+  drop(t)      {const slide=Math.min(H,W)*.25;const e=t<.5?2*t*t:-1+(4-2*t)*t;return{alpha:Math.min(1,t*3.5),sx:1,sy:1,oy:-(1-e)*slide};},
+  slide(t)     {const d=Math.min(H,W)*.35;const e=t<.5?2*t*t:1-Math.pow(-2*t+2,2)/2;return{alpha:Math.min(1,t*4.5),sx:1,sy:1,ox:(1-e)*d};},
+  slideLtr(t)  {const d=Math.min(H,W)*.35;const e=t<.5?2*t*t:1-Math.pow(-2*t+2,2)/2;return{alpha:Math.min(1,t*4.5),sx:1,sy:1,ox:-(1-e)*d};},
+  glitch(t)    {const ox=t<.4?Math.sin(t*130)*13*(1-t/.4):0;return{alpha:Math.min(1,t*6),sx:1,sy:1,ox,glitch:t<.4};},
+  fade(t)      {return{alpha:t<.4?t/.4:t>.85?(1-t)/.15:1,sx:1,sy:1};},
+  stretch(t)   {let sx=1,sy=1;if(t<.2){sx=.1+(t/.2)*1.6;sy=.5+(t/.2)*.5;}else if(t<.35){const tt=(t-.2)/.15;sx=1.7-tt*.7;sy=1;}return{alpha:Math.min(1,t*7),sx,sy};},
+  flip(t)      {const sx=t<.25?1-(t/.25):Math.min(1,(t-.25)/.35);return{alpha:t<.25?0:Math.min(1,(t-.25)*5.5),sx,sy:1};},
+  spin(t)      {const rot=t<.3?(1-(t/.3))*Math.PI*.7:0;return{alpha:Math.min(1,t*5.5),sx:1,sy:1,rot};},
+  zoom(t)      {const s=t<.35?2.8-(t/.35)*1.8:1;return{alpha:Math.min(1,t*6),sx:s,sy:s};},
+  wave(t)      {return{alpha:Math.min(1,t*4.5),sx:1,sy:1,waveT:t};},
+  typewriter(t){return{alpha:1,sx:1,sy:1,typeT:t};},
+  bounce(t)    {const amp=Math.max(0,1-t)*Math.min(H,W)*.12;const oy=-Math.abs(Math.sin(t*9.5))*amp;return{alpha:Math.min(1,t*8),sx:1,sy:1,oy};},
+  whip(t)      {const k=Math.max(0,1-t/.35);return{alpha:Math.min(1,t*10),sx:1,sy:1,ox:k*Math.min(W,H)*.22,rot:k*.45};},
+  swing(t)     {const damp=Math.max(0,1-t);return{alpha:Math.min(1,t*6),sx:1,sy:1,rot:Math.sin(t*9)*.32*damp};},
+  orbit(t)     {const r=Math.max(0,1-t)*Math.min(W,H)*.14;const a=t*Math.PI*2.2;return{alpha:Math.min(1,t*8),sx:1,sy:1,ox:Math.cos(a)*r,oy:Math.sin(a)*r,rot:(1-t)*.6};},
+  elastic(t)   {const e=Math.sin(t*18)*Math.max(0,1-t)*.55;return{alpha:Math.min(1,t*8),sx:1+e,sy:1-e};},
+  drift(t)     {const oy=(1-t)*Math.min(W,H)*.16;return{alpha:t<.5?t/.5:1,sx:1,sy:1,oy};},
+  shutter(t)   {const s=t<.25?0.15+(t/.25)*1.2:t<.45?1.35-((t-.25)/.2)*.35:1;const rot=t<.3?(1-t/.3)*.18:0;return{alpha:Math.min(1,t*9),sx:s,sy:1,rot};},
+  handwrite(t) {return{alpha:1,sx:1,sy:1,typeT:Math.min(1,t*1.15)};},
+  jitter(t)    {const j=Math.max(0,1-t/.45);return{alpha:Math.min(1,t*8),sx:1,sy:1,ox:(Math.sin(t*90)*7*j),oy:(Math.cos(t*84)*5*j)};},
+  reveal(t)    {const sx=t<.3?0.2+(t/.3)*0.8:1;return{alpha:Math.min(1,t*7),sx,sy:1};},
+  spiral(t)    {const r=Math.max(0,1-t)*Math.min(W,H)*.2;const a=(1-t)*Math.PI*2.8;return{alpha:Math.min(1,t*8),sx:1,sy:1,ox:Math.cos(a)*r,oy:Math.sin(a)*r,rot:(1-t)*.8};},
+  quote(t)     {const e=t<.5?2*t*t:1-Math.pow(-2*t+2,2)/2;const oy=(1-e)*Math.min(H,W)*.045;const sx=0.97+0.03*e;return{alpha:Math.min(1,t*5.5),sx,sy:1,oy};},
+};
+const ANIM_KEYS=Object.keys(ANIMS);
+
+// ═══════════════════════════════════════════
+//  SEEDED RNG
+// ═══════════════════════════════════════════
+function seededRng(seed){
+  let s=seed;
+  return()=>{s=(s*1664525+1013904223)&0xffffffff;return(s>>>0)/0xffffffff;};
+}
+
+// ═══════════════════════════════════════════
+//  RATIO → W,H
+// ═══════════════════════════════════════════
+function ratioWH(canvasMaxW, canvasMaxH, ratio){
+  const [rw,rh]={
+    '16:9':[16,9],'9:16':[9,16],'1:1':[1,1],'4:5':[4,5],'21:9':[21,9],'3:2':[3,2]
+  }[ratio]||[16,9];
+  let w=canvasMaxW, h=Math.round(canvasMaxW*rh/rw);
+  if(h>canvasMaxH){h=canvasMaxH;w=Math.round(canvasMaxH*rw/rh);}
+  return{w,h};
+}
+
+// ═══════════════════════════════════════════
+//  COMPUTE LAYOUTS
+// ═══════════════════════════════════════════
+function computeLayouts(phraseWords,phraseIndex){
+  const rng=seededRng(phraseIndex*7919+3141);
+  const userFz=parseInt(document.getElementById('fontSize').value);
+  // Scale font proportionally to canvas size — keeps text inside on 9:16/1:1/4:5
+  const scaleFactor=Math.min(1, W/560, H/360);
+  const baseFz=Math.max(10, Math.round(userFz*scaleFactor));
+  const sizeVar=parseInt(document.getElementById('sizeVar').value)/100;
+  const rotMax=parseInt(document.getElementById('rotRange').value);
+  const spreadMul=(parseInt(document.getElementById('spreadRange')?.value||'100')/100);
+  const fontMixP=parseInt(document.getElementById('fontMix').value)/100;
+  const useMixFonts=document.getElementById('toggleFontMix').classList.contains('on');
+  const useAccents=document.getElementById('toggleAccents').classList.contains('on');
+  const st=getActiveStyleConfig();
+  const n=phraseWords.length;
+  const heroIdx=currentLayout==='poster'
+    ? phraseWords.reduce((best,w,i)=>{
+        const len=(w.text||'').length;
+        const score=(w.isEmph?40:0)+len;
+        return score>best.score?{i,score}:best;
+      },{i:0,score:-1}).i
+    : -1;
+
+  return phraseWords.map((w,wi)=>{
+    const emphMul=currentLayout==='poster'
+      ? (wi===heroIdx?(1.9+sizeVar*.65):(0.68+sizeVar*.2*rng()))
+      : (w.isEmph?(1+sizeVar*.6):(1-sizeVar*.15*rng()));
+    const sz=Math.round(baseFz*emphMul);
+    let fontIdx=(currentStyle==='editorial' || currentStyle==='newspaper')?6:0;
+    if(useMixFonts&&rng()<fontMixP) fontIdx=Math.floor(rng()*FONTS.length);
+    let colorIdx=(currentLayout==='poster'&&currentStyle==='editorial')?(wi===heroIdx?2:0):0;
+    if(currentLayout!=='poster' && useAccents&&(w.isEmph||rng()<.32)) colorIdx=1+Math.floor(rng()*(st.fills.length-1));
+    let rot=0;
+    if(currentLayout==='poster'){
+      rot=(rng()-.5)*0.035;
+    }else if(rotMax>0){
+      rot=(rng()-.5)*2*(rotMax*Math.PI/180)*(w.isEmph?.5:1);
+    }
+    let x,y;
+    switch(currentLayout){
+      case 'center':{
+        const lineH=sz*1.55*spreadMul;const totalH=n*lineH;
+        x=W/2+(rng()-.5)*W*.05*spreadMul;
+        y=H/2-totalH/2+wi*lineH+lineH/2;
+        break;
+      }
+      case 'scattered':{
+        const zones=[[.15,.2],[.5,.14],[.83,.2],[.1,.5],[.5,.5],[.88,.5],[.16,.78],[.5,.83],[.82,.75]];
+        const z=zones[wi%zones.length];
+        x=(z[0]+(rng()-.5)*.1*spreadMul)*W; y=(z[1]+(rng()-.5)*.1*spreadMul)*H;
+        break;
+      }
+      case 'diagonal':{
+        const step=1/Math.max(n,1);const t2=wi*step+step*.5;
+        x=(0.12+t2*.76)*W+(wi%2===0?-1:1)*W*.07*rng();
+        y=(0.1+t2*.8)*H;
+        break;
+      }
+      case 'corners':{
+        const pos=[[.17,.18],[.83,.18],[.17,.8],[.83,.8],[.5,.5],[.35,.35],[.65,.35],[.35,.65],[.65,.65]];
+        const p=pos[wi%pos.length];
+        x=p[0]*W+(rng()-.5)*W*.07; y=p[1]*H+(rng()-.5)*H*.07;
+        break;
+      }
+      case 'stack':{
+        const lineH=sz*1.45;const totalH=n*lineH;const startY=H/2-totalH/2;
+        const indents=[.12,.2,.26,.16,.1];
+        x=(indents[wi%indents.length]+rng()*.05)*W;
+        y=startY+wi*lineH+lineH/2;
+        rot=(rng()-.5)*rotMax*.35*Math.PI/180;
+        break;
+      }
+      case 'burst':{
+        if(wi===0){x=W/2;y=H/2;}
+        else{const angle=(wi-1)*(Math.PI*2/(n-1))+rng()*.4;const radius=(.2+rng()*.13)*Math.min(W,H);x=W/2+Math.cos(angle)*radius;y=H/2+Math.sin(angle)*radius;}
+        rot=(rng()-.5)*rotMax*Math.PI/180;
+        break;
+      }
+      case 'comic':{
+        // Bold angled placements like comic book captions
+        const slots=[[.12,.12],[.78,.08],[.5,.45],[.08,.7],[.85,.65],[.45,.85],[.2,.5],[.7,.3]];
+        const s2=slots[wi%slots.length];
+        x=s2[0]*W+(rng()-.5)*W*.06; y=s2[1]*H+(rng()-.5)*H*.06;
+        rot=(wi%2===0?.08:-.07)+(rng()-.5)*.06;
+        break;
+      }
+      case 'wave':{
+        // Words follow a sine arc across canvas
+        const t2=(wi+.5)/n;
+        x=(.08+t2*.84)*W;
+        y=H/2+Math.sin(t2*Math.PI*1.5)*H*.28*spreadMul;
+        rot=Math.cos(t2*Math.PI*1.5)*.18*(wi%2===0?1:-1);
+        break;
+      }
+      case 'grid':{
+        const cols=Math.ceil(Math.sqrt(n));const rows=Math.ceil(n/cols);
+        const ci=wi%cols;const ri=Math.floor(wi/cols);
+        const cellW=W/cols;const cellH=H/rows;
+        x=cellW*ci+cellW/2+(rng()-.5)*cellW*.15;
+        y=cellH*ri+cellH/2+(rng()-.5)*cellH*.15;
+        rot=(rng()-.5)*rotMax*.5*Math.PI/180;
+        break;
+      }
+      case 'poster':{
+        const left=0.36*W;
+        const top=0.32*H;
+        const bottom=0.74*H;
+        if(wi===heroIdx){
+          x=left;
+          y=0.55*H;
+        }else{
+          const slots=[
+            [left-0.22*W, top],
+            [left-0.06*W, top-0.01*H],
+            [left+0.20*W, top-0.02*H],
+            [left-0.14*W, bottom],
+            [left+0.08*W, bottom-0.01*H],
+            [left+0.28*W, bottom+0.02*H],
+            [left+0.02*W, 0.18*H],
+            [left+0.22*W, 0.86*H]
+          ];
+          const slot=slots[(wi<heroIdx?wi:wi-1)%slots.length];
+          x=slot[0]+(rng()-.5)*W*.04;
+          y=slot[1]+(rng()-.5)*H*.035;
+        }
+        break;
+      }
+      case 'beat':{
+        const t2=(wi+.5)/Math.max(1,n);
+        const lane=(wi%2===0)?-1:1;
+        x=W/2 + lane*(W*(0.12 + (wi%3)*0.03)) + (rng()-.5)*W*.02;
+        y=H*(0.16 + t2*0.7);
+        rot=(rng()-.5)*0.14;
+        break;
+      }
+      case 'organic':{
+        const t2=(wi+.5)/Math.max(1,n);
+        x=W*(0.12+t2*0.76) + Math.sin(t2*Math.PI*2 + phraseIndex*0.35)*W*.08;
+        y=H*(0.5 + Math.sin(t2*Math.PI*1.3 + phraseIndex*0.28)*0.22);
+        rot=Math.sin(t2*Math.PI*2)*0.14;
+        break;
+      }
+      case 'info':{
+        const cols=n>6?3:2;
+        const rows=Math.ceil(n/cols);
+        const ci=wi%cols;
+        const ri=Math.floor(wi/cols);
+        const colSpan=cols===1?0:(ci/(cols-1));
+        x=W*(0.18 + colSpan*0.64);
+        y=H*(0.2 + ((ri+.5)/Math.max(1,rows))*0.62);
+        rot=0;
+        break;
+      }
+      case 'crawl':{
+        const t2=(wi+.5)/Math.max(1,n);
+        const depth=0.35 + t2*0.65;
+        x=W/2 + (rng()-.5)*W*.03*depth;
+        y=H*(0.9 - t2*0.74);
+        rot=0;
+        break;
+      }
+      case 'lyrics':{
+        const t2=(wi+.5)/Math.max(1,n);
+        x=(wi%2===0?W*0.34:W*0.66)+(rng()-.5)*W*.025;
+        y=H*(0.18 + t2*0.68);
+        rot=(wi%2===0?-1:1)*0.03;
+        break;
+      }
+      case 'path':{
+        const t2=(wi+.5)/Math.max(1,n);
+        x=W*(0.08+t2*0.84);
+        y=H*(0.46 + Math.sin((t2*1.5 + phraseIndex*0.07)*Math.PI)*0.2*spreadMul);
+        rot=Math.cos((t2*1.5 + phraseIndex*0.07)*Math.PI)*0.22;
+        break;
+      }
+      case 'radial':{
+        const t2=(wi)/Math.max(1,n);
+        const ring=Math.min(W,H)*(0.2+0.22*spreadMul);
+        const a=(Math.PI*2*t2)+(phraseIndex*0.35);
+        x=W/2+Math.cos(a)*ring;
+        y=H/2+Math.sin(a)*ring;
+        rot=a+Math.PI/2;
+        break;
+      }
+      case 'marquee':{
+        const cols=Math.max(2,Math.ceil(Math.sqrt(n*1.8)));
+        const rows=Math.ceil(n/cols);
+        const ci=wi%cols;const ri=Math.floor(wi/cols);
+        const rowShift=(ri%2===0?0.06:-0.06)*spreadMul;
+        x=W*(0.08 + (ci/(Math.max(1,cols-1)))*0.84 + rowShift);
+        y=H*(0.2 + ((ri+.5)/Math.max(1,rows))*0.62);
+        rot=(ri%2===0?1:-1)*0.025;
+        break;
+      }
+      default:x=W/2;y=H/2;
+    }
+    // Clamp: pad based on estimated text half-width and font height
+    const estHalfW=sz*3.5; // rough estimate: ~7 chars avg * sz * 0.5
+    const padX=Math.min(estHalfW, W*0.42);
+    const padY=sz*0.7;
+    x=Math.max(padX, Math.min(W-padX, x));
+    y=Math.max(padY, Math.min(H-padY, y));
+    return{x,y,rot,sz,fontIdx,colorIdx};
+  });
+}
+
+// ═══════════════════════════════════════════
+//  PARSE → PHRASES
+// ═══════════════════════════════════════════
+const EMPH=new Set(['believe','beauty','dream','dreams','future','power','love','hope','never','always','today','now','rise','fight','win','free','truth','strong','bold','real','life','world','change','create','build','you','we','yes','no','stop','go','one','all']);
+
+function parseIntoPhrases(text){
+  const segs=text.trim().split(/(?<=[.!?,;:\n])\s*/);
+  const result=[];
+  segs.forEach(seg=>{
+    const raw=seg.trim().split(/\s+/).filter(Boolean);
+    const cs=raw.length<=4?raw.length:raw.length<=7?Math.ceil(raw.length/2):3;
+    for(let i=0;i<raw.length;i+=cs){
+      const chunk=raw.slice(i,i+cs);
+      if(!chunk.length)continue;
+      const words=chunk.map(w=>{
+        const clean=w.replace(/[^\w']/g,'');
+        if(!clean)return null;
+        const isEmph=EMPH.has(clean.toLowerCase())||/^[A-Z]{2,}$/.test(clean)||clean.length<=2;
+        const animName=currentAnim==='mix'?ANIM_KEYS[Math.floor(Math.random()*ANIM_KEYS.length)]:currentAnim;
+        return{text:clean.toUpperCase(),raw:clean,isEmph,animName};
+      }).filter(Boolean);
+      if(words.length)result.push({words});
+    }
+  });
+  return result;
+}
+
+function buildTimeline(parsed){
+  let cursor=0;
+  return parsed.map((ph,pi)=>{
+    const wordStarts=ph.words.map((_,wi)=>wi*wordMs);
+    const totalMs=ph.words.length*wordMs+phraseGapMs;
+    const layout=computeLayouts(ph.words,pi);
+    const obj={...ph,startMs:cursor,wordStarts,totalMs,layout};
+    cursor+=totalMs;
+    return obj;
+  });
+}
+
+// ═══════════════════════════════════════════
+//  CANVAS
+// ═══════════════════════════════════════════
+function initCanvas(){
+  cv=document.getElementById('cv');
+  sizeCanvas();
+  ctx=cv.getContext('2d');
+  drawIdle();
+}
+
+function sizeCanvas(){
+  const area=document.getElementById('canvasArea');
+  if(!area)return;
+  const maxW=Math.max(220,area.clientWidth-40);
+  const maxH=Math.max(220,area.clientHeight-40);
+  const dim=ratioWH(maxW,maxH,currentRatio);
+  W=dim.w; H=dim.h;
+  cv.width=W; cv.height=H;
+  cv.style.width=W+'px'; cv.style.height=H+'px';
+}
+
+function drawIdle(){
+  const st=getActiveStyleConfig();
+  if(currentStyle==='newspaper'){
+    drawNewspaperBackground(st);
+  }else{
+    ctx.fillStyle=st.bg;
+    ctx.fillRect(0,0,W,H);
+  }
+  ctx.save();ctx.globalAlpha=.18;ctx.fillStyle=st.fills[0];
+  ctx.font='500 24px Inter,sans-serif';ctx.textAlign='center';ctx.textBaseline='middle';
+  ctx.fillText('Enter a script and hit Generate ✦',W/2,H/2);
+  ctx.restore();
+}
+
+function drawNewspaperBackground(st){
+  ctx.save();
+  ctx.fillStyle=(st&&st.bg)||'#E8DFC2';
+  ctx.fillRect(0,0,W,H);
+
+  const g=ctx.createLinearGradient(0,0,0,H);
+  g.addColorStop(0,'rgba(255,252,242,0.34)');
+  g.addColorStop(0.45,'rgba(232,223,194,0.0)');
+  g.addColorStop(1,'rgba(210,197,160,0.24)');
+  ctx.fillStyle=g;
+  ctx.fillRect(0,0,W,H);
+
+  // Subtle column-guide lines to emulate print layout texture.
+  ctx.strokeStyle='rgba(34,27,36,0.12)';
+  ctx.lineWidth=1;
+  ctx.globalAlpha=0.5;
+  const lineStep=Math.max(16,Math.round(H/42));
+  for(let y=lineStep;y<H;y+=lineStep){
+    ctx.beginPath();
+    ctx.moveTo(0,y);
+    ctx.lineTo(W,y);
+    ctx.stroke();
+  }
+
+  // Deterministic grain dots to avoid flicker across frames.
+  ctx.globalAlpha=0.18;
+  ctx.fillStyle='rgba(36,30,38,0.22)';
+  const grains=Math.max(140,Math.round((W*H)/4200));
+  for(let i=0;i<grains;i++){
+    const x=((i*73)%W)+0.5;
+    const y=((i*97)%H)+0.5;
+    ctx.fillRect(x,y,1,1);
+  }
+
+  ctx.globalAlpha=0.12;
+  ctx.strokeStyle='rgba(20,15,18,0.35)';
+  ctx.strokeRect(1,1,Math.max(0,W-2),Math.max(0,H-2));
+  ctx.restore();
+}
+
+// ═══════════════════════════════════════════
+//  DRAW
+// ═══════════════════════════════════════════
+function drawAtTime(ms){
+  if(!ctx||!phrases.length){drawIdle();return;}
+  const st=getActiveStyleConfig();
+  if(currentStyle==='newspaper'){
+    drawNewspaperBackground(st);
+  }else{
+    ctx.fillStyle=st.bg;
+    ctx.fillRect(0,0,W,H);
+  }
+  // Hard clip — nothing can draw outside the canvas bounds
+  ctx.save();
+  ctx.beginPath();ctx.rect(0,0,W,H);ctx.clip();
+  let phIdx=0;
+  for(let i=phrases.length-1;i>=0;i--){if(ms>=phrases[i].startMs){phIdx=i;break;}}
+  const ph=phrases[phIdx];
+  const localMs=ms-ph.startMs;
+  ph.words.forEach((w,wi)=>{
+    const elapsed=localMs-ph.wordStarts[wi];
+    if(elapsed<0)return;
+    const t=Math.min(1,elapsed/wordMs);
+    w._mg=null; // per-word mg disabled; phrase-level used instead
+    drawWord(w,ph.layout[wi],t,st);
+  });
+  // Draw one motion graphic per phrase
+  drawPhraseMotionGraphic(ph, phIdx, localMs);
+  updateTimelineUI(ph,localMs);
+  ctx.restore(); // end clip
+}
+
+// ═══════════════════════════════════════════
+//  MOTION GRAPHICS ENGINE
+//  Pure CSS/SVG animations overlaid on canvas.
+//  No external deps — always works, fully opaque.
+// ═══════════════════════════════════════════
+
+// Keyword → graphic type
+const GRAPHIC_MAP = {
+  // fire
+  fire:'fire', passion:'fire', hot:'fire', burn:'fire', motivate:'fire', awesome:'fire', amazing:'fire',
+  // stars / sparkle
+  star:'stars', stars:'stars', dream:'stars', dreams:'stars', magic:'stars', wonder:'stars',
+  beautiful:'stars', beauty:'stars', believe:'stars', hope:'stars',
+  // lightning / energy
+  lightning:'lightning', energy:'lightning', power:'lightning', electric:'lightning', fast:'lightning',
+  // heart / love
+  love:'heart', heart:'heart', happy:'heart', joy:'heart', soul:'heart', feeling:'heart',
+  // trophy / win
+  win:'trophy', winner:'trophy', success:'trophy', trophy:'trophy', achieve:'trophy', goal:'trophy', best:'trophy',
+  // rocket
+  rocket:'rocket', future:'rocket', rise:'rocket', startup:'rocket', launch:'rocket', go:'rocket',
+  // idea / lightbulb
+  idea:'bulb', think:'bulb', light:'bulb', create:'bulb', inspire:'bulb', change:'bulb',
+  // money
+  money:'money', rich:'money', gold:'money', diamond:'money',
+  // music
+  music:'music', sing:'music', sound:'music', beat:'music', rhythm:'music',
+  // world / earth
+  world:'world', earth:'world', globe:'world', life:'world', freedom:'world', free:'world',
+  // camera / content
+  camera:'camera', photo:'camera', video:'camera', creator:'camera', reel:'camera', edit:'camera',
+  // social / chat
+  chat:'chat', message:'chat', comment:'chat', social:'chat', community:'chat',
+  // target / focus
+  target:'target', goal:'target', focus:'target', aim:'target', mission:'target',
+  // shield / trust
+  shield:'shield', safe:'shield', security:'shield', protect:'shield', trust:'shield',
+  // crown / premium
+  crown:'crown', premium:'crown', elite:'crown', king:'crown', queen:'crown',
+  // gift / promo
+  gift:'gift', offer:'gift', sale:'gift', deal:'gift', bonus:'gift',
+  // clock / urgency
+  time:'clock', clock:'clock', deadline:'clock', urgent:'clock', now:'clock',
+  // cloud / web
+  cloud:'cloud', web:'cloud', upload:'cloud', download:'cloud', server:'cloud',
+  // flower / calm
+  flower:'flower', bloom:'flower', calm:'flower', relax:'flower', wellness:'flower',
+};
+
+const FALLBACK_GRAPHICS = ['stars','fire','lightning','rocket','heart','camera','chat','target','gift','cloud'];
+
+function getPhraseGraphicType(phrase, phIdx) {
+  for (const w of phrase.words) {
+    const clean = w.text.replace(/[^A-Z]/g,'').toLowerCase();
+    if (GRAPHIC_MAP[clean]) return GRAPHIC_MAP[clean];
+    for (const [kw, type] of Object.entries(GRAPHIC_MAP)) {
+      if (clean.startsWith(kw) || kw.startsWith(clean)) return type;
+    }
+  }
+  return FALLBACK_GRAPHICS[phIdx % FALLBACK_GRAPHICS.length];
+}
+
+// Build an animated SVG string for each graphic type
+function buildGraphicSVG(type, sz) {
+  const s = sz;
+  const h = s / 2;
+  switch(type) {
+    case 'fire': return `<svg width="${s}" height="${s}" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+      <style>
+        @keyframes flicker{0%,100%{transform:scaleY(1) translateY(0)}25%{transform:scaleY(1.08) translateY(-3px)}50%{transform:scaleY(0.93) translateY(2px)}75%{transform:scaleY(1.05) translateY(-2px)}}
+        @keyframes flicker2{0%,100%{transform:scaleY(1)}33%{transform:scaleY(1.12) translateY(-4px)}66%{transform:scaleY(0.9) translateY(3px)}}
+        .f1{animation:flicker 0.6s ease-in-out infinite;transform-origin:50% 100%;}
+        .f2{animation:flicker2 0.45s ease-in-out infinite;transform-origin:50% 100%;}
+        .f3{animation:flicker 0.75s ease-in-out infinite 0.2s;transform-origin:50% 100%;}
+      </style>
+      <g class="f1"><ellipse cx="50" cy="72" rx="28" ry="26" fill="#FF4500"/></g>
+      <g class="f2"><ellipse cx="50" cy="55" rx="20" ry="30" fill="#FF6600"/></g>
+      <g class="f3"><ellipse cx="50" cy="42" rx="13" ry="22" fill="#FFAA00"/></g>
+      <ellipse cx="50" cy="35" rx="8" ry="14" fill="#FFE000"/>
+      <ellipse cx="50" cy="30" rx="4" ry="8" fill="#FFFFFF" opacity="0.8"/>
+    </svg>`;
+
+    case 'stars': return `<svg width="${s}" height="${s}" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+      <style>
+        @keyframes twinkle{0%,100%{opacity:1;transform:scale(1)}50%{opacity:0.3;transform:scale(0.6)}}
+        @keyframes spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}
+        .s1{animation:twinkle 1.1s ease-in-out infinite;transform-origin:50 50;}
+        .s2{animation:twinkle 0.8s ease-in-out infinite 0.3s;}
+        .s3{animation:twinkle 1.4s ease-in-out infinite 0.6s;}
+        .s4{animation:twinkle 0.9s ease-in-out infinite 0.15s;}
+        .big{animation:spin 4s linear infinite;transform-origin:50px 50px;}
+      </style>
+      <g class="big"><polygon points="50,8 56,36 84,36 62,54 70,82 50,65 30,82 38,54 16,36 44,36" fill="#FFE000" stroke="#FFA500" stroke-width="1"/></g>
+      <circle class="s1" cx="15" cy="20" r="4" fill="#FFF"/>
+      <circle class="s2" cx="82" cy="15" r="3" fill="#FFE000"/>
+      <circle class="s3" cx="88" cy="75" r="4" fill="#FFF"/>
+      <circle class="s4" cx="12" cy="80" r="3" fill="#FFE000"/>
+      <circle class="s1" cx="50" cy="90" r="2.5" fill="#FFF"/>
+    </svg>`;
+
+    case 'lightning': return `<svg width="${s}" height="${s}" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+      <style>
+        @keyframes zap{0%,100%{opacity:1;filter:drop-shadow(0 0 6px #FFE000)}40%{opacity:0.4;filter:drop-shadow(0 0 2px #FFE000)}60%{opacity:1;filter:drop-shadow(0 0 14px #FFF)}}
+        @keyframes glow{0%,100%{opacity:0.6}50%{opacity:1}}
+        .bolt{animation:zap 0.7s ease-in-out infinite;}
+        .bg{animation:glow 0.7s ease-in-out infinite;}
+      </style>
+      <ellipse class="bg" cx="50" cy="50" rx="35" ry="35" fill="#FFF200" opacity="0.18"/>
+      <g class="bolt">
+        <polygon points="58,5 35,52 50,52 42,95 72,42 55,42 68,5" fill="#FFE000" stroke="#FFA500" stroke-width="1.5" stroke-linejoin="round"/>
+        <polygon points="58,5 35,52 50,52 42,95 72,42 55,42 68,5" fill="#FFFFFF" opacity="0.4"/>
+      </g>
+    </svg>`;
+
+    case 'heart': return `<svg width="${s}" height="${s}" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+      <style>
+        @keyframes beat{0%,100%{transform:scale(1)}15%{transform:scale(1.18)}30%{transform:scale(0.95)}45%{transform:scale(1.1)}60%{transform:scale(1)}}
+        @keyframes pulse{0%,100%{opacity:0;r:20}100%{opacity:0}50%{opacity:0.3;r:45}}
+        .h{animation:beat 0.9s ease-in-out infinite;transform-origin:50px 55px;}
+        .p{animation:pulse 0.9s ease-out infinite;}
+      </style>
+      <circle class="p" cx="50" cy="55" r="20" fill="#FF3366" opacity="0"/>
+      <g class="h">
+        <path d="M50 82 C50 82 10 58 10 35 C10 20 22 12 35 18 C42 21 47 28 50 33 C53 28 58 21 65 18 C78 12 90 20 90 35 C90 58 50 82 50 82Z" fill="#FF3366" stroke="#FF0044" stroke-width="1.5"/>
+        <path d="M50 75 C50 75 18 54 18 35 C18 24 28 18 37 22 C43 25 47 31 50 36" fill="#FF6688" opacity="0.5"/>
+      </g>
+    </svg>`;
+
+    case 'trophy': return `<svg width="${s}" height="${s}" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+      <style>
+        @keyframes shine{0%,100%{opacity:0;transform:translateX(-30px) rotate(30deg)}50%{opacity:0.6;transform:translateX(60px) rotate(30deg)}}
+        @keyframes bob{0%,100%{transform:translateY(0)}50%{transform:translateY(-4px)}}
+        .t{animation:bob 1.5s ease-in-out infinite;}
+        .sheen{animation:shine 2s ease-in-out infinite;overflow:hidden;}
+      </style>
+      <g class="t">
+        <rect x="35" y="78" width="30" height="6" rx="2" fill="#CC8800"/>
+        <rect x="30" y="84" width="40" height="5" rx="2" fill="#CC8800"/>
+        <rect x="44" y="65" width="12" height="15" fill="#DDAA00"/>
+        <path d="M20 20 L20 55 Q20 70 50 70 Q80 70 80 55 L80 20 Z" fill="#FFD700" stroke="#CC8800" stroke-width="2"/>
+        <path d="M20 28 Q8 28 8 42 Q8 56 22 56" fill="none" stroke="#FFD700" stroke-width="8" stroke-linecap="round"/>
+        <path d="M80 28 Q92 28 92 42 Q92 56 78 56" fill="none" stroke="#FFD700" stroke-width="8" stroke-linecap="round"/>
+        <clipPath id="tc"><path d="M20 20 L20 55 Q20 70 50 70 Q80 70 80 55 L80 20 Z"/></clipPath>
+        <rect class="sheen" x="0" y="15" width="18" height="60" fill="white" opacity="0" clip-path="url(#tc)"/>
+        <text x="50" y="50" font-size="22" text-anchor="middle" dominant-baseline="middle" fill="#CC8800" font-weight="bold" font-family="serif">★</text>
+      </g>
+    </svg>`;
+
+    case 'rocket': return `<svg width="${s}" height="${s}" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+      <style>
+        @keyframes launch{0%,100%{transform:translateY(0) rotate(-45deg)}50%{transform:translateY(-6px) rotate(-45deg)}}
+        @keyframes flame{0%,100%{transform:scaleY(1);opacity:1}50%{transform:scaleY(1.4);opacity:0.7}}
+        .r{animation:launch 1s ease-in-out infinite;transform-origin:50px 50px;}
+        .fl{animation:flame 0.3s ease-in-out infinite;transform-origin:50px 68px;}
+      </style>
+      <g class="r">
+        <g class="fl">
+          <ellipse cx="45" cy="74" rx="5" ry="10" fill="#FF6600" opacity="0.9"/>
+          <ellipse cx="45" cy="72" rx="3" ry="7" fill="#FFEE00"/>
+        </g>
+        <path d="M50 10 C50 10 28 35 28 58 L35 65 L50 68 L65 65 L72 58 C72 35 50 10 50 10Z" fill="#E0E0FF" stroke="#8888CC" stroke-width="1.5"/>
+        <path d="M28 58 L20 72 L35 65 Z" fill="#CC3300"/>
+        <path d="M72 58 L80 72 L65 65 Z" fill="#CC3300"/>
+        <ellipse cx="50" cy="42" rx="8" ry="8" fill="#00AAFF" stroke="#0066CC" stroke-width="1.5"/>
+        <path d="M50 10 C50 10 36 32 36 50 L50 10Z" fill="white" opacity="0.3"/>
+      </g>
+    </svg>`;
+
+    case 'bulb': return `<svg width="${s}" height="${s}" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+      <style>
+        @keyframes glow{0%,100%{filter:drop-shadow(0 0 4px #FFE000);opacity:1}50%{filter:drop-shadow(0 0 16px #FFF);opacity:0.85}}
+        @keyframes ray{0%,100%{opacity:0.6;transform:scaleX(1)}50%{opacity:1;transform:scaleX(1.3)}}
+        .bulb{animation:glow 1.2s ease-in-out infinite;}
+        .ray{animation:ray 1.2s ease-in-out infinite;transform-origin:50px 38px;}
+      </style>
+      <line class="ray" x1="50" y1="5" x2="50" y2="15" stroke="#FFE000" stroke-width="3" stroke-linecap="round"/>
+      <line class="ray" x1="78" y1="12" x2="72" y2="20" stroke="#FFE000" stroke-width="3" stroke-linecap="round" style="animation-delay:0.15s"/>
+      <line class="ray" x1="22" y1="12" x2="28" y2="20" stroke="#FFE000" stroke-width="3" stroke-linecap="round" style="animation-delay:0.3s"/>
+      <line class="ray" x1="92" y1="38" x2="82" y2="38" stroke="#FFE000" stroke-width="3" stroke-linecap="round" style="animation-delay:0.1s"/>
+      <line class="ray" x1="8" y1="38" x2="18" y2="38" stroke="#FFE000" stroke-width="3" stroke-linecap="round" style="animation-delay:0.25s"/>
+      <g class="bulb">
+        <path d="M35 50 Q35 30 50 25 Q65 30 65 50 Q65 62 58 68 L42 68 Q35 62 35 50Z" fill="#FFE000" stroke="#CC9900" stroke-width="1.5"/>
+        <rect x="42" y="68" width="16" height="5" rx="2" fill="#AAAAAA"/>
+        <rect x="43" y="73" width="14" height="4" rx="2" fill="#AAAAAA"/>
+        <rect x="44" y="77" width="12" height="4" rx="2" fill="#888"/>
+        <path d="M42 45 Q46 38 50 36 Q54 34 56 38" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round" opacity="0.6"/>
+      </g>
+    </svg>`;
+
+    case 'money': return `<svg width="${s}" height="${s}" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+      <style>
+        @keyframes float1{0%,100%{transform:translateY(0) rotate(-8deg)}50%{transform:translateY(-8px) rotate(-5deg)}}
+        @keyframes float2{0%,100%{transform:translateY(0) rotate(6deg)}50%{transform:translateY(-6px) rotate(9deg)}}
+        @keyframes float3{0%,100%{transform:translateY(0) rotate(0deg)}50%{transform:translateY(-10px) rotate(3deg)}}
+        .c1{animation:float1 1.3s ease-in-out infinite;}
+        .c2{animation:float2 1.1s ease-in-out infinite 0.2s;}
+        .c3{animation:float3 0.95s ease-in-out infinite 0.4s;}
+      </style>
+      <g class="c1" transform="translate(18,45)">
+        <circle r="18" fill="#FFD700" stroke="#CC9900" stroke-width="2"/>
+        <text x="0" y="1" font-size="18" text-anchor="middle" dominant-baseline="middle" fill="#CC7700" font-weight="bold" font-family="serif">$</text>
+      </g>
+      <g class="c2" transform="translate(62,55)">
+        <circle r="16" fill="#FFD700" stroke="#CC9900" stroke-width="2"/>
+        <text x="0" y="1" font-size="16" text-anchor="middle" dominant-baseline="middle" fill="#CC7700" font-weight="bold" font-family="serif">$</text>
+      </g>
+      <g class="c3" transform="translate(42,30)">
+        <circle r="20" fill="#FFEE44" stroke="#CC9900" stroke-width="2"/>
+        <text x="0" y="1" font-size="20" text-anchor="middle" dominant-baseline="middle" fill="#AA6600" font-weight="bold" font-family="serif">$</text>
+      </g>
+    </svg>`;
+
+    case 'music': return `<svg width="${s}" height="${s}" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+      <style>
+        @keyframes note1{0%,100%{transform:translateY(0) rotate(-10deg)}50%{transform:translateY(-12px) rotate(-5deg)}}
+        @keyframes note2{0%,100%{transform:translateY(0) rotate(8deg)}50%{transform:translateY(-9px) rotate(12deg)}}
+        @keyframes note3{0%,100%{transform:translateY(0) rotate(0deg)}50%{transform:translateY(-14px) rotate(5deg)}}
+        @keyframes bar{0%,100%{height:10px;y:45}50%{height:30px;y:25}}
+        .n1{animation:note1 1s ease-in-out infinite; fill:#FF6EC7;}
+        .n2{animation:note2 0.85s ease-in-out infinite 0.25s; fill:#AA44FF;}
+        .n3{animation:note3 1.1s ease-in-out infinite 0.5s; fill:#44CCFF;}
+        .b1{animation:bar 0.5s ease-in-out infinite;}
+        .b2{animation:bar 0.5s ease-in-out infinite 0.15s;}
+        .b3{animation:bar 0.5s ease-in-out infinite 0.3s;}
+      </style>
+      <rect class="b1" x="8" y="45" width="8" height="10" rx="3" fill="#FF6EC7"/>
+      <rect class="b2" x="20" y="45" width="8" height="10" rx="3" fill="#AA44FF"/>
+      <rect class="b3" x="32" y="45" width="8" height="10" rx="3" fill="#44CCFF"/>
+      <text class="n1" x="55" y="65" font-size="28" font-family="serif">♪</text>
+      <text class="n2" x="68" y="48" font-size="22" font-family="serif">♫</text>
+      <text class="n3" x="50" y="40" font-size="20" font-family="serif">♩</text>
+    </svg>`;
+
+    case 'world': return `<svg width="${s}" height="${s}" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+      <style>
+        @keyframes spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}
+        @keyframes pulse{0%,100%{opacity:0.3;r:46}50%{opacity:0.6;r:50}}
+        .globe{animation:spin 8s linear infinite;transform-origin:50px 50px;}
+        .ring{animation:pulse 2s ease-in-out infinite;}
+      </style>
+      <circle class="ring" cx="50" cy="50" r="46" fill="none" stroke="#44AAFF" stroke-width="1.5" opacity="0.4"/>
+      <circle cx="50" cy="50" r="40" fill="#1144AA" stroke="#2266CC" stroke-width="2"/>
+      <g class="globe">
+        <ellipse cx="50" cy="50" rx="40" ry="15" fill="none" stroke="#44AAFF" stroke-width="1" opacity="0.5"/>
+        <ellipse cx="50" cy="50" rx="40" ry="28" fill="none" stroke="#44AAFF" stroke-width="1" opacity="0.3"/>
+        <line x1="50" y1="10" x2="50" y2="90" stroke="#44AAFF" stroke-width="1" opacity="0.4"/>
+      </g>
+      <path d="M30 35 Q38 30 42 38 Q46 30 54 33 Q58 45 52 50 Q44 55 38 48 Q28 45 30 35Z" fill="#22AA44" opacity="0.9"/>
+      <path d="M55 48 Q62 42 68 48 Q72 55 65 60 Q58 62 55 55Z" fill="#22AA44" opacity="0.9"/>
+      <path d="M22 52 Q28 48 32 54 Q30 62 24 60Z" fill="#22AA44" opacity="0.9"/>
+    </svg>`;
+
+    case 'camera': return `<svg width="${s}" height="${s}" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+      <style>
+        @keyframes camPulse{0%,100%{transform:scale(1)}50%{transform:scale(1.05)}}
+        @keyframes flashBlink{0%,85%,100%{opacity:0}88%,92%{opacity:1}}
+        .cam{animation:camPulse 1.2s ease-in-out infinite;transform-origin:50px 50px;}
+        .fl{animation:flashBlink 1.8s linear infinite;}
+      </style>
+      <rect x="16" y="28" width="68" height="48" rx="10" fill="#1d2738" stroke="#8DE4FF" stroke-width="2" class="cam"/>
+      <rect x="26" y="22" width="20" height="10" rx="4" fill="#2c3b56"/>
+      <circle cx="50" cy="52" r="15" fill="#0b1526" stroke="#8DE4FF" stroke-width="3"/>
+      <circle cx="50" cy="52" r="7" fill="#64B5FF" opacity="0.85"/>
+      <circle cx="74" cy="40" r="4" fill="#90F7EC"/>
+      <circle cx="84" cy="18" r="9" fill="#fff" opacity="0" class="fl"/>
+    </svg>`;
+
+    case 'chat': return `<svg width="${s}" height="${s}" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+      <style>
+        @keyframes bubbleIn{0%,100%{transform:translateY(0)}50%{transform:translateY(-4px)}}
+        @keyframes dots{0%,100%{opacity:.35}50%{opacity:1}}
+        .b1{animation:bubbleIn 1.4s ease-in-out infinite;}
+        .b2{animation:bubbleIn 1.1s ease-in-out infinite .2s;}
+        .d1{animation:dots .9s ease-in-out infinite .0s;}
+        .d2{animation:dots .9s ease-in-out infinite .15s;}
+        .d3{animation:dots .9s ease-in-out infinite .3s;}
+      </style>
+      <path d="M16 30h48a8 8 0 0 1 8 8v22a8 8 0 0 1-8 8H42l-10 10v-10H16a8 8 0 0 1-8-8V38a8 8 0 0 1 8-8z" fill="#6C8CFF" class="b1"/>
+      <path d="M44 18h40a8 8 0 0 1 8 8v20a8 8 0 0 1-8 8H68l-8 8v-8H44a8 8 0 0 1-8-8V26a8 8 0 0 1 8-8z" fill="#9BE7FF" class="b2"/>
+      <circle cx="28" cy="49" r="3" fill="#fff" class="d1"/><circle cx="38" cy="49" r="3" fill="#fff" class="d2"/><circle cx="48" cy="49" r="3" fill="#fff" class="d3"/>
+    </svg>`;
+
+    case 'target': return `<svg width="${s}" height="${s}" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+      <style>
+        @keyframes ringPulse{0%,100%{transform:scale(1);opacity:.9}50%{transform:scale(1.08);opacity:.6}}
+        @keyframes arrowHit{0%,100%{transform:translateX(0)}50%{transform:translateX(4px)}}
+        .rg{animation:ringPulse 1.2s ease-in-out infinite;transform-origin:50px 50px;}
+        .ar{animation:arrowHit .9s ease-in-out infinite;}
+      </style>
+      <g class="rg">
+        <circle cx="50" cy="50" r="32" fill="#ffdfdf" stroke="#ff5e5e" stroke-width="3"/>
+        <circle cx="50" cy="50" r="22" fill="#fff" stroke="#ff5e5e" stroke-width="3"/>
+        <circle cx="50" cy="50" r="12" fill="#ff9c9c"/>
+        <circle cx="50" cy="50" r="5" fill="#c1121f"/>
+      </g>
+      <g class="ar" transform="translate(0,0)">
+        <line x1="66" y1="34" x2="86" y2="20" stroke="#2f3e46" stroke-width="3" stroke-linecap="round"/>
+        <polygon points="86,20 82,30 93,26" fill="#2f3e46"/>
+      </g>
+    </svg>`;
+
+    case 'shield': return `<svg width="${s}" height="${s}" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+      <style>
+        @keyframes shieldGlow{0%,100%{filter:drop-shadow(0 0 2px #6ee7b7)}50%{filter:drop-shadow(0 0 10px #6ee7b7)}}
+        @keyframes checkPop{0%,100%{transform:scale(1)}50%{transform:scale(1.15)}}
+        .sh{animation:shieldGlow 1.3s ease-in-out infinite;}
+        .ck{animation:checkPop 1s ease-in-out infinite;transform-origin:50px 54px;}
+      </style>
+      <path class="sh" d="M50 12l30 10v22c0 19-11 33-30 42C31 77 20 63 20 44V22l30-10z" fill="#0f3d2e" stroke="#6ee7b7" stroke-width="3"/>
+      <path class="ck" d="M37 54l9 9 18-20" fill="none" stroke="#b7ffe3" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>`;
+
+    case 'crown': return `<svg width="${s}" height="${s}" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+      <style>
+        @keyframes bobCrown{0%,100%{transform:translateY(0)}50%{transform:translateY(-4px)}}
+        @keyframes shineCrown{0%,100%{opacity:.3}50%{opacity:1}}
+        .cr{animation:bobCrown 1.4s ease-in-out infinite;}
+        .gl{animation:shineCrown 1s ease-in-out infinite;}
+      </style>
+      <g class="cr">
+        <path d="M15 68l8-36 20 18 17-30 17 30 20-18 8 36H15z" fill="#ffd54a" stroke="#b67b00" stroke-width="3"/>
+        <rect x="15" y="68" width="70" height="12" rx="4" fill="#e6a700"/>
+        <circle cx="23" cy="32" r="5" fill="#fff3b0" class="gl"/>
+        <circle cx="50" cy="20" r="5" fill="#fff3b0" class="gl"/>
+        <circle cx="77" cy="32" r="5" fill="#fff3b0" class="gl"/>
+      </g>
+    </svg>`;
+
+    case 'gift': return `<svg width="${s}" height="${s}" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+      <style>
+        @keyframes giftBounce{0%,100%{transform:translateY(0)}50%{transform:translateY(-5px)}}
+        @keyframes ribbonPop{0%,100%{transform:scale(1)}50%{transform:scale(1.12)}}
+        .gb{animation:giftBounce 1.1s ease-in-out infinite;transform-origin:50px 60px;}
+        .rb{animation:ribbonPop .9s ease-in-out infinite;transform-origin:50px 44px;}
+      </style>
+      <g class="gb">
+        <rect x="20" y="42" width="60" height="42" rx="6" fill="#ff6b9d"/>
+        <rect x="20" y="42" width="60" height="10" fill="#ff8db4"/>
+        <rect x="46" y="42" width="8" height="42" fill="#fff"/>
+        <rect x="20" y="56" width="60" height="8" fill="#fff"/>
+        <path class="rb" d="M50 42c-9-12-19-8-16 0 2 5 9 6 16 0z" fill="#fff"/>
+        <path class="rb" d="M50 42c9-12 19-8 16 0-2 5-9 6-16 0z" fill="#fff"/>
+      </g>
+    </svg>`;
+
+    case 'clock': return `<svg width="${s}" height="${s}" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+      <style>
+        @keyframes tickHand{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}
+        @keyframes tickHandSlow{from{transform:rotate(0deg)}to{transform:rotate(30deg)}}
+        .h1{animation:tickHand 4s linear infinite;transform-origin:50px 50px;}
+        .h2{animation:tickHandSlow 4s linear infinite;transform-origin:50px 50px;}
+      </style>
+      <circle cx="50" cy="50" r="34" fill="#f8fbff" stroke="#4a6fa5" stroke-width="4"/>
+      <line class="h2" x1="50" y1="50" x2="50" y2="30" stroke="#4a6fa5" stroke-width="4" stroke-linecap="round"/>
+      <line class="h1" x1="50" y1="50" x2="66" y2="50" stroke="#1d3557" stroke-width="3" stroke-linecap="round"/>
+      <circle cx="50" cy="50" r="3" fill="#1d3557"/>
+    </svg>`;
+
+    case 'cloud': return `<svg width="${s}" height="${s}" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+      <style>
+        @keyframes cloudFloat{0%,100%{transform:translateX(0)}50%{transform:translateX(5px)}}
+        @keyframes upDown{0%,100%{transform:translateY(0)}50%{transform:translateY(-4px)}}
+        .cl{animation:cloudFloat 1.8s ease-in-out infinite;}
+        .ar{animation:upDown .9s ease-in-out infinite;}
+      </style>
+      <g class="cl">
+        <path d="M28 66h40a14 14 0 0 0 0-28 18 18 0 0 0-34-4 12 12 0 0 0-6 32z" fill="#d9efff" stroke="#78b8e6" stroke-width="3"/>
+      </g>
+      <g class="ar">
+        <path d="M50 60V44" stroke="#2d6a9f" stroke-width="4" stroke-linecap="round"/>
+        <path d="M44 50l6-6 6 6" fill="none" stroke="#2d6a9f" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+      </g>
+    </svg>`;
+
+    case 'flower': return `<svg width="${s}" height="${s}" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+      <style>
+        @keyframes bloom{0%,100%{transform:scale(.9)}50%{transform:scale(1.08)}}
+        .flw{animation:bloom 1.4s ease-in-out infinite;transform-origin:50px 50px;}
+      </style>
+      <g class="flw">
+        <ellipse cx="50" cy="30" rx="10" ry="16" fill="#ff9ecf"/>
+        <ellipse cx="70" cy="40" rx="10" ry="16" fill="#ff9ecf" transform="rotate(45 70 40)"/>
+        <ellipse cx="30" cy="40" rx="10" ry="16" fill="#ff9ecf" transform="rotate(-45 30 40)"/>
+        <ellipse cx="66" cy="62" rx="10" ry="16" fill="#ff9ecf" transform="rotate(120 66 62)"/>
+        <ellipse cx="34" cy="62" rx="10" ry="16" fill="#ff9ecf" transform="rotate(-120 34 62)"/>
+        <circle cx="50" cy="50" r="10" fill="#ffd166"/>
+        <rect x="48" y="60" width="4" height="24" rx="2" fill="#4caf50"/>
+      </g>
+    </svg>`;
+
+    default: return buildGraphicSVG('stars', sz);
+  }
+}
+
+// Active graphic instances: phIdx → { el }
+const graphicInstances = new Map();
+let currentGraphicPhIdx = -1;
+
+function getGraphicPosition(phIdx) {
+  const zones = [
+    [0.88, 0.15], [0.12, 0.15], [0.88, 0.82], [0.12, 0.82],
+    [0.88, 0.50], [0.12, 0.50],
+  ];
+  const z = zones[phIdx % zones.length];
+  return { left: (z[0] * 100).toFixed(1) + '%', top: (z[1] * 100).toFixed(1) + '%' };
+}
+
+function showGraphicForPhrase(ph, phIdx) {
+  const useMotion = document.getElementById('toggleMotion').classList.contains('on');
+  const layer = document.getElementById('lottiLayer');
+  if (!layer) return;
+  if (!useMotion) { hideAllLotties(); return; }
+  if (currentGraphicPhIdx === phIdx) return;
+
+  hideAllLotties();
+  currentGraphicPhIdx = phIdx;
+
+  const baseSize = parseInt(document.getElementById('graphicSize').value);
+  const scaleFactor = Math.min(1, W / 480, H / 320);
+  const sz = Math.max(48, Math.round(baseSize * scaleFactor * 1.8));
+
+  const type = getPhraseGraphicType(ph, phIdx);
+  const pos = getGraphicPosition(phIdx);
+  const svg = buildGraphicSVG(type, sz);
+
+  const el = document.createElement('div');
+  el.style.cssText = `position:absolute;width:${sz}px;height:${sz}px;left:${pos.left};top:${pos.top};transform:translate(-50%,-50%);pointer-events:none;`;
+  el.innerHTML = svg;
+  layer.appendChild(el);
+  graphicInstances.set(phIdx, { el });
+}
+
+function hideAllLotties() {
+  for (const [idx, inst] of graphicInstances) inst.el.remove();
+  graphicInstances.clear();
+  currentGraphicPhIdx = -1;
+}
+
+// Called each frame
+function drawPhraseMotionGraphic(ph, phIdx, localMs) {
+  showGraphicForPhrase(ph, phIdx);
+  if (isExporting && pixabayEnabled) {
+    drawPixabayOnCanvas(ph, phIdx);
+  }
+  // Also show Lottie beside the words if enabled
+  if (lottieEnabled) showLottieForPhrase(ph, phIdx, localMs);
+  // Also show unDraw illustration if enabled
+  if (undrawEnabled) showUndrawForPhrase(ph, phIdx, localMs);
+  // Also show Pixabay image if enabled
+  if (pixabayEnabled) showPixabayForPhrase(ph, phIdx, localMs);
+  // Also draw searched emoji in-canvas if enabled
+  if (emojiEnabled) drawEmojiForPhrase(ph, phIdx, localMs);
+}
+
+function getEmojiSizePx() {
+  const base = parseInt(document.getElementById('graphicSize').value, 10) || 56;
+  const scale = Math.min(1, W / 480, H / 320);
+  return Math.max(24, Math.round(base * scale * 0.92));
+}
+
+function drawEmojiForPhrase(ph, phIdx, localMs) {
+  const data = emojiPhraseData[phIdx];
+  if (!data || !data.emoji) return;
+
+  const size = getEmojiSizePx();
+  const pos = getMediaSafeSlot(ph, phIdx, size, size);
+  if (!pos) return;
+
+  const pulse = 1 + 0.06 * Math.sin((localMs || 0) / 170);
+  const drawSize = Math.max(20, Math.round(size * pulse));
+
+  ctx.save();
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.globalAlpha = 0.95;
+  ctx.shadowColor = 'rgba(0,0,0,0.28)';
+  ctx.shadowBlur = 8;
+  ctx.font = `${drawSize}px "Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji",sans-serif`;
+  ctx.fillText(data.emoji, pos.x, pos.y);
+  ctx.restore();
+}
+
+function getPhraseTextBounds(ph) {
+  const boxes = getPhraseWordBoxes(ph);
+  if (!boxes.length) {
+    return { minX: W * 0.3, maxX: W * 0.7, minY: H * 0.35, maxY: H * 0.65 };
+  }
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+  boxes.forEach(b => {
+    minX = Math.min(minX, b.minX);
+    maxX = Math.max(maxX, b.maxX);
+    minY = Math.min(minY, b.minY);
+    maxY = Math.max(maxY, b.maxY);
+  });
+  return {
+    minX: Math.max(0, minX),
+    maxX: Math.min(W, maxX),
+    minY: Math.max(0, minY),
+    maxY: Math.min(H, maxY)
+  };
+}
+
+function getPhraseWordBoxes(ph) {
+  if (!ph || !Array.isArray(ph.layout) || !ph.layout.length) return [];
+  const boxes = [];
+  ph.layout.forEach((lp, idx) => {
+    const fallbackWord = ph.words[idx]?.text || '';
+    const drawWord = currentStyle === 'editorial'
+      ? ((ph.words[idx]?.raw || fallbackWord).toLowerCase())
+      : fallbackWord;
+
+    let textW = Math.max(lp.sz * 0.45, lp.sz * 0.56 * Math.max(1, drawWord.length));
+    let textH = lp.sz * 0.95;
+    if (ctx) {
+      const font = FONTS[lp.fontIdx] || FONTS[0];
+      ctx.save();
+      ctx.font = font.f(lp.sz);
+      const m = ctx.measureText(drawWord);
+      const asc = m.actualBoundingBoxAscent || lp.sz * 0.72;
+      const desc = m.actualBoundingBoxDescent || lp.sz * 0.22;
+      textW = Math.max(1, m.width);
+      textH = Math.max(1, asc + desc);
+      ctx.restore();
+    }
+
+    boxes.push({
+      minX: lp.x - textW / 2,
+      maxX: lp.x + textW / 2,
+      minY: lp.y - textH / 2,
+      maxY: lp.y + textH / 2
+    });
+  });
+  return boxes;
+}
+
+function getMediaSafeSlot(ph, phIdx, mediaW, mediaH) {
+  const boxes = getPhraseWordBoxes(ph);
+  const bounds = getPhraseTextBounds(ph);
+  const cx = (bounds.minX + bounds.maxX) / 2;
+  const cy = (bounds.minY + bounds.maxY) / 2;
+
+  const halfW = mediaW / 2;
+  const halfH = mediaH / 2;
+  const m = 2;
+  const xL = halfW + m;
+  const xR = W - halfW - m;
+  const yT = halfH + m;
+  const yB = H - halfH - m;
+
+  const anchors = [
+    { x: bounds.maxX + halfW, y: cy },
+    { x: bounds.minX - halfW, y: cy },
+    { x: cx, y: bounds.minY - halfH },
+    { x: cx, y: bounds.maxY + halfH },
+    { x: bounds.maxX + halfW, y: bounds.minY - halfH },
+    { x: bounds.minX - halfW, y: bounds.minY - halfH },
+    { x: bounds.maxX + halfW, y: bounds.maxY + halfH },
+    { x: bounds.minX - halfW, y: bounds.maxY + halfH }
+  ];
+
+  const clampCandidate = (p) => ({
+    x: Math.max(xL, Math.min(xR, p.x)),
+    y: Math.max(yT, Math.min(yB, p.y))
+  });
+
+  const candidates = [];
+  anchors.forEach((a) => {
+    const dx = a.x - cx;
+    const dy = a.y - cy;
+    const len = Math.hypot(dx, dy) || 1;
+    const ux = dx / len;
+    const uy = dy / len;
+    // Deterministic outward sweep from closest touch position.
+    for (let step = 0; step <= 20; step++) {
+      const d = step * 10;
+      candidates.push(clampCandidate({ x: a.x + ux * d, y: a.y + uy * d }));
+    }
+  });
+
+  function overlapAreaWithPhraseBox(left, top, right, bottom) {
+    if (!boxes.length) return 0;
+    let area = 0;
+    boxes.forEach((b) => {
+      const w = Math.max(0, Math.min(right, b.maxX) - Math.max(left, b.minX));
+      const h = Math.max(0, Math.min(bottom, b.maxY) - Math.max(top, b.minY));
+      area += w * h;
+    });
+    return area;
+  }
+
+  let best = null;
+  let bestScore = -Infinity;
+  candidates.forEach((p) => {
+    const left = p.x - halfW;
+    const right = p.x + halfW;
+    const top = p.y - halfH;
+    const bottom = p.y + halfH;
+
+    const overlapArea = overlapAreaWithPhraseBox(left, top, right, bottom);
+    const overlaps = overlapArea > 0;
+    const dist = Math.hypot(p.x - cx, p.y - cy);
+    // Prefer the closest valid slot; no extra padding between text boxes and media.
+    const score = overlaps ? (-1e9 - overlapArea - dist) : (-dist);
+    if (score > bestScore) {
+      bestScore = score;
+      best = p;
+    }
+  });
+
+  if (!best) best = { x: xR, y: yT };
+  return {
+    x: Math.max(halfW, Math.min(W - halfW, best.x)),
+    y: Math.max(halfH, Math.min(H - halfH, best.y))
+  };
+}
+
+// Sync overlay layer size to canvas
+function syncLottieLayer() {
+  const layer = document.getElementById('lottiLayer');
+  const wrap = document.getElementById('canvasWrap');
+  if (!layer || !wrap) return;
+  const rect = wrap.getBoundingClientRect();
+  layer.style.width = rect.width + 'px';
+  layer.style.height = rect.height + 'px';
+}
+
+// Legacy per-word function kept for compatibility (now a no-op)
+function getMotionGraphic(word, phIdx, wIdx) { return null; }
+function drawMotionGraphic() {}
+
+
+function drawWord(w,lp,t,st){
+  const wordText=currentStyle==='editorial'
+    ? (w.raw||w.text).toLowerCase()
+    : currentStyle==='newspaper'
+      ? (w.raw||w.text).toUpperCase()
+      : w.text;
+  const anim=(ANIMS[w.animName]||ANIMS.pop)(t);
+  const alpha=Math.max(0,Math.min(1,anim.alpha??1));
+  if(alpha<=0)return;
+  ctx.save();
+  ctx.globalAlpha=alpha;
+  const ox=anim.ox||0,oy=anim.oy||0,rot=(anim.rot||0)+lp.rot;
+  ctx.translate(lp.x+ox,lp.y+oy);
+  if(rot)ctx.rotate(rot);
+  ctx.scale(anim.sx??1,anim.sy??1);
+  const font=FONTS[lp.fontIdx];
+  ctx.font=font.f(lp.sz);
+  ctx.textAlign='center';ctx.textBaseline='middle';
+  ctx.shadowColor=st.shadowColor||'transparent';
+  ctx.shadowBlur=st.shadowBlur||0;
+  ctx.shadowOffsetX=st.sOX||0;ctx.shadowOffsetY=st.sOY||0;
+  const color=st.fills[lp.colorIdx]||st.fills[0];
+  if(anim.glitch){
+    ctx.save();ctx.shadowColor='transparent';ctx.globalAlpha=.4;
+    ctx.fillStyle='#FF00FF';ctx.fillText(wordText,3,2);
+    ctx.fillStyle='#00FFFF';ctx.fillText(wordText,-3,-2);
+    ctx.restore();
+  }
+  if(anim.waveT!==undefined){
+    const chars=wordText.split('');
+    ctx.font=font.f(lp.sz);
+    const ws=chars.map(c=>ctx.measureText(c).width);
+    const tw=ws.reduce((a,b)=>a+b,0);
+    let cx2=-tw/2;
+    chars.forEach((ch,ci)=>{
+      const wy=Math.sin(anim.waveT*10+ci*.85)*lp.sz*.28*(1-Math.min(anim.waveT,.7)/.7*.5);
+      ctx.fillStyle=color;ctx.fillText(ch,cx2+ws[ci]/2,wy);cx2+=ws[ci];
+    });
+  } else if(anim.typeT!==undefined){
+    ctx.font=font.f(lp.sz);
+    const fw=ctx.measureText(wordText).width;
+    ctx.save();ctx.beginPath();ctx.rect(-fw/2-2,-lp.sz,fw*anim.typeT+4,lp.sz*2.2);ctx.clip();
+    ctx.fillStyle=color;ctx.fillText(wordText,0,0);ctx.restore();
+  } else {
+    ctx.fillStyle=color;ctx.fillText(wordText,0,0);
+  }
+  ctx.restore();
+  // Draw motion graphic emoji (needs access to word & layout — passed via w._mg, w._wi, w._phLocalMs)
+  if(w._mg!==undefined) drawMotionGraphic(w._mg, lp, t, w.animName, w._phLocalMs||0, w._wi||0);
+}
+
+// ═══════════════════════════════════════════
+//  TIMELINE UI
+// ═══════════════════════════════════════════
+function updateTimelineUI(ph,localMs){
+  const tl=document.getElementById('wordTimeline');
+  if(tl.dataset.phrase!==String(ph.startMs)){
+    tl.dataset.phrase=ph.startMs;tl.innerHTML='';
+    ph.words.forEach((w,i)=>{
+      const el=document.createElement('div');
+      el.className='wt-word';el.id='wt'+i;el.textContent=w.text;tl.appendChild(el);
+    });
+  }
+  ph.words.forEach((_,i)=>{
+    const el=document.getElementById('wt'+i);if(!el)return;
+    el.classList.remove('active','done');
+    if(localMs>=ph.wordStarts[i]){
+      const next=ph.wordStarts[i+1];
+      if(next===undefined||localMs<next)el.classList.add('active');
+      else el.classList.add('done');
+    }
+  });
+}
+
+// ═══════════════════════════════════════════
+//  GENERATE
+// ═══════════════════════════════════════════
+function generate(){
+  const text=document.getElementById('scriptInput').value.trim();
+  if(!text){toast('Enter a script first!',true);return;}
+  const btn=document.getElementById('genBtn');
+  btn.classList.add('busy');
+  btn.innerHTML=`<svg width="14" height="14" viewBox="0 0 14 14" fill="none" style="animation:spin .7s linear infinite;flex-shrink:0"><path d="M7 1.5a5.5 5.5 0 1 1-3.9 1.6" stroke="white" stroke-width="2" stroke-linecap="round"/></svg> Generating…`;
+  setTimeout(()=>{
+    const parsed=parseIntoPhrases(text);
+    hideAllLotties();
+    hideAllLottieSearch();
+    hideAllUndraw();
+    hideAllPixabay();
+    emojiPhraseData = {};
+    phrases=buildTimeline(parsed);
+    selectedSearchKeywords = phrases.map(ph => extractUniversalSearchKeyword(ph));
+    updateSearchKeywordsDisplay(selectedSearchKeywords);
+    totalDurMs=phrases.length?phrases[phrases.length-1].startMs+phrases[phrases.length-1].totalMs:0;
+    progress=0;playing=false;startStamp=null;
+    cancelAnimationFrame(raf);setPlayIcon(false);
+    document.getElementById('progFill').style.width='0%';
+    document.getElementById('progThumb').style.left='0%';
+    updateTimeLabel(0);hideAllLotties();generated=true;drawAtTime(0);
+    btn.classList.remove('busy');
+    btn.innerHTML=`<svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M7 1L8.5 5.2L13 7L8.5 8.8L7 13L5.5 8.8L1 7L5.5 5.2L7 1Z" fill="white"/></svg> Generate Video`;
+    toast(`${phrases.length} phrases · ${(totalDurMs/1000).toFixed(1)}s · hit play!`);
+    // close sidebar on mobile after generate
+    if(window.innerWidth<=768)closeSidebar();
+    // Lottie: preload if enabled
+    if (lottieEnabled) {
+      document.getElementById('lottieStatus').textContent = 'Loading animations…';
+      preloadLottieAnimations(phrases, selectedSearchKeywords);
+    }
+    // unDraw: preload if enabled
+    if (undrawEnabled) {
+      document.getElementById('undrawStatus').textContent = 'Matching illustrations…';
+      preloadUndrawIllustrations(phrases, selectedSearchKeywords);
+    }
+    // Pixabay: preload if enabled
+    if (pixabayEnabled) {
+      document.getElementById('pixabayStatus').textContent = 'Searching Pixabay…';
+      preloadPixabayImages(phrases, selectedSearchKeywords);
+    }
+    // Emoji API: preload if enabled
+    if (emojiEnabled) {
+      document.getElementById('emojiStatus').textContent = 'Searching emojis…';
+      preloadPhraseEmojis(phrases, selectedSearchKeywords);
+    }
+  },600);
+}
+
+// ═══════════════════════════════════════════
+//  PLAYBACK
+// ═══════════════════════════════════════════
+function togglePlay(){
+  if(!generated){toast('Generate first!',true);return;}
+  if(playing){playing=false;cancelAnimationFrame(raf);startStamp=null;setPlayIcon(false);}
+  else{if(progress>=1)progress=0;playing=true;startStamp=null;setPlayIcon(true);raf=requestAnimationFrame(tick);}
+}
+function tick(ts){
+  if(!playing)return;
+  if(!startStamp)startStamp=ts-progress*totalDurMs;
+  const elapsed=ts-startStamp;
+  const clipped=Math.min(elapsed,totalDurMs);
+  progress=clipped/totalDurMs;
+  drawAtTime(clipped);
+  const pct=(progress*100).toFixed(2);
+  document.getElementById('progFill').style.width=pct+'%';
+  document.getElementById('progThumb').style.left=pct+'%';
+  updateTimeLabel(clipped);
+  if(progress>=1){playing=false;progress=1;setPlayIcon(false);return;}
+  raf=requestAnimationFrame(tick);
+}
+function seekClick(e){hideAllLotties();hideAllLottieSearch();hideAllUndraw();hideAllPixabay();
+  if(!generated)return;
+  const rect=e.currentTarget.getBoundingClientRect();
+  progress=Math.max(0,Math.min(1,(e.clientX-rect.left)/rect.width));
+  const ms=progress*totalDurMs;startStamp=null;drawAtTime(ms);
+  document.getElementById('progFill').style.width=(progress*100)+'%';
+  document.getElementById('progThumb').style.left=(progress*100)+'%';
+  updateTimeLabel(ms);
+  if(playing)startStamp=performance.now()-ms;
+}
+function updateTimeLabel(ms){
+  const fmt=s=>`${Math.floor(s/60)}:${String(s%60).padStart(2,'0')}`;
+  document.getElementById('timeLbl').textContent=`${fmt(Math.floor(ms/1000))} / ${fmt(Math.floor(totalDurMs/1000))}`;
+}
+function setPlayIcon(p){
+  document.getElementById('playIco').innerHTML=p
+    ?'<rect x="2" y="1.5" width="2.8" height="9" fill="white"/><rect x="7.2" y="1.5" width="2.8" height="9" fill="white"/>'
+    :'<path d="M2.5 1.5L10.5 6L2.5 10.5V1.5Z"/>';
+}
+
+// ═══════════════════════════════════════════
+//  EXPORT  — MediaRecorder WebM or PNG frame
+// ═══════════════════════════════════════════
+function openExportModal(){
+  if(!generated){toast('Generate a video first!',true);return;}
+  document.getElementById('exportModal').classList.add('show');
+  document.getElementById('dlProgress').style.display='none';
+  document.getElementById('dlBar').style.width='0%';
+  document.getElementById('dlStatus').textContent='';
+  // reset buttons
+  document.querySelectorAll('.modal-btn').forEach(b=>b.disabled=false);
+}
+function closeExportModal(){document.getElementById('exportModal').classList.remove('show');}
+
+async function startExport(type){
+  if(type==='frames'){
+    // Snapshot current frame as PNG
+    drawAtTime(progress*totalDurMs);
+    cv.toBlob(blob=>{
+      const url=URL.createObjectURL(blob);
+      const a=document.createElement('a');a.href=url;a.download='kinetic-frame.png';a.click();
+      setTimeout(()=>URL.revokeObjectURL(url),3000);
+      closeExportModal();toast('PNG frame downloaded!');
+    },'image/png');
+    return;
+  }
+
+  // Video via MediaRecorder (WebM capture, optional MP4 transcode)
+  if(!window.MediaRecorder){
+    toast('MediaRecorder not supported in this browser.',true);
+    closeExportModal();return;
+  }
+
+  const requestedMp4Mime =
+    MediaRecorder.isTypeSupported('video/mp4;codecs=avc1.42E01E')
+      ? 'video/mp4;codecs=avc1.42E01E'
+      : MediaRecorder.isTypeSupported('video/mp4')
+      ? 'video/mp4'
+      : null;
+  const webmMime=MediaRecorder.isTypeSupported('video/webm;codecs=vp9')
+    ?'video/webm;codecs=vp9'
+    :MediaRecorder.isTypeSupported('video/webm')
+    ?'video/webm':null;
+  const mimeType=(type==='mp4' && requestedMp4Mime) ? requestedMp4Mime : webmMime;
+
+  if(!mimeType){
+    toast('Video recording not supported. Try PNG frame export.',true);
+    closeExportModal();return;
+  }
+
+  document.querySelectorAll('.modal-btn').forEach(b=>b.disabled=true);
+  const prog=document.getElementById('dlProgress');
+  prog.style.display='block';
+  const barEl=document.getElementById('dlBar');
+  const statusEl=document.getElementById('dlStatus');
+  statusEl.textContent='Starting recording…';
+  isExporting=true;
+
+  // Stop live playback
+  playing=false;cancelAnimationFrame(raf);startStamp=null;setPlayIcon(false);
+
+  if (pixabayEnabled) {
+    statusEl.textContent='Preparing photos…';
+    await preloadPixabayCanvasAssets();
+  }
+
+  const chunks=[];
+  const stream=cv.captureStream(30);
+  const recorder=new MediaRecorder(stream,{mimeType,videoBitsPerSecond:6_000_000});
+  recorder.ondataavailable=e=>{if(e.data.size>0)chunks.push(e.data);};
+  recorder.onstop=async ()=>{
+    const blob=new Blob(chunks,{type:mimeType});
+    try{
+      if(type==='mp4'){
+        if((mimeType||'').startsWith('video/mp4')){
+          downloadBlob(blob,'kinetic-typography.mp4');
+          statusEl.textContent='Done! MP4 downloaded.';
+          barEl.style.width='100%';
+          setTimeout(closeExportModal,1500);
+          toast('MP4 video downloaded!');
+        }else{
+          statusEl.textContent='Preparing MP4 encoder…';
+          barEl.style.width='92%';
+          const mp4Blob=await transcodeWebmToMp4(blob,statusEl,barEl);
+          downloadBlob(mp4Blob,'kinetic-typography.mp4');
+          statusEl.textContent='Done! MP4 downloaded.';
+          barEl.style.width='100%';
+          setTimeout(closeExportModal,1500);
+          toast('MP4 video downloaded!');
+        }
+      }else{
+        downloadBlob(blob,'kinetic-typography.webm');
+        statusEl.textContent='Done! File downloaded.';
+        barEl.style.width='100%';
+        setTimeout(closeExportModal,1500);
+        toast('WebM video downloaded!');
+      }
+    }catch(err){
+      console.error(err);
+      const reason=getErrorText(err);
+      if(type==='mp4'){
+        downloadBlob(blob,'kinetic-typography.webm');
+        statusEl.textContent='MP4 unavailable. Downloaded WebM instead.';
+        barEl.style.width='100%';
+        toast('MP4 conversion failed ('+reason+'). WebM downloaded instead.',true);
+      }else{
+        statusEl.textContent='Export failed.';
+        toast('Export failed ('+reason+').',true);
+      }
+      setTimeout(closeExportModal,1800);
+    }finally{
+      isExporting=false;
+    }
+  };
+
+  recorder.start();
+  // Render all frames at real speed
+  let renderMs=0;
+  const frameMs=1000/30;
+  const totalFrames=Math.ceil(totalDurMs/frameMs);
+  let frame=0;
+
+  function renderNextFrame(){
+    if(frame>=totalFrames){
+      recorder.stop();return;
+    }
+    drawAtTime(renderMs);
+    const pct=Math.round((frame/totalFrames)*100);
+    barEl.style.width=pct+'%';
+    statusEl.textContent=`Recording… ${pct}%`;
+    renderMs+=frameMs;frame++;
+    setTimeout(renderNextFrame,frameMs);
+  }
+  renderNextFrame();
+}
+
+// ═══════════════════════════════════════════
+//  UI HELPERS
+// ═══════════════════════════════════════════
+function regenLayouts(){
+  if(generated){phrases=buildTimeline(phrases.map(p=>({words:p.words})));drawAtTime(progress*totalDurMs);}
+}
+
+const STYLE_DEFAULTS={
+  pulse:{layout:'beat',anim:'whip',timing:270},
+  serene:{layout:'organic',anim:'drift',timing:700},
+  blueprint:{layout:'info',anim:'shutter',timing:450},
+  noir:{layout:'crawl',anim:'drift',timing:700},
+  lyric:{layout:'lyrics',anim:'bounce',timing:450},
+  retro3d:{layout:'radial',anim:'spiral',timing:270},
+  uihero:{layout:'path',anim:'reveal',timing:450},
+  mono:{layout:'info',anim:'handwrite',timing:700},
+  quotes:{layout:'stack',anim:'quote',timing:700},
+  newspaper:{layout:'info',anim:'shutter',timing:700},
+  editorial:{layout:'poster',anim:'slam',timing:450}
+};
+
+function applyStyleDefaults(styleKey){
+  const defaults=STYLE_DEFAULTS[styleKey];
+  if(!defaults)return;
+  if(defaults.layout){
+    const layoutEl=document.querySelector(`.layout-card[data-layout="${defaults.layout}"]`);
+    if(layoutEl) selLayout(layoutEl);
+  }
+  if(defaults.anim){
+    const animEl=document.querySelector(`.anim-chip[data-anim="${defaults.anim}"]`);
+    if(animEl) selAnim(animEl);
+  }
+  if(defaults.timing){
+    const timingEl=document.querySelector(`.timing-chip[data-ms="${defaults.timing}"]`);
+    if(timingEl) selTiming(timingEl);
+  }
+}
+
+function initSidebarSectionCollapse(){
+  const sections=document.querySelectorAll('.sidebar .s-section');
+  sections.forEach((section,idx)=>{
+    if(section.dataset.collapsible==='ready')return;
+    const existingLabel=section.querySelector(':scope > .s-label');
+    const title=existingLabel?existingLabel.textContent.trim():'Generate';
+    if(existingLabel) existingLabel.remove();
+
+    const content=document.createElement('div');
+    content.className='s-content';
+    while(section.firstChild){content.appendChild(section.firstChild);}
+
+    const headBtn=document.createElement('button');
+    headBtn.type='button';
+    headBtn.className='s-head-btn';
+    headBtn.innerHTML=`<span>${title}</span><span class="s-caret">▾</span>`;
+
+    section.appendChild(headBtn);
+    section.appendChild(content);
+    section.dataset.collapsible='ready';
+
+    const shouldStartOpen=true;
+    if(!shouldStartOpen)section.classList.add('collapsed');
+    headBtn.setAttribute('aria-expanded', String(!section.classList.contains('collapsed')));
+
+    headBtn.addEventListener('click',()=>{
+      section.classList.toggle('collapsed');
+      headBtn.setAttribute('aria-expanded', String(!section.classList.contains('collapsed')));
+    });
+  });
+}
+
+function selStyle(el){
+  document.querySelectorAll('.style-card').forEach(c=>c.classList.remove('sel'));
+  el.classList.add('sel');currentStyle=el.dataset.style;
+  refreshStyleVariantUI();
+  applyStyleDefaults(currentStyle);
+  regenLayouts();if(!generated)drawIdle();
+}
+function selLayout(el){
+  document.querySelectorAll('.layout-card').forEach(c=>c.classList.remove('sel'));
+  el.classList.add('sel');currentLayout=el.dataset.layout;regenLayouts();
+}
+function selRatio(el){
+  document.querySelectorAll('.ratio-chip').forEach(c=>c.classList.remove('sel'));
+  el.classList.add('sel');currentRatio=el.dataset.ratio;
+  document.getElementById('ratioBadge').textContent=currentRatio;
+  sizeCanvas();
+  // Keep overlay layers aligned with the resized canvas for all ratios.
+  syncLottieLayer();
+  syncLottieSearchLayer();
+  syncUndrawLayer();
+  syncPixabayLayer();
+  hideAllLotties();
+  hideAllLottieSearch();
+  hideAllUndraw();
+  hideAllPixabay();
+  if(generated){
+    phrases=buildTimeline(phrases.map(p=>({words:p.words})));
+    drawAtTime(progress*totalDurMs);
+    // Re-run Pixabay matching because preferred orientation depends on canvas ratio.
+    if (pixabayEnabled) preloadPixabayImages(phrases, selectedSearchKeywords);
+  }
+  else drawIdle();
+}
+function selAnim(el){
+  document.querySelectorAll('.anim-chip').forEach(c=>c.classList.remove('sel'));
+  el.classList.add('sel');currentAnim=el.dataset.anim;
+  if(generated){
+    phrases.forEach(ph=>ph.words.forEach(w=>{
+      w.animName=currentAnim==='mix'?ANIM_KEYS[Math.floor(Math.random()*ANIM_KEYS.length)]:currentAnim;
+    }));drawAtTime(progress*totalDurMs);
+  }
+}
+function selTiming(el){
+  document.querySelectorAll('.timing-chip').forEach(c=>c.classList.remove('sel'));
+  el.classList.add('sel');wordMs=parseInt(el.dataset.ms);
+}
+function ensureStyleVariantDefaults(){
+  Object.keys(STYLE_VARIANTS).forEach(styleKey=>{
+    const variants=STYLE_VARIANTS[styleKey];
+    if(variants&&variants.length&&!styleVariantSelection[styleKey]){
+      styleVariantSelection[styleKey]=variants[0].id;
+    }
+  });
+}
+
+function refreshStyleVariantUI(){
+  document.querySelectorAll('.style-card').forEach(card=>{
+    const styleKey=card.dataset.style;
+    const selectedId=styleVariantSelection[styleKey];
+    card.querySelectorAll('.style-vdot').forEach(dot=>{
+      dot.classList.toggle('sel',dot.dataset.variantId===selectedId);
+    });
+  });
+}
+
+function setStyleVariant(styleKey,variantId,selectStyle){
+  styleVariantSelection[styleKey]=variantId;
+  refreshStyleVariantUI();
+  if(selectStyle){
+    const card=document.querySelector(`.style-card[data-style="${styleKey}"]`);
+    if(card && currentStyle!==styleKey) selStyle(card);
+  }
+  if(currentStyle===styleKey){
+    if(generated)drawAtTime(progress*totalDurMs);else drawIdle();
+  }
+}
+
+function initStyleVariantSwatches(){
+  ensureStyleVariantDefaults();
+  document.querySelectorAll('.style-card').forEach(card=>{
+    const styleKey=card.dataset.style;
+    const variants=STYLE_VARIANTS[styleKey]||[];
+    if(variants.length<2) return;
+    const nameEl=card.querySelector('.sc-name');
+    if(!nameEl) return;
+
+    const existing=card.querySelector('.style-variants');
+    if(existing) existing.remove();
+
+    const row=document.createElement('div');
+    row.className='style-variants';
+    variants.forEach(v=>{
+      const dot=document.createElement('button');
+      dot.type='button';
+      dot.className='style-vdot';
+      dot.dataset.variantId=v.id;
+      dot.style.background=v.bg;
+      dot.title=v.id;
+      dot.addEventListener('click',(e)=>{
+        e.stopPropagation();
+        setStyleVariant(styleKey,v.id,true);
+      });
+      row.appendChild(dot);
+    });
+    nameEl.appendChild(row);
+  });
+  refreshStyleVariantUI();
+}
+function updateCtrl(el,valId,suffix){
+  document.getElementById(valId).textContent=el.value+suffix;regenLayouts();
+}
+document.getElementById('scriptInput').addEventListener('input',function(){
+  const wc=this.value.trim()?this.value.trim().split(/\s+/).length:0;
+  document.getElementById('wordCount').textContent=wc+(wc===1?' word':' words');
+  document.getElementById('charCount').textContent=this.value.length+' / 500';
+});
+function toast(msg,err=false){
+  const el=document.getElementById('toastEl');
+  document.getElementById('toastMsg').textContent=msg;
+  document.getElementById('toastDot').className='toast-dot'+(err?' err':'');
+  el.classList.add('show');clearTimeout(el._t);
+  el._t=setTimeout(()=>el.classList.remove('show'),3500);
+}
+
+// ═══════════════════════════════════════════
+//  MOBILE SIDEBAR
+// ═══════════════════════════════════════════
+function toggleSidebar(){
+  const sb=document.getElementById('sidebar');
+  const ov=document.getElementById('sidebarOverlay');
+  sb.classList.toggle('open');ov.classList.toggle('show');
+}
+function closeSidebar(){
+  document.getElementById('sidebar').classList.remove('open');
+  document.getElementById('sidebarOverlay').classList.remove('show');
+}
+
+// ═══════════════════════════════════════════
+//  LOTTIE ANIMATION SYSTEM
+//  Uses curated assets.lottiefiles.com JSON URLs (public CDN).
+//  Animations appear BESIDE the active words, scaled to match typography.
+// ═══════════════════════════════════════════
+
+let lottieEnabled = false;
+let lottieInstances = {}; // phIdx → { el, anim }
+let currentLottiePhIdx = -1;
+// Loaded JSON data per phrase (fetched once on generate)
+let lottieDataCache = {}; // phIdx → animationJSON | null
+let selectedSearchKeywords = [];
+let emojiEnabled = false;
+let emojiPhraseData = {}; // phIdx -> { emoji, keyword, unicodeName } | null
+const EMOJI_API_KEY = 'aeb20aa0231a8b96173ef4a13225e9b8dd53d21c';
+
+// Pixabay configuration:
+// 1) Create an API key from https://pixabay.com/api/docs/
+// 2) Paste it below
+const PIXABAY_API_KEY = '56480406-5cce7c671ac3b6783ff479070';
+
+const LOTTIE_STOPWORDS = new Set([
+  'the','a','an','and','or','but','in','on','at','to','for','of','with','by','from',
+  'is','are','was','were','be','been','being','have','has','had','do','does','did',
+  'will','would','could','should','may','might','can','you','your','we','they','them',
+  'this','that','these','those','our','their','its','my','me','us','it','as','if','so'
+]);
+
+const LOTTIE_VISUAL_HINTS = new Set([
+  'rocket','launch','fire','flame','spark','sparkle','star','magic','glow','light','lightning',
+  'energy','power','heart','love','happy','celebrate','party','win','winner','trophy','goal',
+  'music','beat','dance','idea','bulb','money','coin','rich','world','earth','globe','success',
+  'future','rise','growth','speed','fast','cloud','rain','snow','sun','moon'
+]);
+
+// Concrete nouns are preferred for animation search terms.
+const LOTTIE_CONCRETE_NOUNS = new Set([
+  'life','journey','destination','canvas','challenge','challenges','impact',
+  'world','earth','globe','city','ocean','forest','mountain','sun','moon','star',
+  'rocket','fire','lightning','heart','trophy','music','money','coin','cloud',
+  'tree','flower','book','bridge','door','window','road','river','ship','car',
+  'phone','laptop','camera','home','house','office','team','goal'
+]);
+
+// Connectors/abstract words that should never be selected as animation keywords.
+const LOTTIE_ABSTRACT_CONNECTORS = new Set([
+  'rather','than','not','by','how','deeply','defined','experience','learn','positive','positively',
+  'fleeting','precious','fixed','length','those','their','belongs','from','into','onto','across',
+  'within','without','because','while','where','when','whose','which'
+]);
+
+const LOTTIE_FALLBACK_ASSETS = [
+  { url: 'https://assets9.lottiefiles.com/packages/lf20_jcikwtux.json', type: 'json' },
+  { url: 'https://assets3.lottiefiles.com/packages/lf20_iwmd6pyr.json', type: 'json' },
+  { url: 'https://assets2.lottiefiles.com/packages/lf20_touohxv0.json', type: 'json' },
+  { url: 'https://assets10.lottiefiles.com/packages/lf20_zrqthn6o.json', type: 'json' }
+];
+
+// Deterministic keyword map used when live search is blocked/challenged.
+const LOTTIE_KEYWORD_LIBRARY = {
+  sun:        { url: 'https://assets-v2.lottiefiles.com/a/5855a50a-1151-11ee-8713-db7d99d1cba7/0K62KcjosX.lottie', type: 'dotlottie' },
+  sunrise:    { url: 'https://assets-v2.lottiefiles.com/a/5855a50a-1151-11ee-8713-db7d99d1cba7/0K62KcjosX.lottie', type: 'dotlottie' },
+  day:        { url: 'https://assets-v2.lottiefiles.com/a/cc77c6a2-cc95-11ee-b2a6-d3b7f8367623/LhlmwRoYAn.lottie', type: 'dotlottie' },
+  rise:       { url: 'https://assets-v2.lottiefiles.com/a/1156d60a-389d-11ef-bd36-1f297c31d51b/AMvc8vHE7K.lottie', type: 'dotlottie' },
+  rises:      { url: 'https://assets-v2.lottiefiles.com/a/1156d60a-389d-11ef-bd36-1f297c31d51b/AMvc8vHE7K.lottie', type: 'dotlottie' },
+  strength:   { url: 'https://assets-v2.lottiefiles.com/a/0a84cc84-116f-11ee-9671-e72f8582f445/WtNfSqHDfB.lottie', type: 'dotlottie' },
+  courage:    { url: 'https://assets-v2.lottiefiles.com/a/9283245a-1174-11ee-9d88-8b23459bc101/ODB2bUwQpV.lottie', type: 'dotlottie' },
+  life:       { url: 'https://assets-v2.lottiefiles.com/a/28eb2ff4-117b-11ee-ab4d-af0f3e9153ed/v89fEUK5MO.lottie', type: 'dotlottie' },
+  journey:    { url: 'https://assets-v2.lottiefiles.com/a/7ab12b4a-1167-11ee-80e1-03da2ae8e225/p0jgxVbd5j.lottie', type: 'dotlottie' },
+  destination:{ url: 'https://assets-v2.lottiefiles.com/a/78f7d96a-2873-11ef-8c7f-7f4486a28ca8/sAsQ7VnfjJ.lottie', type: 'dotlottie' }
+};
+
+const lottieKeywordToUrlCache = new Map();
+const lottieDetailToJsonCache = new Map();
+
+const UNIVERSAL_GENERIC_WORDS = new Set([
+  'about','above','across','after','again','against','almost','along','already','also','although',
+  'always','another','anyone','anything','around','because','before','behind','below','between',
+  'beyond','both','during','either','enough','every','everyone','everything','however','inside',
+  'itself','maybe','nothing','other','outside','someone','something','somewhere','still','their',
+  'theirs','themself','there','therefore','these','those','through','toward','towards','under',
+  'until','where','wherever','while','whose','within','without','your','yours','yourself'
+]);
+
+const UNIVERSAL_FILLER_WORDS = new Set([
+  'gone','familiar','finally','sound','sounds','wheres','wheres','still','just','zero',
+  'really','very','okay','ok','hmm','umm','uh','like'
+]);
+
+const UNIVERSAL_PRIORITY_NOUNS = new Set([
+  'content','idea','edit','editing','video','clip','dm','message','post','growth','creator',
+  'audience','workflow','script','caption','hook','reel','brand','marketing','design','create'
+]);
+
+const UNIVERSAL_KEYWORD_ALIASES = {
+  ideas: 'idea',
+  editing: 'edit',
+  edits: 'edit',
+  dms: 'message',
+  dm: 'message',
+  dming: 'message',
+  messages: 'message',
+  posts: 'post',
+  posting: 'post',
+  clips: 'clip',
+  videos: 'video',
+  creates: 'create',
+  created: 'create',
+  creating: 'create',
+  wheres: 'where'
+};
+
+function normalizeKeywordBase(word) {
+  if (!word) return '';
+  let base = word.toLowerCase().replace(/[^a-z]/g, '');
+  if (base.endsWith('ies') && base.length > 4) base = base.slice(0, -3) + 'y';
+  else if (base.endsWith('es') && base.length > 4) base = base.slice(0, -2);
+  else if (base.endsWith('s') && base.length > 3) base = base.slice(0, -1);
+  if (base.endsWith('ing') && base.length > 5) base = base.slice(0, -3);
+  else if (base.endsWith('ed') && base.length > 4) base = base.slice(0, -2);
+  return base;
+}
+
+function extractUniversalSearchKeyword(phrase) {
+  const universalPreferredNouns = new Set([...LOTTIE_CONCRETE_NOUNS, ...VISUAL_NOUNS, ...UNIVERSAL_PRIORITY_NOUNS]);
+  const universalStopwords = new Set([...LOTTIE_STOPWORDS, ...UNDRAW_STOPWORDS]);
+  const universalBlocked = new Set([...LOTTIE_ABSTRACT_CONNECTORS, ...UNIVERSAL_GENERIC_WORDS, ...UNIVERSAL_FILLER_WORDS]);
+
+  const cleaned = phrase.words.map((w, idx) => {
+    const key = (w.text || '').toLowerCase().replace(/[^a-z]/g, '');
+    const base = normalizeKeywordBase(key);
+    const canonical = UNIVERSAL_KEYWORD_ALIASES[key] || UNIVERSAL_KEYWORD_ALIASES[base] || base || key;
+    if (!key || key.length < 3) return null;
+    if (universalStopwords.has(key) || universalStopwords.has(base) || universalStopwords.has(canonical)) return null;
+    if (universalBlocked.has(key) || universalBlocked.has(base) || universalBlocked.has(canonical)) return null;
+
+    const isPreferred = universalPreferredNouns.has(key) || universalPreferredNouns.has(base) || universalPreferredNouns.has(canonical);
+    const isVisualHint = LOTTIE_VISUAL_HINTS.has(key) || LOTTIE_VISUAL_HINTS.has(base) || LOTTIE_VISUAL_HINTS.has(canonical);
+    const isVisualNoun = VISUAL_NOUNS.has(key) || VISUAL_NOUNS.has(base) || VISUAL_NOUNS.has(canonical);
+    const isPriority = UNIVERSAL_PRIORITY_NOUNS.has(key) || UNIVERSAL_PRIORITY_NOUNS.has(base) || UNIVERSAL_PRIORITY_NOUNS.has(canonical);
+
+    // Penalize likely non-nouns unless we have a strong visual match.
+    const looksAdverb = key.endsWith('ly');
+    const looksVerbish = key.endsWith('ing') || key.endsWith('ed');
+
+    let score = 0;
+    if (isPreferred) score += 120;
+    if (isPriority) score += 45;
+    if (isVisualHint) score += 18;
+    if (isVisualNoun) score += 14;
+    if (w.isEmph) score += 4;
+    if (looksAdverb) score -= 10;
+    if (looksVerbish && !isPreferred && !isVisualHint) score -= 6;
+    score += Math.min(6, key.length / 2);
+    score += Math.max(0, 2 - idx * 0.35);
+    return { key: canonical, base, score, isPreferred, isVisualHint, isVisualNoun };
+  }).filter(Boolean);
+
+  if (!cleaned.length) {
+    const fallbackWord = phrase.words
+      .map(w => (w.text || '').toLowerCase().replace(/[^a-z]/g, ''))
+      .find(k => {
+        const base = normalizeKeywordBase(k);
+        const canonical = UNIVERSAL_KEYWORD_ALIASES[k] || UNIVERSAL_KEYWORD_ALIASES[base] || base || k;
+        return k && k.length >= 3
+          && !universalStopwords.has(k)
+          && !universalStopwords.has(base)
+          && !universalStopwords.has(canonical)
+          && !universalBlocked.has(k)
+          && !universalBlocked.has(base)
+          && !universalBlocked.has(canonical);
+      });
+    return fallbackWord || 'creative';
+  }
+
+  // First pass: concrete/visual nouns only.
+  const concrete = cleaned.filter(item => item.isPreferred || item.isVisualNoun || item.isVisualHint);
+  if (concrete.length) {
+    concrete.sort((a, b) => b.score - a.score);
+    return concrete[0].key;
+  }
+
+  cleaned.sort((a, b) => b.score - a.score);
+  return cleaned[0].key;
+}
+
+function parseLottieSearchResults(html) {
+  const direct = html.match(/\/free-animation\/[a-z0-9-]+/gi) || [];
+  const tagPages = html.match(/\/free-animations\/[a-z0-9-]+/gi) || [];
+  const matches = [...direct, ...tagPages];
+  const unique = [];
+  const seen = new Set();
+  for (const path of matches) {
+    if (!seen.has(path)) {
+      seen.add(path);
+      unique.push(path);
+    }
+    if (unique.length >= 12) break;
+  }
+  return unique;
+}
+
+function extractLottieAssetUrlFromDetailHtml(html) {
+  const normalized = html.replace(/\\\//g, '/');
+
+  // Prefer dotlottie asset when available.
+  const lottieMatches = normalized.match(/https:\/\/assets-v2\.lottiefiles\.com\/a\/[a-z0-9-]+\/[a-zA-Z0-9_-]+\.lottie(?:\?[^"'\s<>]*)?/gi) || [];
+  for (const raw of lottieMatches) {
+    const lottieUrl = raw.replace(/\\+$/g, '');
+    if (lottieUrl.includes('.lottie')) return lottieUrl;
+  }
+
+  // Fallback to JSON if dotlottie isn't present on this page payload.
+  const jsonMatches = normalized.match(/https:\/\/assets-v2\.lottiefiles\.com\/a\/[a-z0-9-]+\/[a-zA-Z0-9_-]+\.json(?:\?[^"'\s<>]*)?/gi) || [];
+  for (const raw of jsonMatches) {
+    const jsonUrl = raw.replace(/\\+$/g, '');
+    if (jsonUrl.includes('.json')) return jsonUrl;
+  }
+  return null;
+}
+
+async function resolveLottieJsonFromDetailPath(path, depth = 0) {
+  if (!path || depth > 2) return null;
+  if (lottieDetailToJsonCache.has(path)) return lottieDetailToJsonCache.get(path);
+  try {
+    const detailUrl = `https://lottiefiles.com${path}`;
+    const res = await fetch(detailUrl);
+    if (!res.ok) {
+      return null;
+    }
+    const html = await res.text();
+
+    // Some routes are listing pages (/free-animations/*); resolve to a concrete detail page first.
+    if (path.startsWith('/free-animations/')) {
+      const nested = parseLottieSearchResults(html).find(p => p.startsWith('/free-animation/'));
+      if (nested) return resolveLottieJsonFromDetailPath(nested, depth + 1);
+      return null;
+    }
+
+    const lottieUrl = extractLottieAssetUrlFromDetailHtml(html);
+    if (!lottieUrl) {
+      return null;
+    }
+    const resolved = { url: lottieUrl, type: lottieUrl.includes('.json') ? 'json' : 'dotlottie' };
+    lottieDetailToJsonCache.set(path, resolved);
+    return resolved;
+  } catch (e) {
+    return null;
+  }
+}
+
+async function searchLottieJsonUrlByKeyword(keyword) {
+  if (lottieKeywordToUrlCache.has(keyword)) return lottieKeywordToUrlCache.get(keyword);
+
+  const directAsset = LOTTIE_KEYWORD_LIBRARY[keyword];
+  if (directAsset) {
+    lottieKeywordToUrlCache.set(keyword, directAsset);
+    return directAsset;
+  }
+
+  try {
+    const searchUrl = `https://lottiefiles.com/search?q=${encodeURIComponent(keyword)}`;
+    const res = await fetch(searchUrl);
+    if (!res.ok) {
+      return null;
+    }
+    const html = await res.text();
+    const candidates = parseLottieSearchResults(html);
+    for (const path of candidates) {
+      const asset = await resolveLottieJsonFromDetailPath(path);
+      if (asset) {
+        lottieKeywordToUrlCache.set(keyword, asset);
+        return asset;
+      }
+    }
+  } catch (e) {
+    // ignore and fall back
+  }
+  return null;
+}
+
+function toggleLottieMode(btn) {
+  btn.classList.toggle('on');
+  lottieEnabled = btn.classList.contains('on');
+  const statusRow = document.getElementById('lottieStatusRow');
+  statusRow.style.display = lottieEnabled ? '' : 'none';
+  if (!lottieEnabled) {
+    hideAllLottieSearch();
+    document.getElementById('lottieStatus').textContent = 'Off';
+  } else {
+    document.getElementById('lottieStatus').textContent = generated
+      ? '✓ Active — animations beside words'
+      : 'Hit Generate to activate';
+  }
+}
+
+// Preload all phrase animations after generate
+async function preloadLottieAnimations(phrasesArr, phraseKeywords = []) {
+  lottieDataCache = {};
+  const statusEl = document.getElementById('lottieStatus');
+  const resolvedKeywords = (phraseKeywords.length === phrasesArr.length)
+    ? phraseKeywords
+    : phrasesArr.map(ph => extractUniversalSearchKeyword(ph));
+
+  statusEl.textContent = 'Searching LottieFiles animations…';
+
+  const resolvedAssets = [];
+  const keywordAssetCache = new Map();
+  const sourceByPhrase = [];
+  for (let i = 0; i < phrasesArr.length; i++) {
+    const kw = resolvedKeywords[i] || 'motion';
+    if (!keywordAssetCache.has(kw)) {
+      const found = await searchLottieJsonUrlByKeyword(kw);
+      keywordAssetCache.set(kw, found);
+    }
+    const matched = keywordAssetCache.get(kw);
+    resolvedAssets[i] = matched || LOTTIE_FALLBACK_ASSETS[i % LOTTIE_FALLBACK_ASSETS.length];
+    sourceByPhrase[i] = matched
+      ? (LOTTIE_KEYWORD_LIBRARY[kw] ? 'library' : 'search')
+      : 'fallback';
+    statusEl.textContent = `Searching LottieFiles animations ${i + 1}/${phrasesArr.length} (${kw})`;
+  }
+
+  const urlPayloadByUrl = {};
+  for (let i = 0; i < resolvedAssets.length; i++) {
+    const asset = resolvedAssets[i];
+    if (asset.type === 'json') {
+      if (!urlPayloadByUrl[asset.url]) {
+        try {
+          const res = await fetch(asset.url);
+          urlPayloadByUrl[asset.url] = res.ok ? await res.json() : null;
+        } catch (e) {
+          urlPayloadByUrl[asset.url] = null;
+        }
+      }
+      lottieDataCache[i] = { url: asset.url, type: 'json', data: urlPayloadByUrl[asset.url], keyword: resolvedKeywords[i] || 'motion', source: sourceByPhrase[i] };
+    } else {
+      lottieDataCache[i] = { url: asset.url, type: 'dotlottie', data: null, keyword: resolvedKeywords[i] || 'motion', source: sourceByPhrase[i] };
+    }
+  }
+
+  // Fill in shared URL data for duplicate entries (defensive)
+  const urlToData = {};
+  for (const entry of Object.values(lottieDataCache)) {
+    if (entry.data) urlToData[entry.url] = entry.data;
+  }
+  for (const idx of Object.keys(lottieDataCache)) {
+    const entry = lottieDataCache[idx];
+    if (!entry.data && urlToData[entry.url]) entry.data = urlToData[entry.url];
+  }
+  const loaded = Object.values(lottieDataCache).filter(e => e && ((e.type === 'json' && e.data) || e.type === 'dotlottie')).length;
+  const matchedCount = Object.values(lottieDataCache).filter(e => e && (e.source === 'search' || e.source === 'library')).length;
+  const fallbackCount = Object.values(lottieDataCache).filter(e => e && e.source === 'fallback').length;
+  statusEl.textContent = `✓ ${loaded}/${phrasesArr.length} ready · matched ${matchedCount} · fallback ${fallbackCount}`;
+}
+
+// ── Compute where to place Lottie relative to a phrase's words ──
+// Places animation to the RIGHT of the rightmost word in the phrase,
+// vertically centred on the phrase. Falls back to above if near right edge.
+function getLottiePositionForPhrase(ph, phIdx) {
+  const lottieSize = getLottieSizePx();
+  return getMediaSafeSlot(ph, phIdx, lottieSize, lottieSize);
+}
+
+function getLottieSizePx() {
+  const base = parseInt(document.getElementById('graphicSize').value);
+  const scale = Math.min(1, W/480, H/320);
+  return Math.max(48, Math.round(base * scale * 1.6));
+}
+
+// Called each frame — positions animation using canvas pixel coords mapped to overlay CSS
+function showLottieForPhrase(ph, phIdx, localMs) {
+  if (!lottieEnabled) { hideAllLottieSearch(); return; }
+  if (currentLottiePhIdx === phIdx) return;
+  hideAllLottieSearch();
+  currentLottiePhIdx = phIdx;
+
+  const cached = lottieDataCache[phIdx];
+  if (!cached || !cached.url) return;
+
+  const layer = document.getElementById('lottieSearchLayer');
+  if (!layer) return;
+
+  const pos = getLottiePositionForPhrase(ph, phIdx);
+  if (!pos) return;
+
+  const sz = getLottieSizePx();
+
+  // Convert canvas pixel coords to overlay percentage
+  // The overlay covers the same pixel dimensions as the canvas
+  const leftPct = ((pos.x / W) * 100).toFixed(2) + '%';
+  const topPct  = ((pos.y / H) * 100).toFixed(2) + '%';
+
+  const wrap = document.createElement('div');
+  wrap.style.cssText = `
+    position:absolute;
+    width:${sz}px;height:${sz}px;
+    left:${leftPct};top:${topPct};
+    transform:translate(-50%,-50%);
+    pointer-events:none;
+    border-radius:50%;
+    overflow:hidden;
+  `;
+
+  const container = document.createElement('div');
+  container.style.cssText = `width:${sz}px;height:${sz}px;`;
+  wrap.appendChild(container);
+  layer.appendChild(wrap);
+
+  if (cached.type === 'dotlottie') {
+    const player = document.createElement('dotlottie-player');
+    player.setAttribute('src', cached.url);
+    player.setAttribute('autoplay', '');
+    player.setAttribute('loop', '');
+    player.style.width = `${sz}px`;
+    player.style.height = `${sz}px`;
+    player.style.display = 'block';
+    container.appendChild(player);
+    lottieInstances[phIdx] = { el: wrap, anim: null };
+    return;
+  }
+
+  if (!cached.data) return;
+  const anim = lottie.loadAnimation({
+    container,
+    animationData: cached.data,
+    renderer: 'svg',
+    loop: true,
+    autoplay: true,
+  });
+
+  lottieInstances[phIdx] = { el: wrap, anim };
+}
+
+function hideAllLottieSearch() {
+  for (const inst of Object.values(lottieInstances)) {
+    try { inst.anim.destroy(); } catch(e) {}
+    try { inst.el.remove(); } catch(e) {}
+  }
+  lottieInstances = {};
+  currentLottiePhIdx = -1;
+}
+
+function syncLottieSearchLayer() {
+  const layer = document.getElementById('lottieSearchLayer');
+  const wrap = document.getElementById('canvasWrap');
+  if (!layer || !wrap) return;
+  // Match overlay to the canvas's rendered dimensions exactly
+  layer.style.width  = cv.offsetWidth  + 'px';
+  layer.style.height = cv.offsetHeight + 'px';
+}
+
+// ═══════════════════════════════════════════
+//  UNDRAW ILLUSTRATION ENGINE
+//  Fetches undraw.co public REST API to build a
+//  searchable index, then shows the best-match
+//  SVG illustration beside each active phrase.
+// ═══════════════════════════════════════════
+
+let undrawEnabled = false;
+let undrawPhraseData = {};    // phIdx → { url, el } | null
+let currentUndrawPhIdx = -1;
+
+// ── Semantic noun priority — these are the kinds of concrete visual words
+//    that undraw actually has illustrations for. Verbs, adjectives, abstracts
+//    get deprioritized. We rank by: concrete visual noun > adjective > verb > other.
+
+// Words that describe *things you can draw a picture of* → highest priority
+const VISUAL_NOUNS = new Set([
+  // tech / UI
+  'search','magnify','magnifier','phone','mobile','laptop','computer','tablet','code','coding',
+  'developer','app','startup','dashboard','notification','email','message','chat','video','camera',
+  'drone','photo','photography','film','music','headphones','podcast','microphone',
+  // nature / places
+  'mountain','mountains','hike','hiking','beach','sunset','sunrise','sky','forest','ocean',
+  'coffee','tea','food','pizza','burger','sushi','restaurant','cooking','kitchen',
+  'city','street','building','office','home','house','garden','park','travel',
+  'goa','newyork','tokyo','london','paris',
+  // people / activities
+  'bikini','fashion','shopping','workout','yoga','meditation','running','cycling','swimming',
+  'wedding','party','celebration','birthday','graduation','family','friends','couple','baby',
+  // concepts with clear visuals
+  'rocket','launch','growth','chart','analytics','finance','money','investment','bank',
+  'heart','love','smile','happy','success','trophy','winner','goal',
+  'idea','lightbulb','innovation','creativity','design','art','illustration',
+  'book','reading','learning','education','school','university',
+  'health','doctor','medicine','hospital','fitness','gym',
+  'team','collaboration','meeting','presentation','brainstorm',
+  'delivery','package','shipping','ecommerce','store','cart',
+  'security','lock','privacy','data','cloud','server','network',
+  'social','community','connection','global','world','earth',
+  'dog','cat','animal','bird','fish',
+]);
+
+// True stopwords — skip completely
+const UNDRAW_STOPWORDS = new Set([
+  'the','a','an','and','or','but','in','on','at','to','for','of','with','by','from',
+  'is','are','was','were','be','been','being','have','has','had','do','does','did',
+  'will','would','could','should','may','might','shall','can','need','just','way',
+  'this','that','these','those','i','you','he','she','it','we','they','who','what',
+  'my','your','his','her','its','our','their','how','why','when','where',
+  'very','just','now','still','even','also','so','yet','them','us','him','me',
+  'such','both','each','more','most','only','same','than','too','also','then',
+  'built','said','made','went','came','got','know','want','like','look','make',
+  'snoolink','remember','search','way',
+]);
+
+// Extract the best single visual/concrete keyword from a phrase
+// Strategy: visual noun > longest non-stop word > first non-stop word
+// Score title against keyword for local index fallback search
+function undrawScore(title, kw) {
+  const t = title.toLowerCase();
+  const titleWords = t.split(/[\s\-_]+/);
+  // Exact word in title
+  if (titleWords.includes(kw)) return 100;
+  // Title contains keyword as substring
+  if (t.includes(kw)) return 85;
+  // Keyword starts with a title word (e.g. kw='mountains' matches title word 'mountain')
+  for (const tw of titleWords) {
+    if (kw.startsWith(tw) && tw.length >= 4) return 70;
+    if (tw.startsWith(kw) && kw.length >= 4) return 70;
+  }
+  // Partial substring (first 5 chars)
+  if (kw.length >= 5) {
+    const kwStem = kw.slice(0, 5);
+    for (const tw of titleWords) {
+      if (tw.startsWith(kwStem)) return 50;
+    }
+  }
+  return 0;
+}
+
+const UNDRAW_LOCAL_SCENES = {
+  tech: 'tech',
+  work: 'tech',
+  code: 'tech',
+  app: 'tech',
+  idea: 'idea',
+  lightbulb: 'idea',
+  startup: 'idea',
+  growth: 'growth',
+  success: 'growth',
+  chart: 'growth',
+  money: 'growth',
+  health: 'health',
+  fitness: 'health',
+  doctor: 'health',
+  travel: 'travel',
+  world: 'travel',
+  rocket: 'travel',
+  team: 'team',
+  community: 'team',
+  collaboration: 'team',
+  education: 'learn',
+  learning: 'learn',
+  book: 'learn'
+};
+
+const UNDRAW_SCENE_ROTATION = ['tech', 'idea', 'growth', 'team', 'travel', 'learn', 'health'];
+const UNDRAW_SEARCH_SOURCES = [
+  keyword => `https://undraw.co/search/${encodeURIComponent(keyword)}`,
+  keyword => `https://r.jina.ai/http://undraw.co/search/${encodeURIComponent(keyword)}`,
+  keyword => `https://r.jina.ai/http://www.undraw.co/search/${encodeURIComponent(keyword)}`
+];
+
+function parseUndrawFirstResultFromHtml(html) {
+  if (!html || typeof html !== 'string') return null;
+  const nextDataMatch = html.match(/<script id="__NEXT_DATA__" type="application\/json">([\s\S]*?)<\/script>/i);
+  if (!nextDataMatch || !nextDataMatch[1]) return null;
+  try {
+    const data = JSON.parse(nextDataMatch[1]);
+    const results = data?.props?.pageProps?.initialResults;
+    if (!Array.isArray(results) || !results.length) return null;
+    const first = results[0];
+    if (!first?.media) return null;
+    const normalizedMedia = String(first.media).replace('/illustration/', '/illustrations/');
+    return {
+      title: first.title || 'untitled',
+      image: normalizedMedia,
+      slug: first.newSlug || null,
+      source: 'search-first'
+    };
+  } catch (e) {
+    return null;
+  }
+}
+
+async function undrawSearchFirstResult(keyword) {
+  const key = String(keyword || '').trim().toLowerCase();
+  if (!key) return null;
+  for (const sourceBuilder of UNDRAW_SEARCH_SOURCES) {
+    try {
+      const url = sourceBuilder(key);
+      const res = await fetch(url, { method: 'GET' });
+      if (!res.ok) continue;
+      const html = await res.text();
+      const parsed = parseUndrawFirstResultFromHtml(html);
+      if (parsed?.image) return parsed;
+    } catch (e) {
+      // Continue to next source.
+    }
+  }
+  return null;
+}
+
+function sceneFromKeyword(keyword, idx) {
+  const key = (keyword || '').toLowerCase();
+  if (UNDRAW_LOCAL_SCENES[key]) return UNDRAW_LOCAL_SCENES[key];
+  if (key.includes('idea') || key.includes('creative')) return 'idea';
+  if (key.includes('grow') || key.includes('win') || key.includes('goal')) return 'growth';
+  if (key.includes('learn') || key.includes('study') || key.includes('book')) return 'learn';
+  if (key.includes('team') || key.includes('friend')) return 'team';
+  if (key.includes('travel') || key.includes('world') || key.includes('journey')) return 'travel';
+  if (key.includes('fit') || key.includes('health')) return 'health';
+  return UNDRAW_SCENE_ROTATION[idx % UNDRAW_SCENE_ROTATION.length];
+}
+
+function buildUndrawLocalSvg(scene, accentHex) {
+  const accent = `#${accentHex || '5D1EF4'}`;
+  const soft = `${accent}22`;
+  const dark = '#1f2430';
+  const base = '#f6f8fb';
+  const body = {
+    tech: `<rect x="28" y="70" width="184" height="18" rx="9" fill="${soft}"/><rect x="52" y="52" width="118" height="64" rx="8" fill="${base}" stroke="${accent}" stroke-width="3"/><rect x="65" y="66" width="92" height="8" rx="4" fill="${accent}"/><rect x="65" y="81" width="74" height="8" rx="4" fill="#c7cdd9"/><circle cx="183" cy="56" r="18" fill="${accent}"/><path d="M173 56h20M183 46v20" stroke="white" stroke-width="4" stroke-linecap="round"/>`,
+    idea: `<circle cx="116" cy="54" r="28" fill="${soft}" stroke="${accent}" stroke-width="3"/><path d="M116 32c-10 0-18 8-18 18 0 7 3 11 7 15 2 2 3 4 3 6h16c0-2 1-4 3-6 4-4 7-8 7-15 0-10-8-18-18-18z" fill="#ffe48f" stroke="${dark}" stroke-width="2"/><rect x="106" y="71" width="20" height="8" rx="4" fill="${dark}"/><rect x="103" y="80" width="26" height="8" rx="4" fill="${accent}"/><circle cx="70" cy="52" r="10" fill="${accent}"/><circle cx="166" cy="52" r="10" fill="${accent}"/>`,
+    growth: `<rect x="30" y="70" width="184" height="18" rx="9" fill="${soft}"/><polyline points="48,108 48,56 188,56" fill="none" stroke="${dark}" stroke-width="4" stroke-linecap="round"/><polyline points="62,96 88,82 112,86 136,66 162,72 188,42" fill="none" stroke="${accent}" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/><polygon points="188,42 177,44 184,52" fill="${accent}"/><rect x="58" y="88" width="18" height="20" rx="4" fill="#c7cdd9"/><rect x="88" y="78" width="18" height="30" rx="4" fill="#a9b2c3"/><rect x="118" y="72" width="18" height="36" rx="4" fill="${accent}"/>`,
+    team: `<rect x="28" y="70" width="184" height="18" rx="9" fill="${soft}"/><circle cx="78" cy="58" r="16" fill="${accent}"/><circle cx="116" cy="50" r="20" fill="#ffb7c5"/><circle cx="154" cy="58" r="16" fill="#9ad7ff"/><rect x="60" y="74" width="36" height="30" rx="10" fill="#2d3341"/><rect x="96" y="72" width="40" height="34" rx="10" fill="${dark}"/><rect x="138" y="74" width="34" height="30" rx="10" fill="#2d3341"/><path d="M100 86h32" stroke="${accent}" stroke-width="4" stroke-linecap="round"/>`,
+    travel: `<rect x="28" y="70" width="184" height="18" rx="9" fill="${soft}"/><circle cx="80" cy="58" r="26" fill="#d8ecff" stroke="${accent}" stroke-width="3"/><path d="M58 58h44M80 36c8 8 8 36 0 44M80 36c-8 8-8 36 0 44" stroke="${accent}" stroke-width="2"/><path d="M130 90l20-48 18 16-14 6-6 20z" fill="${accent}" stroke="${dark}" stroke-width="2"/><path d="M150 42l8-10" stroke="${accent}" stroke-width="3" stroke-linecap="round"/>`,
+    learn: `<rect x="28" y="70" width="184" height="18" rx="9" fill="${soft}"/><rect x="50" y="48" width="68" height="52" rx="6" fill="${base}" stroke="${dark}" stroke-width="2"/><rect x="122" y="48" width="68" height="52" rx="6" fill="${base}" stroke="${dark}" stroke-width="2"/><path d="M120 50v48" stroke="${accent}" stroke-width="4"/><rect x="62" y="60" width="44" height="8" rx="4" fill="${accent}"/><rect x="62" y="74" width="36" height="7" rx="3.5" fill="#c7cdd9"/><rect x="134" y="60" width="44" height="8" rx="4" fill="${accent}"/><rect x="134" y="74" width="36" height="7" rx="3.5" fill="#c7cdd9"/>`,
+    health: `<rect x="28" y="70" width="184" height="18" rx="9" fill="${soft}"/><circle cx="82" cy="60" r="22" fill="#ffe0e6"/><path d="M82 71c-20-11-16-30-4-30 5 0 8 3 10 6 2-3 5-6 10-6 12 0 16 19-4 30l-6 4z" fill="#ff5777"/><rect x="126" y="42" width="54" height="54" rx="12" fill="${base}" stroke="${accent}" stroke-width="3"/><path d="M153 56v24M141 68h24" stroke="${accent}" stroke-width="6" stroke-linecap="round"/>`
+  };
+  const illustration = body[scene] || body.tech;
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 140" role="img" aria-label="illustration">${illustration}</svg>`;
+}
+
+function localUndrawDataUrl(scene, accentHex) {
+  const svg = buildUndrawLocalSvg(scene, accentHex);
+  return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
+}
+
+function toggleUndrawMode(btn) {
+  btn.classList.toggle('on');
+  undrawEnabled = btn.classList.contains('on');
+  const row = document.getElementById('undrawStatusRow');
+  row.style.display = undrawEnabled ? '' : 'none';
+  if (!undrawEnabled) {
+    hideAllUndraw();
+    document.getElementById('undrawStatus').textContent = 'Off';
+  } else {
+    document.getElementById('undrawStatus').textContent = 'Hit Generate to search and use first unDraw result';
+  }
+}
+
+// Assign an illustration to each phrase — uses LIVE search per keyword
+async function preloadUndrawIllustrations(phrasesArr, phraseKeywords = []) {
+  undrawPhraseData = {};
+  const setStatus = t => {
+    const el = document.getElementById('undrawStatus');
+    if (el) el.textContent = t;
+  };
+
+  let done = 0;
+  let matchedSearch = 0;
+  setStatus(`Preparing illustrations… 0/${phrasesArr.length}`);
+
+  await Promise.all(phrasesArr.map(async (ph, idx) => {
+    const kw = (phraseKeywords.length === phrasesArr.length)
+      ? phraseKeywords[idx]
+      : extractUniversalSearchKeyword(ph);
+    let match = await undrawSearchFirstResult(kw);
+    if (match?.image) {
+      undrawPhraseData[idx] = {
+        url: match.image,
+        keyword: kw,
+        title: match.title || kw,
+        source: 'search-first'
+      };
+      matchedSearch++;
+    } else {
+      const scene = sceneFromKeyword(kw, idx);
+      undrawPhraseData[idx] = {
+        url: localUndrawDataUrl(scene, '5D1EF4'),
+        keyword: kw,
+        title: scene,
+        source: 'local-fallback'
+      };
+    }
+    done++;
+    setStatus(`Searching unDraw… ${done}/${phrasesArr.length} (${kw})`);
+  }));
+
+  const found = Object.values(undrawPhraseData).filter(Boolean).length;
+  const localCount = found - matchedSearch;
+  setStatus(`✓ ${found}/${phrasesArr.length} ready · first-result ${matchedSearch} · local ${localCount}`);
+}
+
+// ── Display ──
+
+function getUndrawSizePx() {
+  const base = parseInt(document.getElementById('graphicSize').value);
+  const scale = Math.min(1, W / 480, H / 320);
+  return Math.max(80, Math.round(base * scale * 2.4));
+}
+
+// Position undraw illustration BELOW the phrase words, centered on the phrase
+function getUndrawPosition(ph, phIdx) {
+  const sz = getUndrawSizePx();
+  return getMediaSafeSlot(ph, phIdx, sz, Math.round(sz * 0.7));
+}
+
+function showUndrawForPhrase(ph, phIdx, localMs) {
+  if (!undrawEnabled) { hideAllUndraw(); return; }
+  if (currentUndrawPhIdx === phIdx) return;
+  hideAllUndraw();
+  currentUndrawPhIdx = phIdx;
+
+  const data = undrawPhraseData[phIdx];
+  if (!data) return;
+
+  const layer = document.getElementById('undrawLayer');
+  if (!layer) return;
+
+  const pos = getUndrawPosition(ph, phIdx);
+  if (!pos) return;
+  const sz = getUndrawSizePx();
+
+  // Determine accent color from current style
+  const st = getActiveStyleConfig();
+  const accentHex = (st.fills[1] || st.fills[0] || '#FF6321').replace('#','');
+
+  // For remote SVGs, append unDraw color param; for data URIs, use as-is.
+  const isDataUri = typeof data.url === 'string' && data.url.startsWith('data:');
+  const coloredUrl = isDataUri
+    ? data.url
+    : data.url + (data.url.includes('?') ? '&' : '?') + `color=${accentHex}`;
+
+  const wrap = document.createElement('div');
+  wrap.style.cssText = `
+    position:absolute;
+    width:${sz}px;height:${Math.round(sz*0.7)}px;
+    left:${((pos.x/W)*100).toFixed(2)}%;
+    top:${((pos.y/H)*100).toFixed(2)}%;
+    transform:translate(-50%,-50%);
+    pointer-events:none;
+    opacity:0;
+    transition:opacity 0.35s ease;
+  `;
+
+  const img = document.createElement('img');
+  img.src = coloredUrl;
+  img.style.cssText = `width:100%;height:100%;object-fit:contain;`;
+  img.onerror = () => { img.src = data.url; }; // fallback without color param
+  img.onload = () => { wrap.style.opacity = '0.88'; };
+  wrap.appendChild(img);
+  layer.appendChild(wrap);
+
+  undrawPhraseData[phIdx]._el = wrap;
+}
+
+function hideAllUndraw() {
+  const layer = document.getElementById('undrawLayer');
+  if (layer) layer.innerHTML = '';
+  currentUndrawPhIdx = -1;
+}
+
+function syncUndrawLayer() {
+  const layer = document.getElementById('undrawLayer');
+  if (!layer || !cv) return;
+  layer.style.width  = cv.offsetWidth  + 'px';
+  layer.style.height = cv.offsetHeight + 'px';
+}
+
+// ═══════════════════════════════════════════
+//  PIXABAY IMAGE ENGINE
+//  Pipeline: keyword -> Pixabay image API -> first hit
+// ═══════════════════════════════════════════
+
+let pixabayEnabled = false;
+let pixabayPhraseData = {}; // phIdx -> { url, keyword, user, tags } | null
+let currentPixabayPhIdx = -1;
+let pixabayCanvasImageCache = {}; // phIdx -> HTMLImageElement | null
+let pixabayCanvasImageLoaders = {}; // phIdx -> Promise<HTMLImageElement|null>
+
+function ensurePixabayCanvasImage(phIdx, url) {
+  if (!url) return Promise.resolve(null);
+  if (pixabayCanvasImageCache[phIdx]) return Promise.resolve(pixabayCanvasImageCache[phIdx]);
+  if (pixabayCanvasImageLoaders[phIdx]) return pixabayCanvasImageLoaders[phIdx];
+
+  pixabayCanvasImageLoaders[phIdx] = new Promise((resolve) => {
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.onload = () => {
+      pixabayCanvasImageCache[phIdx] = img;
+      resolve(img);
+    };
+    img.onerror = () => resolve(null);
+    img.src = url;
+  }).finally(() => {
+    delete pixabayCanvasImageLoaders[phIdx];
+  });
+
+  return pixabayCanvasImageLoaders[phIdx];
+}
+
+async function preloadPixabayCanvasAssets() {
+  const jobs = Object.keys(pixabayPhraseData).map(async (k) => {
+    const idx = Number(k);
+    const data = pixabayPhraseData[idx];
+    if (data?.url) await ensurePixabayCanvasImage(idx, data.url);
+  });
+  await Promise.all(jobs);
+}
+
+function drawPixabayOnCanvas(ph, phIdx) {
+  const data = pixabayPhraseData[phIdx];
+  if (!data?.url) return;
+  const img = pixabayCanvasImageCache[phIdx];
+  if (!img) return;
+
+  getPixabaySizePx._activeAspect = data.aspect || ((img.naturalWidth && img.naturalHeight) ? (img.naturalWidth / img.naturalHeight) : 1);
+  const size = getPixabaySizePx();
+  const pos = getPixabayPosition(ph, phIdx, size);
+  if (!pos) return;
+
+  const x = Math.round(pos.x - size.w / 2);
+  const y = Math.round(pos.y - size.h / 2);
+
+  ctx.save();
+  ctx.globalAlpha = 0.92;
+  ctx.drawImage(img, x, y, size.w, size.h);
+  ctx.restore();
+}
+
+function hasPixabayKey() {
+  return typeof PIXABAY_API_KEY === 'string' && PIXABAY_API_KEY.trim().length > 0;
+}
+
+async function pixabaySearchFirstHit(keyword) {
+  if (!hasPixabayKey()) return null;
+  const q = String(keyword || '').trim();
+  if (!q) return null;
+
+  const targetAspect = (W && H) ? (W / H) : 16 / 9;
+  const preferredOrientation = targetAspect >= 1.12 ? 'horizontal' : (targetAspect <= 0.9 ? 'vertical' : 'all');
+  const endpointFor = (orientation) => `https://pixabay.com/api/?key=${encodeURIComponent(PIXABAY_API_KEY.trim())}&q=${encodeURIComponent(q)}&image_type=photo&safesearch=true&order=popular&per_page=40&orientation=${orientation}`;
+  // const endpointFor = (orientation) => `https://pixabay.com/api/?key=${encodeURIComponent(PIXABAY_API_KEY.trim())}&q=${encodeURIComponent(q)}&image_type=illustration&safesearch=true&order=popular&per_page=40&orientation=${orientation}`;
+
+  const pickBestHit = (hits, preferredAspect) => {
+    if (!Array.isArray(hits) || !hits.length) return null;
+    let best = null;
+    let bestScore = -Infinity;
+    for (const hit of hits) {
+      const hw = hit.webformatWidth || hit.previewWidth || hit.imageWidth || 1;
+      const hh = hit.webformatHeight || hit.previewHeight || hit.imageHeight || 1;
+      if (!hw || !hh) continue;
+      const hitAspect = hw / hh;
+      const aspectPenalty = Math.abs(Math.log(hitAspect / preferredAspect));
+      const sizeScore = Math.log(1 + Math.max(1, hw * hh));
+      const qualityBonus = (hit.webformatURL ? 2 : 0) + (hit.largeImageURL ? 2 : 0);
+      const score = (sizeScore * 3) + qualityBonus - (aspectPenalty * 24);
+      if (score > bestScore) {
+        bestScore = score;
+        best = hit;
+      }
+    }
+    return best;
+  };
+
+  const requestOrder = preferredOrientation === 'all'
+    ? ['all', 'horizontal', 'vertical']
+    : [preferredOrientation, 'all'];
+
+  try {
+    let hit = null;
+    for (const orientation of requestOrder) {
+      const res = await fetch(endpointFor(orientation));
+      if (!res.ok) continue;
+      const data = await res.json();
+      hit = pickBestHit(data?.hits || [], targetAspect);
+      if (hit) break;
+    }
+    if (!hit) return null;
+    const width = hit.webformatWidth || hit.previewWidth || hit.imageWidth || 0;
+    const height = hit.webformatHeight || hit.previewHeight || hit.imageHeight || 0;
+    return {
+      url: hit.webformatURL || hit.largeImageURL || hit.previewURL || null,
+      user: hit.user || '',
+      tags: hit.tags || '',
+      width,
+      height,
+      aspect: (width > 0 && height > 0) ? (width / height) : 1
+    };
+  } catch (e) {
+    return null;
+  }
+}
+
+function togglePixabayMode(btn) {
+  btn.classList.toggle('on');
+  pixabayEnabled = btn.classList.contains('on');
+  const row = document.getElementById('pixabayStatusRow');
+  row.style.display = pixabayEnabled ? '' : 'none';
+
+  if (!pixabayEnabled) {
+    hideAllPixabay();
+    document.getElementById('pixabayStatus').textContent = 'Off';
+    return;
+  }
+
+  if (!hasPixabayKey()) {
+    document.getElementById('pixabayStatus').textContent = 'Missing API key: set PIXABAY_API_KEY, then Generate';
+    return;
+  }
+
+  document.getElementById('pixabayStatus').textContent = generated
+    ? 'Ready - hit Generate to refresh Pixabay matches'
+    : 'Hit Generate to fetch Pixabay photos';
+}
+
+function toggleEmojiMode(btn) {
+  btn.classList.toggle('on');
+  emojiEnabled = btn.classList.contains('on');
+  const row = document.getElementById('emojiStatusRow');
+  row.style.display = emojiEnabled ? '' : 'none';
+
+  if (!emojiEnabled) {
+    emojiPhraseData = {};
+    const status = document.getElementById('emojiStatus');
+    if (status) status.textContent = 'Off';
+    if (generated) drawAtTime(progress * totalDurMs);
+    return;
+  }
+
+  const status = document.getElementById('emojiStatus');
+  if (status) {
+    status.textContent = generated
+      ? 'Ready - hit Generate to refresh emojis'
+      : 'Hit Generate to fetch emojis by keyword';
+  }
+}
+
+async function searchEmojiByKeyword(keyword) {
+  const q = String(keyword || '').trim();
+  if (!q) return [];
+  const endpoint = `https://emoji-api.com/emojis?search=${encodeURIComponent(q)}&access_key=${encodeURIComponent(EMOJI_API_KEY)}`;
+  try {
+    const res = await fetch(endpoint);
+    if (!res.ok) return [];
+    const data = await res.json();
+    return Array.isArray(data) ? data : [];
+  } catch (e) {
+    return [];
+  }
+}
+
+function getEmojiKeywordCandidates(phrase, preferredKeyword) {
+  const unique = new Set();
+  const out = [];
+  const push = (k) => {
+    const key = String(k || '').toLowerCase().trim().replace(/[^a-z0-9]/g, '');
+    if (!key || key.length < 2 || unique.has(key)) return;
+    unique.add(key);
+    out.push(key);
+  };
+
+  // 1) Try the selected keyword first.
+  push(preferredKeyword);
+
+  if (!phrase || !Array.isArray(phrase.words)) return out;
+
+  // 2) Score phrase words to derive second-best, third-best, etc.
+  const scored = phrase.words.map((w, idx) => {
+    const raw = String(w.raw || w.text || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+    const base = normalizeKeywordBase(raw);
+    if (!raw || raw.length < 2) return null;
+    const score = (w.isEmph ? 14 : 0) + Math.min(8, raw.length) - (idx * 0.6);
+    return { raw, base, score };
+  }).filter(Boolean).sort((a, b) => b.score - a.score);
+
+  scored.forEach(item => {
+    push(item.raw);
+    if (item.base && item.base !== item.raw) push(item.base);
+  });
+
+  return out;
+}
+
+function pickRandomEmojiFromList(list) {
+  if (!Array.isArray(list) || !list.length) return null;
+  const valid = list.filter(item => item && item.character);
+  if (!valid.length) return null;
+  return valid[Math.floor(Math.random() * valid.length)];
+}
+
+async function getRandomEmojiFallback(cache) {
+  const randomSeeds = ['smile', 'party', 'rocket', 'fire', 'music', 'star', 'heart', 'sparkle', 'sun', 'cat'];
+  const start = Math.floor(Math.random() * randomSeeds.length);
+  for (let i = 0; i < randomSeeds.length; i++) {
+    const kw = randomSeeds[(start + i) % randomSeeds.length];
+    if (!cache.has(kw)) {
+      const list = await searchEmojiByKeyword(kw);
+      cache.set(kw, list);
+    }
+    const picked = pickRandomEmojiFromList(cache.get(kw));
+    if (picked) {
+      return { hit: picked, keyword: kw };
+    }
+  }
+  const localFallback = ['😀', '🚀', '✨', '🔥', '🎯', '💡', '🎵', '🌟', '❤️', '🎬'];
+  return {
+    hit: { character: localFallback[Math.floor(Math.random() * localFallback.length)], unicodeName: 'local fallback' },
+    keyword: 'fallback'
+  };
+}
+
+async function preloadPhraseEmojis(phrasesArr, phraseKeywords = []) {
+  emojiPhraseData = {};
+  const statusEl = document.getElementById('emojiStatus');
+  const setStatus = (t) => { if (statusEl) statusEl.textContent = t; };
+
+  const resolvedKeywords = (phraseKeywords.length === phrasesArr.length)
+    ? phraseKeywords
+    : phrasesArr.map(ph => extractUniversalSearchKeyword(ph));
+
+  let done = 0;
+  let matched = 0;
+  let randomAssigned = 0;
+  const cache = new Map();
+  setStatus(`Searching emojis... 0/${phrasesArr.length}`);
+
+  await Promise.all(phrasesArr.map(async (ph, idx) => {
+    const kw = resolvedKeywords[idx] || 'creative';
+    const candidates = getEmojiKeywordCandidates(ph, kw);
+
+    let hit = null;
+    let usedKeyword = kw;
+    for (const candidate of candidates) {
+      if (!cache.has(candidate)) {
+        const list = await searchEmojiByKeyword(candidate);
+        cache.set(candidate, list);
+      }
+      hit = pickRandomEmojiFromList(cache.get(candidate));
+      if (hit) {
+        usedKeyword = candidate;
+        break;
+      }
+    }
+
+    if (!hit) {
+      const random = await getRandomEmojiFallback(cache);
+      hit = random?.hit || null;
+      usedKeyword = random?.keyword || 'fallback';
+      if (hit) randomAssigned++;
+    }
+
+    emojiPhraseData[idx] = hit
+      ? { emoji: hit.character, keyword: usedKeyword, unicodeName: hit.unicodeName || '' }
+      : null;
+
+    if (hit) matched++;
+    done++;
+    setStatus(`Searching emojis... ${done}/${phrasesArr.length} (${kw})`);
+  }));
+
+  setStatus(`✓ ${matched}/${phrasesArr.length} emoji ready · random ${randomAssigned}`);
+}
+
+async function preloadPixabayImages(phrasesArr, phraseKeywords = []) {
+  pixabayPhraseData = {};
+  pixabayCanvasImageCache = {};
+  pixabayCanvasImageLoaders = {};
+  const statusEl = document.getElementById('pixabayStatus');
+  const setStatus = t => { if (statusEl) statusEl.textContent = t; };
+
+  if (!hasPixabayKey()) {
+    setStatus('Missing API key: set PIXABAY_API_KEY in script');
+    return;
+  }
+
+  let done = 0;
+  let matched = 0;
+  setStatus(`Searching Pixabay... 0/${phrasesArr.length}`);
+
+  await Promise.all(phrasesArr.map(async (ph, idx) => {
+    const kw = (phraseKeywords.length === phrasesArr.length)
+      ? phraseKeywords[idx]
+      : extractUniversalSearchKeyword(ph);
+    const hit = await pixabaySearchFirstHit(kw);
+    pixabayPhraseData[idx] = hit
+      ? { url: hit.url, keyword: kw, user: hit.user, tags: hit.tags, aspect: hit.aspect }
+      : null;
+    if (hit?.url) ensurePixabayCanvasImage(idx, hit.url);
+    if (hit) matched++;
+    done++;
+    setStatus(`Searching Pixabay... ${done}/${phrasesArr.length} (${kw})`);
+  }));
+
+  setStatus(`✓ ${matched}/${phrasesArr.length} Pixabay matches`);
+}
+
+function getPixabaySizePx() {
+  const base = parseInt(document.getElementById('graphicSize').value);
+  const scale = Math.min(1, W / 480, H / 320);
+  const fallbackAspect = (W && H) ? (W / H) : 1;
+  const imageAspect = Math.max(0.45, Math.min(2.4, getPixabaySizePx._activeAspect || fallbackAspect || 1));
+
+  const maxW = W * 0.42;
+  const maxH = H * 0.42;
+  const baseLong = Math.max(92, Math.round(base * scale * 2.1));
+
+  let w, h;
+  if (imageAspect >= 1) {
+    w = baseLong;
+    h = w / imageAspect;
+  } else {
+    h = baseLong;
+    w = h * imageAspect;
+  }
+
+  const scaleDown = Math.min(1, maxW / w, maxH / h);
+  w *= scaleDown;
+  h *= scaleDown;
+
+  w = Math.max(72, Math.round(w));
+  h = Math.max(72, Math.round(h));
+  return { w, h };
+}
+
+function getPixabayPosition(ph, phIdx, size) {
+  return getMediaSafeSlot(ph, phIdx, size.w, size.h);
+}
+
+function showPixabayForPhrase(ph, phIdx, localMs) {
+  if (!pixabayEnabled) { hideAllPixabay(); return; }
+  if (currentPixabayPhIdx === phIdx) return;
+  hideAllPixabay();
+  currentPixabayPhIdx = phIdx;
+
+  const data = pixabayPhraseData[phIdx];
+  if (!data || !data.url) return;
+
+  getPixabaySizePx._activeAspect = data.aspect || 1;
+
+  const layer = document.getElementById('pixabayLayer');
+  if (!layer) return;
+
+  const size = getPixabaySizePx();
+  const pos = getPixabayPosition(ph, phIdx, size);
+  if (!pos) return;
+
+  const wrap = document.createElement('div');
+  wrap.style.cssText = `
+    position:absolute;
+    width:${size.w}px;
+    height:${size.h}px;
+    left:${((pos.x/W)*100).toFixed(2)}%;
+    top:${((pos.y/H)*100).toFixed(2)}%;
+    transform:translate(-50%,-50%);
+    border-radius:10px;
+    overflow:hidden;
+    border:1px solid rgba(255,255,255,0.18);
+    background:rgba(0,0,0,0.28);
+    opacity:0;
+    transition:opacity 0.28s ease;
+    box-shadow:0 10px 28px rgba(0,0,0,0.32);
+    pointer-events:none;
+  `;
+
+  const img = document.createElement('img');
+  img.src = data.url;
+  img.alt = data.keyword || 'pixabay';
+  img.style.cssText = 'width:100%;height:100%;object-fit:cover;display:block;';
+  img.onload = () => { wrap.style.opacity = '0.9'; };
+  wrap.appendChild(img);
+
+  layer.appendChild(wrap);
+}
+
+function hideAllPixabay() {
+  const layer = document.getElementById('pixabayLayer');
+  if (layer) layer.innerHTML = '';
+  currentPixabayPhIdx = -1;
+}
+
+function syncPixabayLayer() {
+  const layer = document.getElementById('pixabayLayer');
+  if (!layer || !cv) return;
+  layer.style.width  = cv.offsetWidth + 'px';
+  layer.style.height = cv.offsetHeight + 'px';
+}
+
+function updateSearchKeywordsDisplay(keywords) {
+  const el = document.getElementById('searchKeywordsText');
+  if (!el) return;
+  if (!keywords || !keywords.length) {
+    el.textContent = '—';
+    return;
+  }
+  el.textContent = keywords.join(', ');
+}
+// ═══════════════════════════════════════════
+//  INIT
+// ═══════════════════════════════════════════
+window.addEventListener('load',()=>{
+  initSidebarSectionCollapse();
+  initStyleVariantSwatches();
+  initCanvas();
+  syncLottieLayer();
+  syncLottieSearchLayer();
+  syncUndrawLayer();
+  syncPixabayLayer();
+  window.addEventListener('resize',()=>{
+    sizeCanvas();
+    syncLottieLayer();
+    syncLottieSearchLayer();
+    syncUndrawLayer();
+    syncPixabayLayer();
+    hideAllLotties();
+    hideAllLottieSearch();
+    hideAllUndraw();
+    hideAllPixabay();
+    if(generated){phrases=buildTimeline(phrases.map(p=>({words:p.words})));drawAtTime(progress*totalDurMs);}
+    else drawIdle();
+  });
+});
+</script>
+</body>
+</html>
+
+<!-- https://emoji-api.com/emojis?search=computer&access_key=aeb20aa0231a8b96173ef4a13225e9b8dd53d21c -->
